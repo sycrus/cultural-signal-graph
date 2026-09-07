@@ -1,0 +1,38 @@
+@prefix csg:  <https://cultural-signal-graph.dev/ontology#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# SHACL constraints over the ontology. These are what pyshacl validates against.
+
+csg:SignalShape a sh:NodeShape ;
+    sh:targetClass csg:Signal ;
+    sh:property [
+        sh:path csg:hasSource ;
+        sh:minCount 1 ;
+        sh:nodeKind sh:IRI ;
+        sh:message "A signal must have at least one source." ;
+    ] ;
+    sh:property [
+        sh:path csg:confidence ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:decimal ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 1.0 ;
+        sh:message "A signal must carry exactly one confidence in [0, 1]." ;
+    ] ;
+    sh:property [
+        sh:path csg:timestamp ;
+        sh:minCount 1 ;
+        sh:datatype xsd:dateTime ;
+        sh:message "A signal must carry a timestamp." ;
+    ] .
+
+csg:ProvenanceShape a sh:NodeShape ;
+    sh:targetClass csg:Provenance ;
+    sh:property [
+        sh:path csg:sourceURI ;
+        sh:minCount 1 ;
+        sh:datatype xsd:anyURI ;
+        sh:message "A provenance record must carry a source URI." ;
+    ] .

@@ -1,0 +1,38 @@
+@prefix csg:  <https://cultural-signal-graph.dev/ontology#> .
+@prefix tech: <https://cultural-signal-graph.dev/ontology/tech#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+
+# Tech / consumer-electronics sub-ontology, extending the upper ontology.
+
+# --- Classes ---
+
+tech:Product a owl:Class ;
+    rdfs:subClassOf csg:Entity ;
+    rdfs:label "Product" .
+
+tech:Brand a owl:Class ;
+    rdfs:subClassOf csg:Entity ;
+    rdfs:label "Brand" .
+
+tech:Launch a owl:Class ;
+    rdfs:subClassOf csg:Event ;
+    rdfs:label "Launch" ;
+    rdfs:comment "A product or feature launch event." .
+
+tech:SpecSignal a owl:Class ;
+    rdfs:subClassOf csg:Signal ;
+    rdfs:label "Spec signal" ;
+    rdfs:comment "A signal about a product specification or capability." .
+
+tech:ReleaseNote a owl:Class ;
+    rdfs:subClassOf csg:Source ;
+    rdfs:label "Release note" .
+
+# --- Object properties ---
+
+tech:madeBy a owl:ObjectProperty ;
+    rdfs:label "made by" ;
+    rdfs:domain tech:Product ;
+    rdfs:range tech:Brand .

@@ -1,0 +1,18 @@
+[project]
+name = "cultural-signal-graph"
+version = "0.1.0"
+description = "Agentic knowledge-graph system for cultural/trend forecasting"
+requires-python = ">=3.11"
+dependencies = [
+    "rdflib>=7.0.0",
+    "pyshacl>=0.26.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,0 +1,74 @@
+@prefix csg:  <https://cultural-signal-graph.dev/ontology#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# The thin upper ontology every domain sub-ontology inherits.
+# "Relationship" is realized as the object properties below (edges are triples);
+# edge-level confidence/temporal/provenance reification is deferred.
+
+# --- Classes ---
+
+csg:Entity a owl:Class ;
+    rdfs:label "Entity" ;
+    rdfs:comment "A thing in the world that can trend: a product, brand, person, concept, or event." .
+
+csg:Event a owl:Class ;
+    rdfs:subClassOf csg:Entity ;
+    rdfs:label "Event" ;
+    rdfs:comment "Something that happens at a point or interval in time and can drive signal." .
+
+csg:Signal a owl:Class ;
+    rdfs:label "Signal" ;
+    rdfs:comment "An observed piece of evidence that something is emerging." .
+
+csg:Source a owl:Class ;
+    rdfs:label "Source" ;
+    rdfs:comment "Where a signal came from, carrying its own credibility." .
+
+csg:Provenance a owl:Class ;
+    rdfs:label "Provenance" ;
+    rdfs:comment "The first-class trace of where a claim came from and every step it passed through." .
+
+# --- Object properties ---
+
+csg:about a owl:ObjectProperty ;
+    rdfs:label "about" ;
+    rdfs:domain csg:Signal ;
+    rdfs:range csg:Entity ;
+    rdfs:comment "The entity a signal is evidence about." .
+
+csg:hasSource a owl:ObjectProperty ;
+    rdfs:label "has source" ;
+    rdfs:domain csg:Signal ;
+    rdfs:range csg:Source .
+
+csg:hasProvenance a owl:ObjectProperty ;
+    rdfs:label "has provenance" ;
+    rdfs:range csg:Provenance .
+
+# --- Datatype properties ---
+
+csg:confidence a owl:DatatypeProperty ;
+    rdfs:label "confidence" ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "A 0-1 score expressing how much we trust a node or edge." .
+
+csg:timestamp a owl:DatatypeProperty ;
+    rdfs:label "timestamp" ;
+    rdfs:range xsd:dateTime .
+
+csg:validFrom a owl:DatatypeProperty ;
+    rdfs:label "valid from" ;
+    rdfs:range xsd:dateTime .
+
+csg:validUntil a owl:DatatypeProperty ;
+    rdfs:label "valid until" ;
+    rdfs:range xsd:dateTime .
+
+csg:sourceURI a owl:DatatypeProperty ;
+    rdfs:label "source URI" ;
+    rdfs:domain csg:Provenance ;
+    rdfs:range xsd:anyURI ;
+    rdfs:comment "The origin URI a provenance record points back to." .
