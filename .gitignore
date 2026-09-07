@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Secrets / env
+.env
+.env.*
+
+# Claude Code (personal, machine-specific)
+.claude/settings.local.json
+
+# Local scratch tracker (unused while on GitHub Issues)
+.scratch/
+
+# OS
+.DS_Store
+Thumbs.db
