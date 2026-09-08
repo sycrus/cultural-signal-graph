@@ -189,12 +189,14 @@ class Brief:
 
 @dataclass
 class ForecastRun:
-    """Everything one run produces: the graph plus the assembled brief."""
+    """Everything one run produces: the graph, brief, and the stage outputs."""
 
     graph: Any  # rdflib.Graph
     brief: Brief
     flags: list[Flag]
     gated_edges: list[GatedEdge]
+    extraction: Extraction
+    edges: list[EquivalenceEdge]
 
 
 @dataclass(frozen=True)

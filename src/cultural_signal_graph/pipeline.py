@@ -54,7 +54,14 @@ def _finalize(
         brief = assemble(extraction, corpus, flags, gated_edges, reasoning, category, as_of=AS_OF)
         span.set_attribute("output.claims", len(brief.claims))
         span.set_attribute("output.flags", len(brief.flags))
-        return ForecastRun(graph=graph, brief=brief, flags=flags, gated_edges=gated_edges)
+        return ForecastRun(
+            graph=graph,
+            brief=brief,
+            flags=flags,
+            gated_edges=gated_edges,
+            extraction=extraction,
+            edges=edges,
+        )
 
 
 def run(
