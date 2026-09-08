@@ -6,13 +6,19 @@ import rdflib
 from pyshacl import validate
 from rdflib import Namespace
 
-from cultural_signal_graph.fixtures import EXTRACTED, SEED_CORPUS
+from cultural_signal_graph.fixtures import ALIGNED_EDGES, EXTRACTED, SEED_CORPUS
 from cultural_signal_graph.pipeline import run
 
 
-def _run(corpus=SEED_CORPUS, category="tech"):
-    """Run the pipeline with the deterministic extraction fixture (no live model)."""
-    return run(corpus, category=category, extract_fn=lambda _: EXTRACTED)
+def _run(corpus=SEED_CORPUS, category="tech", decisions=None):
+    """Run the pipeline with deterministic extraction + alignment fixtures (no live model)."""
+    return run(
+        corpus,
+        category=category,
+        extract_fn=lambda _: EXTRACTED,
+        align_fn=lambda _: ALIGNED_EDGES,
+        decisions=decisions,
+    )
 
 
 CSG = Namespace("https://cultural-signal-graph.dev/ontology#")

@@ -1,10 +1,9 @@
-"""Graph construction: extracted fixtures -> RDFLib graph.
+"""Graph construction: extraction + resolved edges -> RDFLib graph (issues #2, #5).
 
-Real plumbing (issue #2). Each signal becomes a `csg:Signal` node carrying
-confidence, temporal validity, and a first-class provenance node. Proposed
-cross-domain equivalence edges are reified as `csg:EquivalenceEdge` nodes with
-status "proposed" — the `csg:equivalentTo` predicate is deliberately *not*
-asserted, which is what the HITL gate holds back until sign-off.
+Real plumbing. Each signal becomes a `csg:Signal` node carrying confidence,
+temporal validity, and provenance. Cross-domain equivalence edges are reified as
+`csg:EquivalenceEdge` nodes; an edge approved at the HITL gate additionally
+asserts the `csg:equivalentTo` triple and gets status "real".
 """
 
 from pathlib import Path
@@ -12,7 +11,7 @@ from pathlib import Path
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS, XSD
 
-from .models import CSG_NS, EX_NS, Extraction, SourceDoc
+from .models import CSG_NS, EX_NS, EquivalenceEdge, Extraction, SourceDoc
 
 CSG = Namespace(CSG_NS)
 EX = Namespace(EX_NS)
@@ -22,7 +21,21 @@ ONT_DIR = Path(__file__).resolve().parent / "ontology"
 _ONTOLOGY_FILES = ("upper.ttl", "tech.ttl", "gaming.ttl")
 
 
-def build_graph(extraction: Extraction, sources: list[SourceDoc]) -> Graph:
+def _edge_status(edge_id: str, decisions: dict[str, bool]) -> str:
+    decision = decisions.get(edge_id)
+    if decision is True:
+        return "real"
+    if decision is False:
+        return "rejected"
+    return "proposed"
+
+
+def build_graph(
+    extraction: Extraction,
+    edges: list[EquivalenceEdge],
+    decisions: dict[str, bool],
+    sources: list[SourceDoc],
+) -> Graph:
     graph = Graph()
     for name in _ONTOLOGY_FILES:
         graph.parse(ONT_DIR / name, format="turtle")
@@ -52,13 +65,15 @@ def build_graph(extraction: Extraction, sources: list[SourceDoc]) -> Graph:
         graph.add((provenance, RDF.type, CSG.Provenance))
         graph.add((provenance, CSG.sourceURI, Literal(signal.source_uri, datatype=XSD.anyURI)))
 
-    for edge in extraction.proposed_edges:
+    for edge in edges:
         node = EX[edge.id]
+        status = _edge_status(edge.id, decisions)
         graph.add((node, RDF.type, CSG.EquivalenceEdge))
         graph.add((node, CSG.leftEntity, EX[edge.left_entity_id]))
         graph.add((node, CSG.rightEntity, EX[edge.right_entity_id]))
         graph.add((node, CSG.confidence, Literal(str(edge.confidence), datatype=XSD.decimal)))
-        graph.add((node, CSG.status, Literal("proposed")))
-        # NOTE: no CSG.equivalentTo triple — the gate holds it back until sign-off.
+        graph.add((node, CSG.status, Literal(status)))
+        if status == "real":
+            graph.add((EX[edge.left_entity_id], CSG.equivalentTo, EX[edge.right_entity_id]))
 
     return graph

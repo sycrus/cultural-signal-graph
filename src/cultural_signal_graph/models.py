@@ -84,7 +84,13 @@ class Extraction:
 
     entities: list[Entity]
     signals: list[Signal]
-    proposed_edges: list[EquivalenceEdge]
+
+
+@dataclass(frozen=True)
+class Alignment:
+    """The alignment stage's output — proposed cross-domain equivalence edges."""
+
+    edges: list[EquivalenceEdge]
 
 
 @dataclass(frozen=True)
@@ -197,6 +203,49 @@ class Usage:
     input_tokens: int
     output_tokens: int
     total_tokens: int
+
+
+# --- JSON-native (de)serialization for the LangGraph state seam ---
+# The checkpointed state is JSON-native dicts, not dataclasses, so custom types stay
+# out of LangGraph's msgpack serializer (and its "unregistered type" path). These
+# convert at the node boundary; the dataclasses remain the typed Python API.
+
+
+def source_doc_to_dict(source: SourceDoc) -> dict:
+    return asdict(source)
+
+
+def source_doc_from_dict(data: dict) -> SourceDoc:
+    data = dict(data)
+    data["topics"] = tuple(data.get("topics", ()))  # msgpack turns tuples into lists
+    return SourceDoc(**data)
+
+
+def entity_from_dict(data: dict) -> Entity:
+    return Entity(**data)
+
+
+def signal_from_dict(data: dict) -> Signal:
+    return Signal(**data)
+
+
+def extraction_to_dict(extraction: Extraction) -> dict:
+    return asdict(extraction)
+
+
+def extraction_from_dict(data: dict) -> Extraction:
+    return Extraction(
+        entities=[entity_from_dict(e) for e in data["entities"]],
+        signals=[signal_from_dict(s) for s in data["signals"]],
+    )
+
+
+def edge_to_dict(edge: EquivalenceEdge) -> dict:
+    return asdict(edge)
+
+
+def edge_from_dict(data: dict) -> EquivalenceEdge:
+    return EquivalenceEdge(**data)
 
 
 def _short(iri: str) -> str:

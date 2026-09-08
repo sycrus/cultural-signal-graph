@@ -1,44 +1,24 @@
 """Extraction stage — real cheap-model call (issue #3).
 
 Turns a source corpus into typed Signal/Entity JSON with source + confidence by
-calling DeepSeek's cheap model (`deepseek-v4-flash`) behind its
-Anthropic-compatible endpoint. Parses and validates the model's JSON into an
-`Extraction`, and logs token usage per run to feed the cost metric.
+calling DeepSeek's cheap model (`deepseek-v4-flash`). Parses and validates the
+model's JSON into an `Extraction`, and logs token usage per run.
 
-The model call is a thin seam (`_call_model`) so tests inject a recorded fixture
-rather than hitting the network; `parse_extraction` is the pure, fixture-tested
-parse + validate step.
+The model call is a thin seam (`_call_model`) so tests inject a recorded fixture.
+Cross-domain edge proposal lives in `alignment.py`, not here (issue #5).
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import os
 
-import anthropic
-
-from .models import (
-    CSG_NS,
-    EX_NS,
-    GAMING_NS,
-    TECH_NS,
-    Entity,
-    EquivalenceEdge,
-    Extraction,
-    Signal,
-    SourceDoc,
-    Usage,
-)
+from .llm import expand_curie, get_client
+from .models import Entity, Extraction, Signal, SourceDoc, Usage
 
 logger = logging.getLogger(__name__)
 
-# Model routing (PRD "two tiers"). Pinned at build time.
 EXTRACTION_MODEL = "deepseek-v4-flash"
-PREMIUM_MODEL = "deepseek-v4-pro"  # reserved for alignment + drafting (#5/#6)
-
-_BASE_URL = "https://api.deepseek.com/anthropic"
-_PREFIXES = {"csg": CSG_NS, "tech": TECH_NS, "gaming": GAMING_NS, "ex": EX_NS}
 
 _ENTITY_TYPES = ["tech:Product", "tech:Brand", "tech:Launch", "gaming:Peripheral"]
 
@@ -48,17 +28,9 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _client() -> anthropic.Anthropic:
-    key = os.environ.get("DEEPSEEK_API_KEY")
-    if not key:
-        raise RuntimeError("DEEPSEEK_API_KEY is not set; cannot call the extraction model")
-    return anthropic.Anthropic(base_url=_BASE_URL, auth_token=key)
-
-
 def _build_prompt(corpus: list[SourceDoc]) -> str:
     lines = [
-        "Given this source corpus, extract the entities and signals, and propose any "
-        "cross-domain equivalence edges.",
+        "Given this source corpus, extract the entities and the signals that mention them.",
         "",
         "Available entity_type values: " + ", ".join(_ENTITY_TYPES),
         "",
@@ -71,19 +43,16 @@ def _build_prompt(corpus: list[SourceDoc]) -> str:
         "Return JSON with exactly these keys:",
         '  "entities": [{"id", "name", "category", "entity_type"}] — entity_type is one of the available values above;',
         '  "signals": [{"id", "text", "about_entity_id", "source_uri", "confidence", "timestamp", "valid_from", "valid_until", "polarity"}]',
-        '    — source_uri must be one of the corpus URIs; polarity is "support" or "refute"; confidence is a number in 0..1; timestamps are ISO-8601;',
-        '  "proposed_edges": [{"id", "left_entity_id", "right_entity_id", "confidence"}] — only cross-domain equivalence edges.',
+        '    — source_uri must be one of the corpus URIs; polarity is "support" or "refute"; confidence is a number in 0..1; timestamps are ISO-8601.',
     ]
     return "\n".join(lines)
 
 
 def _call_model(corpus: list[SourceDoc]) -> tuple[str, Usage]:
     """The seam. Returns (raw model text, usage); monkeypatched in tests."""
-    response = _client().messages.create(
+    response = get_client().messages.create(
         model=EXTRACTION_MODEL,
         max_tokens=16000,
-        # Cheap extraction wants the answer, not reasoning: deepseek-v4-flash
-        # emits a thinking block by default that otherwise eats the token budget.
         thinking={"type": "disabled"},
         system=_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": _build_prompt(corpus)}],
@@ -98,14 +67,6 @@ def _call_model(corpus: list[SourceDoc]) -> tuple[str, Usage]:
         total_tokens=input_tokens + output_tokens,
     )
     return text, usage
-
-
-def _expand(curie: str) -> str:
-    if ":" in curie:
-        prefix, local = curie.split(":", 1)
-        if prefix in _PREFIXES:
-            return _PREFIXES[prefix] + local
-    return curie
 
 
 def _require(obj: dict, key: str):
@@ -125,7 +86,7 @@ def parse_extraction(raw_json: str) -> Extraction:
             id=_require(e, "id"),
             name=_require(e, "name"),
             category=_require(e, "category"),
-            entity_type=_expand(_require(e, "entity_type")),
+            entity_type=expand_curie(_require(e, "entity_type")),
         )
         for e in _require(data, "entities")
     ]
@@ -153,17 +114,7 @@ def parse_extraction(raw_json: str) -> Extraction:
             )
         )
 
-    proposed_edges = [
-        EquivalenceEdge(
-            id=_require(e, "id"),
-            left_entity_id=_require(e, "left_entity_id"),
-            right_entity_id=_require(e, "right_entity_id"),
-            confidence=float(_require(e, "confidence")),
-        )
-        for e in _require(data, "proposed_edges")
-    ]
-
-    return Extraction(entities=entities, signals=signals, proposed_edges=proposed_edges)
+    return Extraction(entities=entities, signals=signals)
 
 
 def extract(corpus: list[SourceDoc]) -> Extraction:

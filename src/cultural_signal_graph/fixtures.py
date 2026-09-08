@@ -116,7 +116,7 @@ _SIGNALS: list[Signal] = [
     ),
 ]
 
-_PROPOSED_EDGES: list[EquivalenceEdge] = [
+ALIGNED_EDGES: list[EquivalenceEdge] = [
     EquivalenceEdge(
         id="edge-ai-headset-wearables",
         left_entity_id="ai_headset",
@@ -125,7 +125,7 @@ _PROPOSED_EDGES: list[EquivalenceEdge] = [
     ),
 ]
 
-EXTRACTED = Extraction(entities=_ENTITIES, signals=_SIGNALS, proposed_edges=_PROPOSED_EDGES)
+EXTRACTED = Extraction(entities=_ENTITIES, signals=_SIGNALS)
 
 
 # A recorded model response standing in for one real `deepseek-v4-flash` output.
@@ -143,9 +143,14 @@ RECORDED_MODEL_OUTPUT = """
     {"id": "sig-search-spike", "text": "Searches for AI wearables up 3x this quarter", "about_entity_id": "ai_wearables", "source_uri": "https://example.com/commerce/search-ai-wearables", "confidence": 0.8, "timestamp": "2026-02-01T00:00:00Z", "valid_from": "2026-02-01T00:00:00Z", "valid_until": "2026-08-01T00:00:00Z", "polarity": "support"},
     {"id": "sig-viral-fad", "text": "AI wearables are a passing fad", "about_entity_id": "ai_wearables", "source_uri": "https://example.com/social/ai-wearables-fad", "confidence": 0.55, "timestamp": "2026-02-10T00:00:00Z", "valid_from": "2026-02-10T00:00:00Z", "valid_until": "2026-03-10T00:00:00Z", "polarity": "refute"},
     {"id": "sig-gaming-chatter", "text": "AI headset chatter surging in gaming communities", "about_entity_id": "ai_headset", "source_uri": "https://example.com/forum/ai-headset-hype", "confidence": 0.6, "timestamp": "2026-02-05T00:00:00Z", "valid_from": "2026-02-05T00:00:00Z", "valid_until": "2026-04-05T00:00:00Z", "polarity": "support"}
-  ],
-  "proposed_edges": [
-    {"id": "edge-ai-headset-wearables", "left_entity_id": "ai_headset", "right_entity_id": "ai_wearables", "confidence": 0.35}
   ]
 }
+"""
+
+# A recorded alignment (deepseek-v4-pro) response: a JSON array of cross-domain edges.
+# parse_alignment(RECORDED_ALIGNMENT_OUTPUT) must equal ALIGNED_EDGES (the golden edges).
+RECORDED_ALIGNMENT_OUTPUT = """
+[
+  {"id": "edge-ai-headset-wearables", "left_entity_id": "ai_headset", "right_entity_id": "ai_wearables", "confidence": 0.35}
+]
 """
