@@ -35,10 +35,13 @@ def build_graph(
     edges: list[EquivalenceEdge],
     decisions: dict[str, bool],
     sources: list[SourceDoc],
+    extra_ontology: Graph | None = None,
 ) -> Graph:
     graph = Graph()
     for name in _ONTOLOGY_FILES:
         graph.parse(ONT_DIR / name, format="turtle")
+    if extra_ontology is not None:
+        graph += extra_ontology
 
     for source in sources:
         node = URIRef(source.uri)

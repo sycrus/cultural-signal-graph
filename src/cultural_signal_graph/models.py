@@ -94,6 +94,22 @@ class Alignment:
 
 
 @dataclass(frozen=True)
+class SeedClass:
+    """One class in a seeded sub-ontology."""
+
+    name: str  # e.g. "Apparel"
+    kind: str  # "entity" | "signal" | "source"
+
+
+@dataclass(frozen=True)
+class SeedOntology:
+    """A seeded sub-ontology for an unfamiliar category."""
+
+    category: str
+    classes: list[SeedClass]
+
+
+@dataclass(frozen=True)
 class SourceRef:
     uri: str
     source_type: str

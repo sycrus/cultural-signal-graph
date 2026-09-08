@@ -20,6 +20,7 @@ from .models import (
     Entity,
     EquivalenceEdge,
     Extraction,
+    SeedClass,
     Signal,
     SourceDoc,
 )
@@ -171,4 +172,22 @@ RECORDED_DRAFT_OUTPUT = """
   {"signal_id": "sig-release-note", "reasoning": "A product announcement confirms on-device Qwen AI glasses shipping now; confidence 0.85."},
   {"signal_id": "sig-search-spike", "reasoning": "A sharp rise in smart-glasses search volume corroborates demand; confidence 0.8."}
 ]
+"""
+
+# A recorded seeding (deepseek-v4-pro) response: proposed classes for "fashion".
+# parse_seed_ontology(RECORDED_SEED_OUTPUT) must equal SEEDED_FASHION.
+SEEDED_FASHION = [
+    SeedClass(name="Apparel", kind="entity"),
+    SeedClass(name="Brand", kind="entity"),
+    SeedClass(name="TrendSignal", kind="signal"),
+    SeedClass(name="TradePress", kind="source"),
+]
+
+RECORDED_SEED_OUTPUT = """
+{"classes": [
+  {"name": "Apparel", "kind": "entity"},
+  {"name": "Brand", "kind": "entity"},
+  {"name": "TrendSignal", "kind": "signal"},
+  {"name": "TradePress", "kind": "source"}
+]}
 """

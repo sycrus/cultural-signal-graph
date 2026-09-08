@@ -9,7 +9,7 @@ flags, brief) runs in `forecast_run_from_state` after the interrupt resolves.
 
 from __future__ import annotations
 
-from typing import Callable, TypedDict
+from typing import Any, Callable, TypedDict
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
@@ -45,10 +45,11 @@ def _finalize(
     corpus: list[SourceDoc],
     category: str,
     reasoning: dict[str, str],
+    extra_ontology: Any = None,
 ) -> ForecastRun:
     """Deterministic plumbing: build the graph, flag conflicts, assemble the brief."""
     with get_tracer().start_as_current_span("finalize") as span:
-        graph = build_graph(extraction, edges, decisions, corpus)
+        graph = build_graph(extraction, edges, decisions, corpus, extra_ontology)
         flags = detect_flags(extraction.signals)
         gated_edges = resolve_edges(edges, decisions, extraction.entities)
         brief = assemble(extraction, corpus, flags, gated_edges, reasoning, category, as_of=AS_OF)
@@ -71,6 +72,7 @@ def run(
     align_fn: Callable[[Extraction], list[EquivalenceEdge]] = align,
     draft_fn: Callable[[Extraction, str], dict[str, str]] = draft,
     decisions: dict[str, bool] | None = None,
+    extra_ontology: Any = None,
 ) -> ForecastRun:
     """Run the pipeline without the HITL interrupt. Un-decided edges stay
     "proposed"; `decisions` pre-supplies approve/reject outcomes."""
@@ -80,7 +82,7 @@ def run(
         extraction = extract_fn(corpus)
         edges = align_fn(extraction)
         reasoning = draft_fn(extraction, category)
-        return _finalize(extraction, edges, decisions, corpus, category, reasoning)
+        return _finalize(extraction, edges, decisions, corpus, category, reasoning, extra_ontology)
 
 
 class ForecastState(TypedDict, total=False):
