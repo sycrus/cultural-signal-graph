@@ -53,8 +53,8 @@ def test_every_claim_has_source_confidence_temporal():
 def test_conflict_signal_is_flagged_not_claimed():
     brief = _run().brief
     claim_text = " ".join(claim.statement for claim in brief.claims)
-    assert "passing fad" not in claim_text
-    conflict = [flag for flag in brief.flags if "passing fad" in flag.statement]
+    assert "solutions looking for a problem" not in claim_text
+    conflict = [flag for flag in brief.flags if "solutions looking for a problem" in flag.statement]
     assert conflict
     assert conflict[0].reason == "conflict"
 

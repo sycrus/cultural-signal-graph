@@ -53,7 +53,7 @@ def test_catch_flag_recall_passes():
     assert metrics["flag_recall"] == 1.0
     # the conflicting signal is flagged, not promoted to a confident claim
     claim_text = " ".join(c.statement for c in forecast.brief.claims)
-    assert "passing fad" not in claim_text
+    assert "solutions looking for a problem" not in claim_text
     assert any(f.reason == "conflict" for f in forecast.brief.flags)
 
 
