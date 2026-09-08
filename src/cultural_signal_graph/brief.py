@@ -23,6 +23,7 @@ def assemble(
     sources: list[SourceDoc],
     flags: list[Flag],
     gated_edges: list[GatedEdge],
+    reasoning: dict[str, str],
     category: str,
     as_of: str,
 ) -> Brief:
@@ -45,6 +46,7 @@ def assemble(
                     valid_from=signal.valid_from, valid_until=signal.valid_until
                 ),
                 sources=[SourceRef(source.uri, source.source_type, source.credibility)],
+                reasoning=reasoning.get(signal.id, ""),
             )
         )
 

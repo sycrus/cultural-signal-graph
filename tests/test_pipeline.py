@@ -6,17 +6,23 @@ import rdflib
 from pyshacl import validate
 from rdflib import Namespace
 
-from cultural_signal_graph.fixtures import ALIGNED_EDGES, EXTRACTED, SEED_CORPUS
+from cultural_signal_graph.fixtures import (
+    ALIGNED_EDGES,
+    DRAFTED_REASONING,
+    EXTRACTED,
+    SEED_CORPUS,
+)
 from cultural_signal_graph.pipeline import run
 
 
 def _run(corpus=SEED_CORPUS, category="tech", decisions=None):
-    """Run the pipeline with deterministic extraction + alignment fixtures (no live model)."""
+    """Run the pipeline with deterministic extraction + alignment + drafting fixtures."""
     return run(
         corpus,
         category=category,
         extract_fn=lambda _: EXTRACTED,
         align_fn=lambda _: ALIGNED_EDGES,
+        draft_fn=lambda extraction, category: DRAFTED_REASONING,
         decisions=decisions,
     )
 
@@ -75,3 +81,26 @@ def test_built_graph_conforms_to_shacl():
         data_graph=forecast.graph, shacl_graph=shapes, ont_graph=ont, inference="rdfs"
     )
     assert conforms, report
+
+
+def test_every_claim_has_reasoning():
+    brief = _run().brief
+    assert brief.claims, "expected at least one confident claim"
+    for claim in brief.claims:
+        assert claim.reasoning, "expected a reasoning chain per claim"
+
+
+def test_claims_trace_to_corpus_sources():
+    brief = _run().brief
+    corpus_uris = {s.uri for s in SEED_CORPUS}
+    for claim in brief.claims:
+        assert claim.sources
+        for source in claim.sources:
+            assert source.uri in corpus_uris, "claim source must come from the corpus"
+
+
+def test_flags_are_surfaced_not_fabricated():
+    from cultural_signal_graph.flags import detect_flags
+
+    forecast = _run()
+    assert forecast.brief.flags == detect_flags(EXTRACTED.signals)

@@ -154,3 +154,21 @@ RECORDED_ALIGNMENT_OUTPUT = """
   {"id": "edge-ai-headset-wearables", "left_entity_id": "ai_headset", "right_entity_id": "ai_wearables", "confidence": 0.35}
 ]
 """
+
+# A recorded drafting (deepseek-v4-pro) response: reasoning per confident signal.
+# parse_draft(RECORDED_DRAFT_OUTPUT) must equal DRAFTED_REASONING.
+DRAFTED_REASONING = {
+    "sig-release-note": (
+        "Release note states on-device models ship now; confidence 0.85 through mid-2026."
+    ),
+    "sig-search-spike": (
+        "3x search increase corroborates demand; confidence 0.8 through Aug 2026."
+    ),
+}
+
+RECORDED_DRAFT_OUTPUT = """
+[
+  {"signal_id": "sig-release-note", "reasoning": "Release note states on-device models ship now; confidence 0.85 through mid-2026."},
+  {"signal_id": "sig-search-spike", "reasoning": "3x search increase corroborates demand; confidence 0.8 through Aug 2026."}
+]
+"""

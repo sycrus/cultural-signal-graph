@@ -108,12 +108,13 @@ class TemporalValidity:
 
 @dataclass(frozen=True)
 class Claim:
-    """A confident trend assertion in the brief, with its provenance."""
+    """A confident trend assertion in the brief, with provenance and reasoning."""
 
     statement: str
     confidence: float
     temporal_validity: TemporalValidity
     sources: list[SourceRef]
+    reasoning: str
 
 
 @dataclass(frozen=True)
@@ -157,6 +158,7 @@ class Brief:
             tv = claim.temporal_validity
             lines.append(f"\n### {i}. {claim.statement}")
             lines.append(f"- Confidence: {claim.confidence}")
+            lines.append(f"- Reasoning: {claim.reasoning}")
             lines.append(f"- Temporal validity: {tv.valid_from} → {tv.valid_until}")
             lines.append("- Sources:")
             for src in claim.sources:

@@ -3,9 +3,8 @@
 `run` is the plain, deterministic batch path (no interrupt); un-decided cross-domain
 edges stay "proposed". `build_forecast_graph` compiles the LangGraph pipeline whose
 gate node interrupts for sign-off (ADR-0001). The graph's checkpointed state is
-JSON-native (dicts, not dataclasses) so custom types stay out of the serializer; the
-deterministic plumbing (graph construction, flags, brief) is not an agent stage and
-runs in `forecast_run_from_state` after the interrupt resolves.
+JSON-native (dicts, not dataclasses); the deterministic plumbing (graph construction,
+flags, brief) runs in `forecast_run_from_state` after the interrupt resolves.
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ from langgraph.types import interrupt
 
 from .alignment import align
 from .brief import assemble
+from .draft import draft
 from .extraction import extract
 from .flags import detect_flags, resolve_edges
 from .graph import build_graph
@@ -43,12 +43,13 @@ def _finalize(
     decisions: dict[str, bool],
     corpus: list[SourceDoc],
     category: str,
+    reasoning: dict[str, str],
 ) -> ForecastRun:
     """Deterministic plumbing: build the graph, flag conflicts, assemble the brief."""
     graph = build_graph(extraction, edges, decisions, corpus)
     flags = detect_flags(extraction.signals)
     gated_edges = resolve_edges(edges, decisions, extraction.entities)
-    brief = assemble(extraction, corpus, flags, gated_edges, category, as_of=AS_OF)
+    brief = assemble(extraction, corpus, flags, gated_edges, reasoning, category, as_of=AS_OF)
     return ForecastRun(graph=graph, brief=brief, flags=flags, gated_edges=gated_edges)
 
 
@@ -57,6 +58,7 @@ def run(
     category: str = "tech",
     extract_fn: Callable[[list[SourceDoc]], Extraction] = extract,
     align_fn: Callable[[Extraction], list[EquivalenceEdge]] = align,
+    draft_fn: Callable[[Extraction, str], dict[str, str]] = draft,
     decisions: dict[str, bool] | None = None,
 ) -> ForecastRun:
     """Run the pipeline without the HITL interrupt. Un-decided edges stay
@@ -64,7 +66,8 @@ def run(
     decisions = decisions or {}
     extraction = extract_fn(corpus)
     edges = align_fn(extraction)
-    return _finalize(extraction, edges, decisions, corpus, category)
+    reasoning = draft_fn(extraction, category)
+    return _finalize(extraction, edges, decisions, corpus, category, reasoning)
 
 
 class ForecastState(TypedDict, total=False):
@@ -73,6 +76,7 @@ class ForecastState(TypedDict, total=False):
     extraction: dict
     edges: list[dict]
     decisions: dict[str, bool]
+    reasoning: dict[str, str]
 
 
 def initial_state(corpus: list[SourceDoc], category: str) -> dict:
@@ -83,6 +87,7 @@ def initial_state(corpus: list[SourceDoc], category: str) -> dict:
 def build_forecast_graph(
     extract_fn: Callable[[list[SourceDoc]], Extraction] = extract,
     align_fn: Callable[[Extraction], list[EquivalenceEdge]] = align,
+    draft_fn: Callable[[Extraction, str], dict[str, str]] = draft,
 ):
     """Compile the LangGraph pipeline; the gate node interrupts for sign-off."""
 
@@ -110,14 +115,20 @@ def build_forecast_graph(
         decisions = interrupt({"sign_off": payload})
         return {"decisions": decisions}
 
+    def draft_node(state: ForecastState) -> dict:
+        extraction = extraction_from_dict(state["extraction"])
+        return {"reasoning": draft_fn(extraction, state["category"])}
+
     builder = StateGraph(ForecastState)
     builder.add_node("extract", extract_node)
     builder.add_node("align", align_node)
     builder.add_node("gate", gate_node)
+    builder.add_node("draft", draft_node)
     builder.add_edge(START, "extract")
     builder.add_edge("extract", "align")
     builder.add_edge("align", "gate")
-    builder.add_edge("gate", END)
+    builder.add_edge("gate", "draft")
+    builder.add_edge("draft", END)
     return builder.compile(checkpointer=MemorySaver())
 
 
@@ -127,4 +138,6 @@ def forecast_run_from_state(state: ForecastState) -> ForecastRun:
     edges = [edge_from_dict(e) for e in state["edges"]]
     decisions = state.get("decisions", {})
     corpus = [source_doc_from_dict(d) for d in state["corpus"]]
-    return _finalize(extraction, edges, decisions, corpus, state["category"])
+    return _finalize(
+        extraction, edges, decisions, corpus, state["category"], state.get("reasoning", {})
+    )

@@ -3,7 +3,7 @@
 from langgraph.types import Command
 from rdflib import Namespace
 
-from cultural_signal_graph.fixtures import ALIGNED_EDGES, EXTRACTED, SEED_CORPUS
+from cultural_signal_graph.fixtures import ALIGNED_EDGES, DRAFTED_REASONING, EXTRACTED, SEED_CORPUS
 from cultural_signal_graph.pipeline import (
     build_forecast_graph,
     forecast_run_from_state,
@@ -18,7 +18,9 @@ EDGE_ID = "edge-ai-headset-wearables"
 
 def _graph():
     return build_forecast_graph(
-        extract_fn=lambda _: EXTRACTED, align_fn=lambda _: ALIGNED_EDGES
+        extract_fn=lambda _: EXTRACTED,
+        align_fn=lambda _: ALIGNED_EDGES,
+        draft_fn=lambda extraction, category: DRAFTED_REASONING,
     )
 
 
