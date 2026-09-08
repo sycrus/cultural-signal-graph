@@ -2,6 +2,7 @@
 
 from cultural_signal_graph.discovery import (
     MAX_SOURCES,
+    MAX_WEB_BACKFILL,
     SOURCE_INDEX,
     _web_backfill,
     discover_sources,
@@ -42,9 +43,47 @@ def test_selection_ranks_relevance_first():
     assert "https://example.com/release-notes/cloud-infra" not in uris
 
 
-def test_no_live_web_search():
-    # Live backfill is stubbed: it returns nothing, and discovery only ever
-    # returns sources that are already in the index (no network in v1).
-    assert _web_backfill(_ask("tech", "AI wearables")) == []
+def test_known_category_uses_index_not_backfill():
+    # A known category is served from the index; backfill only fires on a miss.
     selected = discover_sources(_ask("tech", "AI wearables"))
+    assert selected
     assert all(s in SOURCE_INDEX for s in selected)
+
+
+def test_web_backfill_returns_typed_sources(monkeypatch):
+    monkeypatch.setattr(
+        "cultural_signal_graph.discovery._fetch_search_results",
+        lambda query, limit: [
+            {"title": "Foo", "url": "https://en.wikipedia.org/wiki/Foo", "snippet": "Foo is a thing."},
+            {"title": "Bar", "url": "https://en.wikipedia.org/wiki/Bar", "snippet": "Bar is another."},
+        ],
+    )
+    sources = _web_backfill(_ask("fashion", "Foo Bar"))
+    assert sources, "expected backfilled sources"
+    assert all(s.category == "fashion" for s in sources)
+    assert all(s.uri.startswith("https://en.wikipedia.org/wiki/") for s in sources)
+    assert all(s.source_type.endswith("Source") for s in sources)
+
+
+def test_backfill_is_bounded(monkeypatch):
+    monkeypatch.setattr(
+        "cultural_signal_graph.discovery._fetch_search_results",
+        lambda query, limit: [
+            {"title": f"T{i}", "url": f"https://example.com/{i}", "snippet": "x"}
+            for i in range(100)
+        ],
+    )
+    sources = _web_backfill(_ask("fashion", "query"))
+    assert len(sources) <= MAX_WEB_BACKFILL
+
+
+def test_discover_sources_backfills_when_index_empty(monkeypatch):
+    monkeypatch.setattr(
+        "cultural_signal_graph.discovery._fetch_search_results",
+        lambda query, limit: [
+            {"title": "Foo", "url": "https://en.wikipedia.org/wiki/Foo", "snippet": "x"}
+        ],
+    )
+    selected = discover_sources(_ask("fashion", "Foo"))  # fashion not in SOURCE_INDEX
+    assert selected
+    assert selected[0].category == "fashion"

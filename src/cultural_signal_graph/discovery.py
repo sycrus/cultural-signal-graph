@@ -1,17 +1,28 @@
-"""Source discovery — known index + context-dependent selection (issue #4).
+"""Source discovery — known index + context-dependent selection + live backfill (#4, #10).
 
 Given an ask (category + question + window), select the contextually relevant
-sources from a known index. The operator does not enumerate sources. Live web
-backfill is stubbed in v1 (ADR-0004), so discovery never touches the network.
+sources from a known index. When the index has no coverage for the ask's category,
+backfill from the live web (Wikipedia search — free, keyless) with a bounded result
+cap (ADR-0004; enabled in v2 by #10).
 """
 
 from __future__ import annotations
 
-from .models import GAMING_NS, TECH_NS, Ask, SourceDoc
+import json
+import re
+import urllib.parse
+import urllib.request
+
+from .models import CSG_NS, GAMING_NS, TECH_NS, Ask, SourceDoc
 
 # Bound the selection so a category with many sources returns a focused subset
 # ("not all"), while a known category always yields at least one ("not none").
 MAX_SOURCES = 3
+
+# Live backfill: bounded Wikipedia results per run (the cost cap — free API, capped requests).
+MAX_WEB_BACKFILL = 5
+_WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
+_WEB_SOURCE_CREDIBILITY = 0.6
 
 SOURCE_INDEX: list[SourceDoc] = [
     # Tech
@@ -100,10 +111,11 @@ def _tokenize(question: str) -> set[str]:
 
 
 def discover_sources(ask: Ask, index: list[SourceDoc] = SOURCE_INDEX) -> list[SourceDoc]:
-    """Select the sources relevant to the ask (category, then topic + credibility)."""
+    """Select the sources relevant to the ask (category, then topic + credibility);
+    backfill from the web when the index has no coverage for the category."""
     candidates = [source for source in index if source.category == ask.category]
     if not candidates:
-        return []
+        return _web_backfill(ask)[:MAX_SOURCES]
     tokens = _tokenize(ask.question)
 
     def rank(source: SourceDoc) -> tuple[int, float]:
@@ -113,6 +125,47 @@ def discover_sources(ask: Ask, index: list[SourceDoc] = SOURCE_INDEX) -> list[So
     return ranked[:MAX_SOURCES]
 
 
-def _web_backfill(ask: Ask) -> list[SourceDoc]:
-    """Stubbed in v1 (ADR-0004): live web search is a non-goal for this slice."""
-    return []
+def _strip_html(text: str) -> str:
+    return re.sub(r"<[^>]+>", "", text).strip()
+
+
+def _fetch_search_results(query: str, limit: int) -> list[dict]:
+    """Search the web (Wikipedia) for a query. Returns [{title, url, snippet}]. The seam."""
+    params = {
+        "action": "query",
+        "list": "search",
+        "srsearch": query,
+        "format": "json",
+        "srlimit": str(limit),
+    }
+    url = _WIKIPEDIA_API + "?" + urllib.parse.urlencode(params)
+    request = urllib.request.Request(url, headers={"User-Agent": "cultural-signal-graph/0.1"})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    results = payload.get("query", {}).get("search", [])
+    return [
+        {
+            "title": r["title"],
+            "url": "https://en.wikipedia.org/wiki/"
+            + urllib.parse.quote(r["title"].replace(" ", "_")),
+            "snippet": _strip_html(r.get("snippet", "")),
+        }
+        for r in results
+    ]
+
+
+def _web_backfill(ask: Ask, limit: int = MAX_WEB_BACKFILL) -> list[SourceDoc]:
+    """Backfill relevant sources from the live web when the known index has none."""
+    results = _fetch_search_results(ask.question, limit)
+    topics = tuple(sorted(_tokenize(ask.question)))
+    return [
+        SourceDoc(
+            uri=r["url"],
+            source_type=CSG_NS + "Source",
+            credibility=_WEB_SOURCE_CREDIBILITY,
+            category=ask.category,
+            text=r["snippet"],
+            topics=topics,
+        )
+        for r in results[:limit]
+    ]
