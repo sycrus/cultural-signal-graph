@@ -75,8 +75,8 @@ const cy = cytoscape({
   elements: data,
   style: [
     { selector: 'node', style: {
-      'label': 'data(label)', 'font-size': 10, 'text-valign': 'bottom', 'text-halign': 'center',
-      'text-wrap': 'wrap', 'text-max-width': '110px', 'color': '#111827'
+      'label': 'data(label)', 'font-size': 9, 'text-valign': 'bottom', 'text-halign': 'center',
+      'text-wrap': 'ellipsis', 'text-max-width': '90px', 'color': '#111827'
     }},
     { selector: 'node[kind = "entity"]', style: { 'background-color': '#3b82f6', 'shape': 'ellipse', 'width': 56, 'height': 56 } },
     { selector: 'node[kind = "signal"]', style: { 'background-color': '#22c55e', 'shape': 'round-rectangle' } },
@@ -93,7 +93,7 @@ const cy = cytoscape({
 
 function showDetail(node) {
   const d = node.data();
-  let html = '<b>' + d.kind + '</b><br>' + d.label;
+  let html = '<b>' + d.kind + '</b><br>' + (d.statement || d.label);
   if (d.kind === 'source') html += '<br><a href="' + d.id + '" target="_blank" rel="noopener">' + d.id + ' &#8599;</a>';
   if (d.confidence) html += '<br>confidence: ' + d.confidence;
   if (d.valid) html += '<br>valid: ' + d.valid;
@@ -142,6 +142,11 @@ def _short_uri(uri: str) -> str:
     return uri.rstrip("/").rsplit("/", 1)[-1]
 
 
+def _shorten(text: str, limit: int = 22) -> str:
+    text = text.strip()
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
 def build_cyto_elements(forecast: ForecastRun) -> dict:
     """Build Cytoscape nodes/edges from a forecast's RDF graph + flags."""
     graph = forecast.graph
@@ -155,11 +160,13 @@ def build_cyto_elements(forecast: ForecastRun) -> dict:
         sid = str(signal)
         local_id = sid.rsplit("#", 1)[-1]
         is_flagged = local_id in flagged
+        statement = _value(graph, signal, RDFS.label) or local_id
         nodes.append(
             {
                 "data": {
                     "id": sid,
-                    "label": _value(graph, signal, RDFS.label) or local_id,
+                    "label": _shorten(statement),
+                    "statement": statement,
                     "kind": "signal",
                     "confidence": _value(graph, signal, CSG.confidence),
                     "valid": _value(graph, signal, CSG.validFrom)
@@ -196,7 +203,7 @@ def build_cyto_elements(forecast: ForecastRun) -> dict:
             {
                 "data": {
                     "id": str(source),
-                    "label": _short_uri(str(source)),
+                    "label": _shorten(_short_uri(str(source)), 20),
                     "kind": "source",
                     "credibility": _value(graph, source, CSG.credibility),
                 }
