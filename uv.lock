@@ -18,7 +18,7 @@ wheels = [
 [[package]]
 name = "cultural-signal-graph"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "pyshacl" },
     { name = "rdflib" },

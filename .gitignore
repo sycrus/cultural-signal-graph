@@ -20,6 +20,9 @@ build/
 # Local scratch tracker (unused while on GitHub Issues)
 .scratch/
 
+# Forecast run artifacts
+out/
+
 # OS
 .DS_Store
 Thumbs.db

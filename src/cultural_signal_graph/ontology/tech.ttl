@@ -36,3 +36,12 @@ tech:madeBy a owl:ObjectProperty ;
     rdfs:label "made by" ;
     rdfs:domain tech:Product ;
     rdfs:range tech:Brand .
+
+tech:SearchIndex a owl:Class ;
+    rdfs:subClassOf csg:Source ;
+    rdfs:label "Search index" ;
+    rdfs:comment "A commerce/search data source." .
+
+tech:SocialPost a owl:Class ;
+    rdfs:subClassOf csg:Source ;
+    rdfs:label "Social post" .

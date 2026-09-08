@@ -1,0 +1,21 @@
+@prefix csg:    <https://cultural-signal-graph.dev/ontology#> .
+@prefix gaming: <https://cultural-signal-graph.dev/ontology/gaming#> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:    <http://www.w3.org/2002/07/owl#> .
+
+# Gaming sub-ontology — minimal, added for the cross-domain gate demo (issue #2).
+# Extends the upper ontology.
+
+gaming:Peripheral a owl:Class ;
+    rdfs:subClassOf csg:Entity ;
+    rdfs:label "Peripheral" ;
+    rdfs:comment "A gaming hardware peripheral." .
+
+gaming:ForumPost a owl:Class ;
+    rdfs:subClassOf csg:Source ;
+    rdfs:label "Forum post" .
+
+gaming:CommunitySignal a owl:Class ;
+    rdfs:subClassOf csg:Signal ;
+    rdfs:label "Community signal" .

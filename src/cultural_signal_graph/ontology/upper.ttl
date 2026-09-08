@@ -72,3 +72,34 @@ csg:sourceURI a owl:DatatypeProperty ;
     rdfs:domain csg:Provenance ;
     rdfs:range xsd:anyURI ;
     rdfs:comment "The origin URI a provenance record points back to." .
+
+# --- Crosswalk (equivalence edges) ---
+
+csg:equivalentTo a owl:ObjectProperty ;
+    rdfs:label "equivalent to" ;
+    rdfs:comment "A promoted cross-domain equivalence edge, asserted only after sign-off." .
+
+csg:EquivalenceEdge a owl:Class ;
+    rdfs:label "Equivalence edge" ;
+    rdfs:comment "A reified proposed equivalence assertion carrying its own confidence and gate status." .
+
+csg:leftEntity a owl:ObjectProperty ;
+    rdfs:domain csg:EquivalenceEdge ;
+    rdfs:range csg:Entity .
+
+csg:rightEntity a owl:ObjectProperty ;
+    rdfs:domain csg:EquivalenceEdge ;
+    rdfs:range csg:Entity .
+
+csg:status a owl:DatatypeProperty ;
+    rdfs:domain csg:EquivalenceEdge ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Gate state of an equivalence edge: \"proposed\" or \"real\"." .
+
+# --- Source credibility ---
+
+csg:credibility a owl:DatatypeProperty ;
+    rdfs:label "credibility" ;
+    rdfs:domain csg:Source ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "A 0-1 score for how much we trust a source." .
