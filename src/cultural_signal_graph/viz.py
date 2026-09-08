@@ -25,7 +25,7 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <title>Cultural Signal Graph</title>
 <script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
 <style>
-  html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
   #cy { width: 100%; height: 100%; display: block; }
   #legend { position: absolute; top: 12px; left: 12px; background: #fff;
     border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 12px; font-size: 12px; }
@@ -65,7 +65,7 @@ const cy = cytoscape({
     { selector: 'edge[kind = "equivalence"][status != "real"]', style: { 'line-style': 'dashed', 'line-color': '#c084fc', 'target-arrow-color': '#c084fc' } },
     { selector: '.dimmed', style: { 'opacity': 0.12 } },
   ],
-  layout: { name: 'cose', animate: false, nodeRepulsion: 6000, idealEdgeLength: 90 },
+  layout: { name: 'cose', animate: false, fit: true, padding: 30, nodeRepulsion: 6000, idealEdgeLength: 90 },
 });
 
 function showDetail(node) {
