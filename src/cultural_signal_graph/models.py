@@ -171,6 +171,16 @@ class ForecastRun:
     gated_edges: list[GatedEdge]
 
 
+@dataclass(frozen=True)
+class Usage:
+    """Token usage for one model call — feeds the cost metric."""
+
+    model: str
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+
+
 def _short(iri: str) -> str:
     """Abbreviate a full ontology IRI to a readable CURIE for display."""
     for prefix, ns in (("tech:", TECH_NS), ("gaming:", GAMING_NS), ("csg:", CSG_NS)):

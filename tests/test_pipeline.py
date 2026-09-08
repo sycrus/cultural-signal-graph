@@ -6,23 +6,29 @@ import rdflib
 from pyshacl import validate
 from rdflib import Namespace
 
-from cultural_signal_graph.fixtures import SEED_CORPUS
+from cultural_signal_graph.fixtures import EXTRACTED, SEED_CORPUS
 from cultural_signal_graph.pipeline import run
+
+
+def _run(corpus=SEED_CORPUS, category="tech"):
+    """Run the pipeline with the deterministic extraction fixture (no live model)."""
+    return run(corpus, category=category, extract_fn=lambda _: EXTRACTED)
+
 
 CSG = Namespace("https://cultural-signal-graph.dev/ontology#")
 ONT_DIR = Path(__file__).resolve().parents[1] / "src" / "cultural_signal_graph" / "ontology"
 
 
 def test_run_is_deterministic():
-    first = run(SEED_CORPUS)
-    second = run(SEED_CORPUS)
+    first = _run()
+    second = _run()
     assert first.brief.to_json() == second.brief.to_json()
     assert first.brief.to_markdown() == second.brief.to_markdown()
     assert set(first.graph) == set(second.graph)
 
 
 def test_every_claim_has_source_confidence_temporal():
-    brief = run(SEED_CORPUS).brief
+    brief = _run().brief
     assert brief.claims, "expected at least one confident claim"
     for claim in brief.claims:
         assert len(claim.sources) >= 1
@@ -33,7 +39,7 @@ def test_every_claim_has_source_confidence_temporal():
 
 
 def test_conflict_signal_is_flagged_not_claimed():
-    brief = run(SEED_CORPUS).brief
+    brief = _run().brief
     claim_text = " ".join(claim.statement for claim in brief.claims)
     assert "passing fad" not in claim_text
     conflict = [flag for flag in brief.flags if "passing fad" in flag.statement]
@@ -42,7 +48,7 @@ def test_conflict_signal_is_flagged_not_claimed():
 
 
 def test_low_confidence_cross_domain_edge_is_gated():
-    forecast = run(SEED_CORPUS)
+    forecast = _run()
     assert forecast.brief.gated_edges
     edge = forecast.brief.gated_edges[0]
     assert edge.status == "proposed"
@@ -58,7 +64,7 @@ def test_built_graph_conforms_to_shacl():
     shapes = rdflib.Graph()
     shapes.parse(ONT_DIR / "shapes.ttl", format="turtle")
 
-    forecast = run(SEED_CORPUS)
+    forecast = _run()
     conforms, _graph, report = validate(
         data_graph=forecast.graph, shacl_graph=shapes, ont_graph=ont, inference="rdfs"
     )

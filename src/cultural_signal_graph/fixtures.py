@@ -126,3 +126,26 @@ _PROPOSED_EDGES: list[EquivalenceEdge] = [
 ]
 
 EXTRACTED = Extraction(entities=_ENTITIES, signals=_SIGNALS, proposed_edges=_PROPOSED_EDGES)
+
+
+# A recorded model response standing in for one real `deepseek-v4-flash` output.
+# Used only by tests: `parse_extraction(RECORDED_MODEL_OUTPUT)` must equal `EXTRACTED`
+# (the golden extraction), so extraction is tested against a fixture, not live output.
+# entity_type uses CURIEs here, which parse_extraction expands to full ontology IRIs.
+RECORDED_MODEL_OUTPUT = """
+{
+  "entities": [
+    {"id": "ai_wearables", "name": "AI wearables", "category": "tech", "entity_type": "tech:Product"},
+    {"id": "ai_headset", "name": "AI headset", "category": "gaming", "entity_type": "gaming:Peripheral"}
+  ],
+  "signals": [
+    {"id": "sig-release-note", "text": "AI wearables now ship with on-device models", "about_entity_id": "ai_wearables", "source_uri": "https://example.com/release-notes/ai-wearables", "confidence": 0.85, "timestamp": "2026-01-15T00:00:00Z", "valid_from": "2026-01-15T00:00:00Z", "valid_until": "2026-07-15T00:00:00Z", "polarity": "support"},
+    {"id": "sig-search-spike", "text": "Searches for AI wearables up 3x this quarter", "about_entity_id": "ai_wearables", "source_uri": "https://example.com/commerce/search-ai-wearables", "confidence": 0.8, "timestamp": "2026-02-01T00:00:00Z", "valid_from": "2026-02-01T00:00:00Z", "valid_until": "2026-08-01T00:00:00Z", "polarity": "support"},
+    {"id": "sig-viral-fad", "text": "AI wearables are a passing fad", "about_entity_id": "ai_wearables", "source_uri": "https://example.com/social/ai-wearables-fad", "confidence": 0.55, "timestamp": "2026-02-10T00:00:00Z", "valid_from": "2026-02-10T00:00:00Z", "valid_until": "2026-03-10T00:00:00Z", "polarity": "refute"},
+    {"id": "sig-gaming-chatter", "text": "AI headset chatter surging in gaming communities", "about_entity_id": "ai_headset", "source_uri": "https://example.com/forum/ai-headset-hype", "confidence": 0.6, "timestamp": "2026-02-05T00:00:00Z", "valid_from": "2026-02-05T00:00:00Z", "valid_until": "2026-04-05T00:00:00Z", "polarity": "support"}
+  ],
+  "proposed_edges": [
+    {"id": "edge-ai-headset-wearables", "left_entity_id": "ai_headset", "right_entity_id": "ai_wearables", "confidence": 0.35}
+  ]
+}
+"""
