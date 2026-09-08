@@ -21,6 +21,7 @@ from .draft import draft
 from .extraction import extract
 from .flags import detect_flags, resolve_edges
 from .graph import build_graph
+from .tracing import get_tracer
 from .models import (
     EquivalenceEdge,
     Extraction,
@@ -46,11 +47,14 @@ def _finalize(
     reasoning: dict[str, str],
 ) -> ForecastRun:
     """Deterministic plumbing: build the graph, flag conflicts, assemble the brief."""
-    graph = build_graph(extraction, edges, decisions, corpus)
-    flags = detect_flags(extraction.signals)
-    gated_edges = resolve_edges(edges, decisions, extraction.entities)
-    brief = assemble(extraction, corpus, flags, gated_edges, reasoning, category, as_of=AS_OF)
-    return ForecastRun(graph=graph, brief=brief, flags=flags, gated_edges=gated_edges)
+    with get_tracer().start_as_current_span("finalize") as span:
+        graph = build_graph(extraction, edges, decisions, corpus)
+        flags = detect_flags(extraction.signals)
+        gated_edges = resolve_edges(edges, decisions, extraction.entities)
+        brief = assemble(extraction, corpus, flags, gated_edges, reasoning, category, as_of=AS_OF)
+        span.set_attribute("output.claims", len(brief.claims))
+        span.set_attribute("output.flags", len(brief.flags))
+        return ForecastRun(graph=graph, brief=brief, flags=flags, gated_edges=gated_edges)
 
 
 def run(
@@ -63,11 +67,13 @@ def run(
 ) -> ForecastRun:
     """Run the pipeline without the HITL interrupt. Un-decided edges stay
     "proposed"; `decisions` pre-supplies approve/reject outcomes."""
-    decisions = decisions or {}
-    extraction = extract_fn(corpus)
-    edges = align_fn(extraction)
-    reasoning = draft_fn(extraction, category)
-    return _finalize(extraction, edges, decisions, corpus, category, reasoning)
+    with get_tracer().start_as_current_span("forecast") as span:
+        span.set_attribute("category", category)
+        decisions = decisions or {}
+        extraction = extract_fn(corpus)
+        edges = align_fn(extraction)
+        reasoning = draft_fn(extraction, category)
+        return _finalize(extraction, edges, decisions, corpus, category, reasoning)
 
 
 class ForecastState(TypedDict, total=False):
@@ -100,20 +106,23 @@ def build_forecast_graph(
         return {"edges": [edge_to_dict(e) for e in align_fn(extraction)]}
 
     def gate_node(state: ForecastState) -> dict:
-        edges = state.get("edges", [])
-        if not edges:
-            return {"decisions": {}}
-        payload = [
-            {
-                "id": edge["id"],
-                "left_entity_id": edge["left_entity_id"],
-                "right_entity_id": edge["right_entity_id"],
-                "confidence": edge["confidence"],
-            }
-            for edge in edges
-        ]
-        decisions = interrupt({"sign_off": payload})
-        return {"decisions": decisions}
+        with get_tracer().start_as_current_span("gate") as span:
+            edges = state.get("edges", [])
+            span.set_attribute("input.edges", len(edges))
+            if not edges:
+                return {"decisions": {}}
+            payload = [
+                {
+                    "id": edge["id"],
+                    "left_entity_id": edge["left_entity_id"],
+                    "right_entity_id": edge["right_entity_id"],
+                    "confidence": edge["confidence"],
+                }
+                for edge in edges
+            ]
+            decisions = interrupt({"sign_off": payload})
+            span.set_attribute("output.decisions", len(decisions))
+            return {"decisions": decisions}
 
     def draft_node(state: ForecastState) -> dict:
         extraction = extraction_from_dict(state["extraction"])

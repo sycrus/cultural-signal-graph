@@ -15,6 +15,7 @@ import logging
 
 from .llm import expand_curie, get_client
 from .models import Entity, Extraction, Signal, SourceDoc, Usage
+from .tracing import get_tracer, model_span, record_usage
 
 logger = logging.getLogger(__name__)
 
@@ -119,19 +120,27 @@ def parse_extraction(raw_json: str) -> Extraction:
 
 def extract(corpus: list[SourceDoc]) -> Extraction:
     """Run the cheap-model extraction, retrying once on parse/validation failure."""
-    last_error: Exception | None = None
-    for attempt in range(2):
-        text, usage = _call_model(corpus)
-        logger.info(
-            "extraction model call: model=%s input_tokens=%d output_tokens=%d total_tokens=%d",
-            usage.model,
-            usage.input_tokens,
-            usage.output_tokens,
-            usage.total_tokens,
-        )
-        try:
-            return parse_extraction(text)
-        except ValueError as exc:
-            last_error = exc
-            logger.warning("extraction parse failed (attempt %d): %s", attempt + 1, exc)
-    raise ValueError(f"extraction failed after 2 attempts: {last_error}") from last_error
+    with get_tracer().start_as_current_span("extract") as span:
+        span.set_attribute("input.sources", len(corpus))
+        last_error: Exception | None = None
+        for attempt in range(2):
+            with model_span() as model:
+                text, usage = _call_model(corpus)
+                record_usage(model, usage)
+            logger.info(
+                "extraction model call: model=%s input_tokens=%d output_tokens=%d total_tokens=%d",
+                usage.model,
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.total_tokens,
+            )
+            try:
+                result = parse_extraction(text)
+            except ValueError as exc:
+                last_error = exc
+                logger.warning("extraction parse failed (attempt %d): %s", attempt + 1, exc)
+            else:
+                span.set_attribute("output.entities", len(result.entities))
+                span.set_attribute("output.signals", len(result.signals))
+                return result
+        raise ValueError(f"extraction failed after 2 attempts: {last_error}") from last_error

@@ -16,6 +16,7 @@ import logging
 from .flags import detect_flags
 from .llm import get_client
 from .models import Extraction, Signal, Usage
+from .tracing import get_tracer, model_span, record_usage
 
 logger = logging.getLogger(__name__)
 
@@ -100,22 +101,29 @@ def parse_draft(raw_json: str) -> dict[str, str]:
 
 def draft(extraction: Extraction, category: str) -> dict[str, str]:
     """Draft a reasoning chain per confident signal, retrying once on failure."""
-    signals = _confident_signals(extraction, category)
-    if not signals:
-        return {}
-    last_error: Exception | None = None
-    for attempt in range(2):
-        text, usage = _call_draft_model(signals, category)
-        logger.info(
-            "drafting model call: model=%s input_tokens=%d output_tokens=%d total_tokens=%d",
-            usage.model,
-            usage.input_tokens,
-            usage.output_tokens,
-            usage.total_tokens,
-        )
-        try:
-            return parse_draft(text)
-        except ValueError as exc:
-            last_error = exc
-            logger.warning("draft parse failed (attempt %d): %s", attempt + 1, exc)
-    raise ValueError(f"drafting failed after 2 attempts: {last_error}") from last_error
+    with get_tracer().start_as_current_span("draft") as span:
+        signals = _confident_signals(extraction, category)
+        span.set_attribute("input.claims", len(signals))
+        if not signals:
+            return {}
+        last_error: Exception | None = None
+        for attempt in range(2):
+            with model_span() as model:
+                text, usage = _call_draft_model(signals, category)
+                record_usage(model, usage)
+            logger.info(
+                "drafting model call: model=%s input_tokens=%d output_tokens=%d total_tokens=%d",
+                usage.model,
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.total_tokens,
+            )
+            try:
+                result = parse_draft(text)
+            except ValueError as exc:
+                last_error = exc
+                logger.warning("draft parse failed (attempt %d): %s", attempt + 1, exc)
+            else:
+                span.set_attribute("output.reasoning", len(result))
+                return result
+        raise ValueError(f"drafting failed after 2 attempts: {last_error}") from last_error

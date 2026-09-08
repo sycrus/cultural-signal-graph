@@ -9,12 +9,16 @@ from pathlib import Path
 
 from .fixtures import SEED_CORPUS
 from .pipeline import run
+from .tracing import init_tracing_from_env
 
 
 def main() -> None:
     # Windows consoles default to cp1252; force UTF-8 so the brief's Unicode
     # (→ and ≈) prints without raising UnicodeEncodeError.
     sys.stdout.reconfigure(encoding="utf-8")
+
+    # Enable OTel trace export (e.g. to Langfuse) when the OTLP env vars are set.
+    init_tracing_from_env()
 
     forecast = run(SEED_CORPUS)
     out = Path("out")
