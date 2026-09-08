@@ -71,7 +71,7 @@ const cy = cytoscape({
 function showDetail(node) {
   const d = node.data();
   let html = '<b>' + d.kind + '</b><br>' + d.label;
-  if (d.kind === 'source') html += '<br>' + d.id;
+  if (d.kind === 'source') html += '<br><a href="' + d.id + '" target="_blank" rel="noopener">' + d.id + ' &#8599;</a>';
   if (d.confidence) html += '<br>confidence: ' + d.confidence;
   if (d.valid) html += '<br>valid: ' + d.valid;
   if (d.credibility) html += '<br>source credibility: ' + d.credibility;
