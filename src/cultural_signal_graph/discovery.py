@@ -1,0 +1,118 @@
+"""Source discovery — known index + context-dependent selection (issue #4).
+
+Given an ask (category + question + window), select the contextually relevant
+sources from a known index. The operator does not enumerate sources. Live web
+backfill is stubbed in v1 (ADR-0004), so discovery never touches the network.
+"""
+
+from __future__ import annotations
+
+from .models import GAMING_NS, TECH_NS, Ask, SourceDoc
+
+# Bound the selection so a category with many sources returns a focused subset
+# ("not all"), while a known category always yields at least one ("not none").
+MAX_SOURCES = 3
+
+SOURCE_INDEX: list[SourceDoc] = [
+    # Tech
+    SourceDoc(
+        uri="https://example.com/release-notes/ai-wearables",
+        source_type=TECH_NS + "ReleaseNote",
+        credibility=0.9,
+        category="tech",
+        text="AI wearables now ship with on-device models, no phone required.",
+        topics=("ai", "wearables", "hardware"),
+    ),
+    SourceDoc(
+        uri="https://example.com/commerce/search-ai-wearables",
+        source_type=TECH_NS + "SearchIndex",
+        credibility=0.8,
+        category="tech",
+        text="Searches for AI wearables up 3x this quarter.",
+        topics=("ai", "wearables", "commerce"),
+    ),
+    SourceDoc(
+        uri="https://example.com/social/ai-wearables-fad",
+        source_type=TECH_NS + "SocialPost",
+        credibility=0.2,
+        category="tech",
+        text="AI wearables are a passing fad — no one wants another gadget.",
+        topics=("ai", "wearables", "social"),
+    ),
+    SourceDoc(
+        uri="https://example.com/release-notes/cloud-infra",
+        source_type=TECH_NS + "ReleaseNote",
+        credibility=0.85,
+        category="tech",
+        text="Managed cloud infrastructure adds a new region and lower egress.",
+        topics=("cloud", "infrastructure"),
+    ),
+    SourceDoc(
+        uri="https://example.com/commerce/edge-compute",
+        source_type=TECH_NS + "SearchIndex",
+        credibility=0.7,
+        category="tech",
+        text="Edge compute interest rises as latency budgets shrink.",
+        topics=("edge", "compute"),
+    ),
+    # Gaming
+    SourceDoc(
+        uri="https://example.com/forum/ai-headset-hype",
+        source_type=GAMING_NS + "ForumPost",
+        credibility=0.5,
+        category="gaming",
+        text="AI headset chatter surging across gaming communities.",
+        topics=("headset", "peripheral"),
+    ),
+    SourceDoc(
+        uri="https://example.com/forum/cloud-gaming",
+        source_type=GAMING_NS + "ForumPost",
+        credibility=0.75,
+        category="gaming",
+        text="Cloud gaming latency improves with the new streaming stack.",
+        topics=("cloud", "streaming"),
+    ),
+    SourceDoc(
+        uri="https://example.com/forum/esports-viewership",
+        source_type=GAMING_NS + "ForumPost",
+        credibility=0.65,
+        category="gaming",
+        text="Esports viewership sets a new record this season.",
+        topics=("esports", "viewership"),
+    ),
+    SourceDoc(
+        uri="https://example.com/forum/controller-ergonomics",
+        source_type=GAMING_NS + "ForumPost",
+        credibility=0.6,
+        category="gaming",
+        text="Long threads on controller ergonomics and hand strain.",
+        topics=("controller", "peripheral"),
+    ),
+]
+
+
+def _tokenize(question: str) -> set[str]:
+    return {
+        word.strip(".,?!;:'\"()").lower()
+        for word in question.split()
+        if word.strip(".,?!;:'\"()")
+    }
+
+
+def discover_sources(ask: Ask, index: list[SourceDoc] = SOURCE_INDEX) -> list[SourceDoc]:
+    """Select the sources relevant to the ask (category, then topic + credibility)."""
+    candidates = [source for source in index if source.category == ask.category]
+    if not candidates:
+        return []
+    tokens = _tokenize(ask.question)
+
+    def rank(source: SourceDoc) -> tuple[int, float]:
+        return (len(set(source.topics) & tokens), source.credibility)
+
+    ranked = sorted(candidates, key=rank, reverse=True)
+    return ranked[:MAX_SOURCES]
+
+
+def _web_backfill(ask: Ask) -> list[SourceDoc]:
+    """Stubbed in v1 (ADR-0004): live web search is a non-goal for this slice."""
+    return []

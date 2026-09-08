@@ -27,6 +27,24 @@ class SourceDoc:
     credibility: float
     category: str
     text: str
+    topics: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class TimeWindow:
+    """The time window an ask is scoped to."""
+
+    start: str
+    end: str
+
+
+@dataclass(frozen=True)
+class Ask:
+    """The runtime input to a forecast: category + question + time window."""
+
+    category: str
+    question: str
+    window: TimeWindow
 
 
 @dataclass(frozen=True)
