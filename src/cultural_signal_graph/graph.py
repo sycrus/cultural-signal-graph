@@ -53,6 +53,7 @@ def build_graph(
     for signal in extraction.signals:
         node = EX[signal.id]
         graph.add((node, RDF.type, CSG.Signal))
+        graph.add((node, RDFS.label, Literal(signal.text)))
         graph.add((node, CSG.about, EX[signal.about_entity_id]))
         graph.add((node, CSG.hasSource, URIRef(signal.source_uri)))
         graph.add((node, CSG.confidence, Literal(str(signal.confidence), datatype=XSD.decimal)))

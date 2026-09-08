@@ -1,0 +1,193 @@
+"""Interactive graph explorer — a self-contained HTML file (issue #11).
+
+Serializes the RDF graph into Cytoscape elements (nodes + edges with type, confidence,
+temporal validity, provenance) and renders a self-contained `graph.html` using
+Cytoscape.js from a CDN — no server, matches the project's zero-infrastructure goal.
+Clicking a node highlights its neighborhood (claim -> sources -> provenance); flagged
+signals and gated cross-domain edges are visually distinct.
+"""
+
+from __future__ import annotations
+
+import json
+
+from rdflib.namespace import RDF, RDFS
+
+from .graph import CSG
+from .models import CSG_NS, GAMING_NS, TECH_NS, ForecastRun
+
+_ONTOLOGY_NAMESPACES = (CSG_NS, TECH_NS, GAMING_NS)
+
+_HTML_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cultural Signal Graph</title>
+<script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+  #cy { width: 100%; height: 100%; display: block; }
+  #legend { position: absolute; top: 12px; left: 12px; background: #fff;
+    border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 12px; font-size: 12px; }
+  #legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  #detail { position: absolute; top: 12px; right: 12px; width: 300px; background: #fff;
+    border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.12); display: none; }
+</style>
+</head>
+<body>
+<div id="cy"></div>
+<div id="legend">
+  <div><span class="dot" style="background:#3b82f6"></span>entity</div>
+  <div><span class="dot" style="background:#22c55e"></span>signal (confident)</div>
+  <div><span class="dot" style="background:#ef4444"></span>signal (conflict/flag)</div>
+  <div><span class="dot" style="background:#9ca3af"></span>source</div>
+  <div style="margin-top:4px">dashed purple = gated cross-domain edge</div>
+</div>
+<div id="detail"></div>
+<script>
+const data = __DATA__;
+
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  elements: data,
+  style: [
+    { selector: 'node', style: {
+      'label': 'data(label)', 'font-size': 10, 'text-valign': 'bottom', 'text-halign': 'center',
+      'text-wrap': 'wrap', 'text-max-width': '110px', 'color': '#111827'
+    }},
+    { selector: 'node[kind = "entity"]', style: { 'background-color': '#3b82f6', 'shape': 'ellipse', 'width': 56, 'height': 56 } },
+    { selector: 'node[kind = "signal"]', style: { 'background-color': '#22c55e', 'shape': 'round-rectangle' } },
+    { selector: 'node[kind = "signal"][flagged = "true"]', style: { 'background-color': '#ef4444' } },
+    { selector: 'node[kind = "source"]', style: { 'background-color': '#9ca3af', 'shape': 'hexagon' } },
+    { selector: 'edge', style: { 'curve-style': 'bezier', 'width': 1.5, 'line-color': '#cbd5e1', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#cbd5e1' } },
+    { selector: 'edge[kind = "about"]', style: { 'line-color': '#60a5fa', 'target-arrow-color': '#60a5fa', 'width': 2 } },
+    { selector: 'edge[kind = "equivalence"]', style: { 'line-color': '#a855f7', 'target-arrow-color': '#a855f7', 'width': 2.5 } },
+    { selector: 'edge[kind = "equivalence"][status != "real"]', style: { 'line-style': 'dashed', 'line-color': '#c084fc', 'target-arrow-color': '#c084fc' } },
+    { selector: '.dimmed', style: { 'opacity': 0.12 } },
+  ],
+  layout: { name: 'cose', animate: false, nodeRepulsion: 6000, idealEdgeLength: 90 },
+});
+
+function showDetail(node) {
+  const d = node.data();
+  let html = '<b>' + d.kind + '</b><br>' + d.label;
+  if (d.kind === 'source') html += '<br>' + d.id;
+  if (d.confidence) html += '<br>confidence: ' + d.confidence;
+  if (d.valid) html += '<br>valid: ' + d.valid;
+  if (d.credibility) html += '<br>source credibility: ' + d.credibility;
+  document.getElementById('detail').innerHTML = html;
+  document.getElementById('detail').style.display = 'block';
+}
+
+cy.on('tap', 'node', (evt) => {
+  const node = evt.target;
+  cy.elements().addClass('dimmed');
+  node.closedNeighborhood().removeClass('dimmed');
+  showDetail(node);
+});
+
+cy.on('tap', (evt) => {
+  if (evt.target === cy) {
+    cy.elements().removeClass('dimmed');
+    document.getElementById('detail').style.display = 'none';
+  }
+});
+</script>
+</body>
+</html>
+"""
+
+
+def _value(graph, subject, predicate):
+    obj = graph.value(subject, predicate)
+    return str(obj) if obj is not None else None
+
+
+def _short_uri(uri: str) -> str:
+    return uri.rstrip("/").rsplit("/", 1)[-1]
+
+
+def build_cyto_elements(forecast: ForecastRun) -> dict:
+    """Build Cytoscape nodes/edges from a forecast's RDF graph + flags."""
+    graph = forecast.graph
+    flagged = {flag.signal_id for flag in forecast.flags}
+
+    nodes: list[dict] = []
+    edges: list[dict] = []
+
+    signal_nodes = set(graph.subjects(RDF.type, CSG.Signal))
+    for signal in signal_nodes:
+        sid = str(signal)
+        local_id = sid.rsplit("#", 1)[-1]
+        is_flagged = local_id in flagged
+        nodes.append(
+            {
+                "data": {
+                    "id": sid,
+                    "label": _value(graph, signal, RDFS.label) or local_id,
+                    "kind": "signal",
+                    "confidence": _value(graph, signal, CSG.confidence),
+                    "valid": _value(graph, signal, CSG.validFrom)
+                    + " -> "
+                    + (_value(graph, signal, CSG.validUntil) or ""),
+                    "flagged": "true" if is_flagged else "false",
+                }
+            }
+        )
+        about = _value(graph, signal, CSG.about)
+        if about:
+            edges.append({"data": {"source": sid, "target": about, "kind": "about"}})
+        source = _value(graph, signal, CSG.hasSource)
+        if source:
+            edges.append({"data": {"source": sid, "target": source, "kind": "hasSource"}})
+
+    for entity in graph.subjects(RDFS.label, None):
+        if entity in signal_nodes:
+            continue
+        if str(entity).startswith(_ONTOLOGY_NAMESPACES):
+            continue  # ontology term, not instance data
+        nodes.append(
+            {
+                "data": {
+                    "id": str(entity),
+                    "label": _value(graph, entity, RDFS.label),
+                    "kind": "entity",
+                }
+            }
+        )
+
+    for source in graph.subjects(CSG.credibility, None):
+        nodes.append(
+            {
+                "data": {
+                    "id": str(source),
+                    "label": _short_uri(str(source)),
+                    "kind": "source",
+                    "credibility": _value(graph, source, CSG.credibility),
+                }
+            }
+        )
+
+    for edge_node in graph.subjects(RDF.type, CSG.EquivalenceEdge):
+        edges.append(
+            {
+                "data": {
+                    "source": _value(graph, edge_node, CSG.leftEntity),
+                    "target": _value(graph, edge_node, CSG.rightEntity),
+                    "kind": "equivalence",
+                    "status": _value(graph, edge_node, CSG.status),
+                }
+            }
+        )
+
+    return {"nodes": nodes, "edges": edges}
+
+
+def render_html(elements: dict) -> str:
+    """Render a self-contained HTML file (Cytoscape.js from CDN) around the elements."""
+    return _HTML_TEMPLATE.replace("__DATA__", json.dumps(elements))
+
+
+def write_graph_html(forecast: ForecastRun, path) -> None:
+    """Write the interactive graph explorer HTML for a forecast."""
+    path.write_text(render_html(build_cyto_elements(forecast)), encoding="utf-8")

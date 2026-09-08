@@ -10,6 +10,7 @@ from pathlib import Path
 from .fixtures import SEED_CORPUS
 from .pipeline import run
 from .tracing import init_tracing_from_env
+from .viz import write_graph_html
 
 
 def main() -> None:
@@ -26,6 +27,7 @@ def main() -> None:
     (out / "brief.md").write_text(forecast.brief.to_markdown(), encoding="utf-8")
     (out / "brief.json").write_text(forecast.brief.to_json(), encoding="utf-8")
     (out / "graph.ttl").write_text(forecast.graph.serialize(format="turtle"), encoding="utf-8")
+    write_graph_html(forecast, out / "graph.html")
     print(forecast.brief.to_markdown())
 
 
