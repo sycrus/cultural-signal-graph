@@ -6,7 +6,11 @@ import os
 
 import anthropic
 
+from .config import load_dotenv
 from .models import CSG_NS, EX_NS, GAMING_NS, TECH_NS
+
+# Make DEEPSEEK_API_KEY (from a `.env` file) available to get_client().
+load_dotenv()
 
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/anthropic"
 _PREFIXES = {"csg": CSG_NS, "tech": TECH_NS, "gaming": GAMING_NS, "ex": EX_NS}
