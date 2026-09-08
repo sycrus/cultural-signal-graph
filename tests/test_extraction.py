@@ -45,3 +45,8 @@ def test_parse_extraction_rejects_out_of_range_confidence():
         assert "confidence" in str(exc)
     else:
         raise AssertionError("expected ValueError for out-of-range confidence")
+
+
+def test_parse_extraction_handles_markdown_fences():
+    fenced = "```json\n" + RECORDED_MODEL_OUTPUT + "\n```"
+    assert ext.parse_extraction(fenced) == EXTRACTED

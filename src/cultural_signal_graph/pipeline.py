@@ -21,7 +21,7 @@ from .draft import draft
 from .extraction import extract
 from .flags import detect_flags, resolve_edges
 from .graph import build_graph
-from .tracing import get_tracer
+from .tracing import get_tracer, get_usage, reset_usage
 from .models import (
     EquivalenceEdge,
     Extraction,
@@ -76,13 +76,16 @@ def run(
 ) -> ForecastRun:
     """Run the pipeline without the HITL interrupt. Un-decided edges stay
     "proposed"; `decisions` pre-supplies approve/reject outcomes."""
+    reset_usage()
     with get_tracer().start_as_current_span("forecast") as span:
         span.set_attribute("category", category)
         decisions = decisions or {}
         extraction = extract_fn(corpus)
         edges = align_fn(extraction)
         reasoning = draft_fn(extraction, category)
-        return _finalize(extraction, edges, decisions, corpus, category, reasoning, extra_ontology)
+        forecast = _finalize(extraction, edges, decisions, corpus, category, reasoning, extra_ontology)
+        forecast.usage = get_usage()
+        return forecast
 
 
 class ForecastState(TypedDict, total=False):
@@ -103,8 +106,14 @@ def build_forecast_graph(
     extract_fn: Callable[[list[SourceDoc]], Extraction] = extract,
     align_fn: Callable[[Extraction], list[EquivalenceEdge]] = align,
     draft_fn: Callable[[Extraction, str], dict[str, str]] = draft,
+    checkpointer: Any = None,
 ):
-    """Compile the LangGraph pipeline; the gate node interrupts for sign-off."""
+    """Compile the LangGraph pipeline; the gate node interrupts for sign-off.
+
+    `checkpointer` defaults to an in-memory MemorySaver; pass a file-backed checkpointer
+    (e.g. `checkpoint.file_checkpointer`) to make runs resumable across restarts."""
+    if checkpointer is None:
+        checkpointer = MemorySaver()
 
     def extract_node(state: ForecastState) -> dict:
         corpus = [source_doc_from_dict(d) for d in state["corpus"]]
@@ -147,7 +156,7 @@ def build_forecast_graph(
     builder.add_edge("align", "gate")
     builder.add_edge("gate", "draft")
     builder.add_edge("draft", END)
-    return builder.compile(checkpointer=MemorySaver())
+    return builder.compile(checkpointer=checkpointer)
 
 
 def forecast_run_from_state(state: ForecastState) -> ForecastRun:

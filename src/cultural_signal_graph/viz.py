@@ -15,6 +15,7 @@ from rdflib.namespace import RDF, RDFS
 
 from .graph import CSG
 from .models import CSG_NS, GAMING_NS, TECH_NS, ForecastRun
+from .tracing import aggregate_usage
 
 _ONTOLOGY_NAMESPACES = (CSG_NS, TECH_NS, GAMING_NS)
 
@@ -43,6 +44,10 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   <div><span class="dot" style="background:#9ca3af"></span>source</div>
   <div style="margin-top:4px">dashed purple = gated cross-domain edge</div>
 </div>
+<details id="usage" style="position:absolute; bottom:12px; left:12px; background:#fff; border:1px solid #d1d5db; border-radius:8px; padding:8px 12px; font-size:12px;">
+  <summary>Usage</summary>
+  __USAGE__
+</details>
 <div id="detail"></div>
 <script>
 const data = __DATA__;
@@ -183,11 +188,27 @@ def build_cyto_elements(forecast: ForecastRun) -> dict:
     return {"nodes": nodes, "edges": edges}
 
 
-def render_html(elements: dict) -> str:
+def render_html(elements: dict, usage: dict | None = None) -> str:
     """Render a self-contained HTML file (Cytoscape.js from CDN) around the elements."""
-    return _HTML_TEMPLATE.replace("__DATA__", json.dumps(elements))
+    html = _HTML_TEMPLATE.replace("__DATA__", json.dumps(elements))
+    return html.replace("__USAGE__", _usage_html(usage) if usage else "")
 
 
 def write_graph_html(forecast: ForecastRun, path) -> None:
     """Write the interactive graph explorer HTML for a forecast."""
-    path.write_text(render_html(build_cyto_elements(forecast)), encoding="utf-8")
+    usage = aggregate_usage(forecast.usage) if forecast.usage else None
+    path.write_text(render_html(build_cyto_elements(forecast), usage), encoding="utf-8")
+
+
+def _usage_html(usage: dict) -> str:
+    if not usage.get("calls"):
+        return "<div>no model calls recorded</div>"
+    rows = "".join(
+        f'<div>{c["model"]}: {c["input_tokens"]} in / {c["output_tokens"]} out</div>'
+        for c in usage["calls"]
+    )
+    return (
+        f'<div><b>total: {usage["total_tokens"]} tokens</b> '
+        f'({usage["input_tokens"]} in / {usage["output_tokens"]} out)</div>'
+        + rows
+    )

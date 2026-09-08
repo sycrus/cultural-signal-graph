@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import logging
 
-from .llm import expand_curie, get_client
+from .llm import expand_curie, extract_json, get_client
 from .models import Entity, Extraction, Signal, SourceDoc, Usage
 from .tracing import get_tracer, model_span, record_usage
 
@@ -78,7 +78,7 @@ def _require(obj: dict, key: str):
 
 def parse_extraction(raw_json: str) -> Extraction:
     """Parse + validate a model's JSON response into a typed Extraction."""
-    data = json.loads(raw_json)
+    data = json.loads(extract_json(raw_json))
     if not isinstance(data, dict):
         raise ValueError("extraction JSON must be a top-level object")
 

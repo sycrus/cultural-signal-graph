@@ -30,6 +30,34 @@ def _edge_status(edge_id: str, decisions: dict[str, bool]) -> str:
     return "proposed"
 
 
+def add_source(graph: Graph, source: SourceDoc) -> None:
+    node = URIRef(source.uri)
+    graph.add((node, RDF.type, URIRef(source.source_type)))
+    graph.add((node, CSG.credibility, Literal(str(source.credibility), datatype=XSD.decimal)))
+
+
+def add_entity(graph: Graph, entity) -> None:
+    node = EX[entity.id]
+    graph.add((node, RDF.type, URIRef(entity.entity_type)))
+    graph.add((node, RDFS.label, Literal(entity.name)))
+
+
+def add_signal(graph: Graph, signal) -> None:
+    node = EX[signal.id]
+    graph.add((node, RDF.type, CSG.Signal))
+    graph.add((node, RDFS.label, Literal(signal.text)))
+    graph.add((node, CSG.about, EX[signal.about_entity_id]))
+    graph.add((node, CSG.hasSource, URIRef(signal.source_uri)))
+    graph.add((node, CSG.confidence, Literal(str(signal.confidence), datatype=XSD.decimal)))
+    graph.add((node, CSG.timestamp, Literal(signal.timestamp, datatype=XSD.dateTime)))
+    graph.add((node, CSG.validFrom, Literal(signal.valid_from, datatype=XSD.dateTime)))
+    graph.add((node, CSG.validUntil, Literal(signal.valid_until, datatype=XSD.dateTime)))
+    provenance = EX[f"prov-{signal.id}"]
+    graph.add((node, CSG.hasProvenance, provenance))
+    graph.add((provenance, RDF.type, CSG.Provenance))
+    graph.add((provenance, CSG.sourceURI, Literal(signal.source_uri, datatype=XSD.anyURI)))
+
+
 def build_graph(
     extraction: Extraction,
     edges: list[EquivalenceEdge],
@@ -44,30 +72,13 @@ def build_graph(
         graph += extra_ontology
 
     for source in sources:
-        node = URIRef(source.uri)
-        graph.add((node, RDF.type, URIRef(source.source_type)))
-        graph.add((node, CSG.credibility, Literal(str(source.credibility), datatype=XSD.decimal)))
+        add_source(graph, source)
 
     for entity in extraction.entities:
-        node = EX[entity.id]
-        graph.add((node, RDF.type, URIRef(entity.entity_type)))
-        graph.add((node, RDFS.label, Literal(entity.name)))
+        add_entity(graph, entity)
 
     for signal in extraction.signals:
-        node = EX[signal.id]
-        graph.add((node, RDF.type, CSG.Signal))
-        graph.add((node, RDFS.label, Literal(signal.text)))
-        graph.add((node, CSG.about, EX[signal.about_entity_id]))
-        graph.add((node, CSG.hasSource, URIRef(signal.source_uri)))
-        graph.add((node, CSG.confidence, Literal(str(signal.confidence), datatype=XSD.decimal)))
-        graph.add((node, CSG.timestamp, Literal(signal.timestamp, datatype=XSD.dateTime)))
-        graph.add((node, CSG.validFrom, Literal(signal.valid_from, datatype=XSD.dateTime)))
-        graph.add((node, CSG.validUntil, Literal(signal.valid_until, datatype=XSD.dateTime)))
-
-        provenance = EX[f"prov-{signal.id}"]
-        graph.add((node, CSG.hasProvenance, provenance))
-        graph.add((provenance, RDF.type, CSG.Provenance))
-        graph.add((provenance, CSG.sourceURI, Literal(signal.source_uri, datatype=XSD.anyURI)))
+        add_signal(graph, signal)
 
     for edge in edges:
         node = EX[edge.id]

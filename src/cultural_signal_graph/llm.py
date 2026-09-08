@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 import anthropic
 
@@ -31,3 +32,19 @@ def expand_curie(curie: str) -> str:
         if prefix in _PREFIXES:
             return _PREFIXES[prefix] + local
     return curie
+
+
+def extract_json(text: str) -> str:
+    """Extract a JSON object/array from a model response, stripping markdown fences
+    and surrounding prose."""
+    text = text.strip()
+    fence = re.match(r"^```[a-zA-Z]*\s*(.*?)\s*```$", text, re.DOTALL)
+    if fence:
+        text = fence.group(1).strip()
+    if text.startswith("{") or text.startswith("["):
+        return text
+    start = min((i for i in (text.find("{"), text.find("[")) if i >= 0), default=-1)
+    end = max(text.rfind("}"), text.rfind("]"))
+    if start >= 0 and end >= start:
+        return text[start : end + 1]
+    return text

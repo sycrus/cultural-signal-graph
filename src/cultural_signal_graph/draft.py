@@ -14,7 +14,7 @@ import json
 import logging
 
 from .flags import detect_flags
-from .llm import get_client
+from .llm import extract_json, get_client
 from .models import Extraction, Signal, Usage
 from .tracing import get_tracer, model_span, record_usage
 
@@ -89,7 +89,7 @@ def _require(obj: dict, key: str):
 
 def parse_draft(raw_json: str) -> dict[str, str]:
     """Parse + validate a model's JSON array into a signal_id -> reasoning map."""
-    data = json.loads(raw_json)
+    data = json.loads(extract_json(raw_json))
     if not isinstance(data, list):
         raise ValueError("draft JSON must be a top-level array")
     reasoning: dict[str, str] = {}

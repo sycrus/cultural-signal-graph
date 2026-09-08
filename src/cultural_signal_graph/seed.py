@@ -14,7 +14,7 @@ from pathlib import Path
 from rdflib import Graph, Literal, Namespace
 from rdflib.namespace import OWL, RDF, RDFS, XSD
 
-from .llm import get_client
+from .llm import extract_json, get_client
 from .models import CSG_NS, SeedClass, SeedOntology, Usage
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ def _call_seed_model(category: str) -> tuple[str, Usage]:
 
 def parse_seed_ontology(raw_json: str) -> list[SeedClass]:
     """Parse + validate a model's JSON into a list of seed classes."""
-    data = json.loads(raw_json)
+    data = json.loads(extract_json(raw_json))
     if not isinstance(data, dict):
         raise ValueError("seed JSON must be a top-level object")
     classes: list[SeedClass] = []

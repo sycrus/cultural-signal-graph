@@ -83,3 +83,22 @@ def test_langgraph_flow_produces_gate_span(spans):
 
     names = {s.name for s in spans.get_finished_spans()}
     assert {"extract", "align", "gate", "draft"} <= names
+
+
+def test_cost_latency_is_computed_and_gated(spans):
+    from cultural_signal_graph.eval import DEFAULT_COST_BUDGETS, check_cost, cost_latency
+    from cultural_signal_graph.tracing import get_finished_spans
+
+    run(SEED_CORPUS, category="tech")
+    cost = cost_latency(get_finished_spans())
+    assert cost["input_tokens"] == 300  # 3 model calls x 100
+    assert cost["output_tokens"] == 150  # 3 model calls x 50
+    assert cost["total_tokens"] == 450
+    assert check_cost(cost, DEFAULT_COST_BUDGETS) == []  # within budget
+    assert check_cost(cost, {"total_tokens": 100}) == ["total_tokens"]  # over budget
+
+
+def test_run_captures_token_usage(spans):
+    forecast = run(SEED_CORPUS, category="tech")
+    assert len(forecast.usage) == 3  # extract + align + draft
+    assert sum(u.total_tokens for u in forecast.usage) == 450

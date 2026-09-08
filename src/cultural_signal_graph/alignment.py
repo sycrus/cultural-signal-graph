@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 
-from .llm import get_client
+from .llm import extract_json, get_client
 from .models import EquivalenceEdge, Extraction, Usage
 from .tracing import get_tracer, model_span, record_usage
 
@@ -78,7 +78,7 @@ def _require(obj: dict, key: str):
 
 def parse_alignment(raw_json: str) -> list[EquivalenceEdge]:
     """Parse + validate a model's JSON array into typed equivalence edges."""
-    data = json.loads(raw_json)
+    data = json.loads(extract_json(raw_json))
     if not isinstance(data, list):
         raise ValueError("alignment JSON must be a top-level array")
     edges = []

@@ -8,7 +8,7 @@ stdlib dataclasses only, so the slice stays light and deterministic.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 # Ontology namespaces — shared by fixtures and graph construction.
@@ -213,6 +213,7 @@ class ForecastRun:
     gated_edges: list[GatedEdge]
     extraction: Extraction
     edges: list[EquivalenceEdge]
+    usage: list = field(default_factory=list)
 
 
 @dataclass(frozen=True)

@@ -115,3 +115,32 @@ def check(metrics: dict[str, float], thresholds: dict[str, float]) -> list[str]:
         for metric, threshold in thresholds.items()
         if metrics.get(metric, 0.0) < threshold
     ]
+
+
+# Cost/latency is measured from OTel model_call spans (issue #7) and gated here (#15):
+# unlike correctness metrics, a HIGH value is bad.
+DEFAULT_COST_BUDGETS = {
+    "total_tokens": 500,
+    "duration_ms": 60_000,
+}
+
+
+def cost_latency(spans) -> dict[str, float]:
+    """Aggregate token usage and latency across model_call spans."""
+    model_spans = [s for s in spans if s.name == "model_call"]
+    input_tokens = sum(int(s.attributes.get("gen_ai.usage.input_tokens", 0)) for s in model_spans)
+    output_tokens = sum(int(s.attributes.get("gen_ai.usage.output_tokens", 0)) for s in model_spans)
+    starts = [s.start_time for s in model_spans if s.start_time is not None]
+    ends = [s.end_time for s in model_spans if s.end_time is not None]
+    duration_ms = (max(ends) - min(starts)) / 1e6 if starts and ends else 0.0
+    return {
+        "input_tokens": float(input_tokens),
+        "output_tokens": float(output_tokens),
+        "total_tokens": float(input_tokens + output_tokens),
+        "duration_ms": float(duration_ms),
+    }
+
+
+def check_cost(cost: dict[str, float], budgets: dict[str, float]) -> list[str]:
+    """Return the cost metrics that exceed their budget (the cost gate)."""
+    return [metric for metric, budget in budgets.items() if cost.get(metric, 0.0) > budget]
