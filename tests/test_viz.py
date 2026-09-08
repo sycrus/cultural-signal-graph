@@ -45,3 +45,10 @@ def test_render_html_embeds_the_graph_data():
     assert "cytoscape" in html
     assert "ai_wearables" in html  # entity id embedded in the data blob
     assert '"kind": "signal"' in html
+
+
+def test_graph_html_is_offline_with_controls():
+    html = render_html(build_cyto_elements(_forecast()))
+    assert "unpkg.com" not in html  # Cytoscape is inlined, no CDN
+    assert 'id="search"' in html  # search box
+    assert "btn-cose" in html  # layout controls

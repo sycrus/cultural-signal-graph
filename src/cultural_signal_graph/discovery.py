@@ -156,7 +156,8 @@ def _fetch_search_results(query: str, limit: int) -> list[dict]:
 
 def _web_backfill(ask: Ask, limit: int = MAX_WEB_BACKFILL) -> list[SourceDoc]:
     """Backfill relevant sources from the live web when the known index has none."""
-    results = _fetch_search_results(ask.question, limit)
+    query = ask.question if not ask.market else f"{ask.question} {ask.market}"
+    results = _fetch_search_results(query, limit)
     topics = tuple(sorted(_tokenize(ask.question)))
     return [
         SourceDoc(

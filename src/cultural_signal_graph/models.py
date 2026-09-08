@@ -40,11 +40,12 @@ class TimeWindow:
 
 @dataclass(frozen=True)
 class Ask:
-    """The runtime input to a forecast: category + question + time window."""
+    """The runtime input to a forecast: category + question + time window (+ market)."""
 
     category: str
     question: str
     window: TimeWindow
+    market: str | None = None
 
 
 @dataclass(frozen=True)

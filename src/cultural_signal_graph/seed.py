@@ -39,9 +39,10 @@ _UPPER_CONTEXT = (
 )
 
 
-def _build_prompt(category: str) -> str:
+def _build_prompt(category: str, market: str | None = None) -> str:
+    market_clause = f" for the {market} market" if market else ""
     return (
-        f'Propose a minimal sub-ontology for the "{category}" domain.\n\n'
+        f'Propose a minimal sub-ontology for the "{category}" domain{market_clause}.\n\n'
         f"{_UPPER_CONTEXT}\n\n"
         'Return JSON: {"classes": [{"name", "kind"}]} where kind is one of '
         '"entity", "signal", "source". Include 2-3 entity classes, 1-2 signal classes, '
@@ -49,14 +50,14 @@ def _build_prompt(category: str) -> str:
     )
 
 
-def _call_seed_model(category: str) -> tuple[str, Usage]:
+def _call_seed_model(category: str, market: str | None = None) -> tuple[str, Usage]:
     """The seam. Returns (raw model text, usage); monkeypatched in tests."""
     response = get_client().messages.create(
         model=SEEDING_MODEL,
         max_tokens=4000,
         thinking={"type": "disabled"},
         system=_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": _build_prompt(category)}],
+        messages=[{"role": "user", "content": _build_prompt(category, market)}],
     )
     text = "".join(block.text for block in response.content if block.type == "text")
     input_tokens = response.usage.input_tokens or 0
@@ -85,9 +86,9 @@ def parse_seed_ontology(raw_json: str) -> list[SeedClass]:
     return classes
 
 
-def seed_ontology(category: str) -> SeedOntology:
+def seed_ontology(category: str, market: str | None = None) -> SeedOntology:
     """Seed a sub-ontology for an unfamiliar category via the premium model."""
-    text, usage = _call_seed_model(category)
+    text, usage = _call_seed_model(category, market)
     logger.info(
         "seeding model call: model=%s input_tokens=%d output_tokens=%d total_tokens=%d",
         usage.model,

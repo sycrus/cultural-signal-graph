@@ -10,12 +10,20 @@ signals and gated cross-domain edges are visually distinct.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from rdflib.namespace import RDF, RDFS
 
 from .graph import CSG
 from .models import CSG_NS, GAMING_NS, TECH_NS, ForecastRun
 from .tracing import aggregate_usage
+
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+def _read_cytoscape() -> str:
+    """The vendored Cytoscape.js, inlined so graph.html works offline."""
+    return (_STATIC_DIR / "cytoscape.min.js").read_text(encoding="utf-8")
 
 _ONTOLOGY_NAMESPACES = (CSG_NS, TECH_NS, GAMING_NS)
 
@@ -24,7 +32,7 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <title>Cultural Signal Graph</title>
-<script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
+<script>__CYTOSCAPE__</script>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
   #cy { width: 100%; height: 100%; display: block; }
@@ -33,10 +41,20 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   #legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
   #detail { position: absolute; top: 12px; right: 12px; width: 300px; background: #fff;
     border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.12); display: none; }
+  #toolbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; align-items: center; }
+  #toolbar input { padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; width: 160px; }
+  #toolbar button { padding: 4px 8px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; font-size: 12px; cursor: pointer; }
 </style>
 </head>
 <body>
 <div id="cy"></div>
+<div id="toolbar">
+  <input id="search" type="text" placeholder="Search nodes…" />
+  <button id="btn-fit" title="Fit graph to view">Fit</button>
+  <button id="btn-cose" title="Force-directed layout">Cose</button>
+  <button id="btn-grid" title="Grid layout">Grid</button>
+</div>
 <div id="legend">
   <div><span class="dot" style="background:#3b82f6"></span>entity</div>
   <div><span class="dot" style="background:#22c55e"></span>signal (confident)</div>
@@ -97,6 +115,18 @@ cy.on('tap', (evt) => {
     document.getElementById('detail').style.display = 'none';
   }
 });
+
+document.getElementById('search').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  cy.elements().removeClass('dimmed');
+  if (!q) return;
+  cy.nodes().addClass('dimmed');
+  cy.nodes().filter(n => (n.data('label') || '').toLowerCase().includes(q)).removeClass('dimmed');
+});
+
+document.getElementById('btn-fit').onclick = () => cy.fit(undefined, 30);
+document.getElementById('btn-cose').onclick = () => cy.layout({ name: 'cose', animate: true, fit: true, padding: 30 }).run();
+document.getElementById('btn-grid').onclick = () => cy.layout({ name: 'grid', animate: true, fit: true, padding: 30 }).run();
 </script>
 </body>
 </html>
@@ -189,9 +219,10 @@ def build_cyto_elements(forecast: ForecastRun) -> dict:
 
 
 def render_html(elements: dict, usage: dict | None = None) -> str:
-    """Render a self-contained HTML file (Cytoscape.js from CDN) around the elements."""
+    """Render a self-contained, offline HTML file around the elements."""
     html = _HTML_TEMPLATE.replace("__DATA__", json.dumps(elements))
-    return html.replace("__USAGE__", _usage_html(usage) if usage else "")
+    html = html.replace("__USAGE__", _usage_html(usage) if usage else "")
+    return html.replace("__CYTOSCAPE__", _read_cytoscape())
 
 
 def write_graph_html(forecast: ForecastRun, path) -> None:
