@@ -36,7 +36,33 @@ def test_create_discovers_sources_and_parks_at_created(tmp_path):
     assert run["stages"]["sources"]["status"] == "done"
     # fixture mode pins the recorded demo corpus — the fixture outputs cite it
     assert [s["uri"] for s in run["sources"]] == [s.uri for s in SEED_CORPUS]
+    assert run["discovery"] is None  # no search trail for the pinned corpus
     assert (tmp_path / run["id"] / "run.json").exists()
+
+
+def test_live_discovery_stores_the_search_trail(tmp_path):
+    def fake_discover(ask, index):
+        return {
+            "sources": list(index)[:1],
+            "queries": ["ai wearables news"],
+            "query_source": "model",
+            "results": [{"query": "ai wearables news", "title": "T", "url": index[0].uri, "snippet": "s"}],
+            "selected": [{"uri": index[0].uri, "credibility": 0.9, "origin": "index"}],
+            "mode": "index",
+        }
+
+    store = RunStore(tmp_path, stage_fns=fixture_stage_fns(), mode="live", discover=fake_discover)
+    run = _create(store)
+
+    assert run["discovery"]["queries"] == ["ai wearables news"]
+    assert run["discovery"]["query_source"] == "model"
+    trail = (tmp_path / run["id"] / "discovery.json").read_text(encoding="utf-8")
+    assert "ai wearables news" in trail
+
+    # reset re-discovers and rewrites the trail
+    store.edit_sources(run["id"], [])
+    store.reset_sources(run["id"])
+    assert store.snapshot(run["id"])["discovery"]["mode"] == "index"
 
 
 def test_start_pauses_at_the_gate_with_named_pending_edges(tmp_path):

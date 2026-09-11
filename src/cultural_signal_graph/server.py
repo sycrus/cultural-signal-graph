@@ -25,9 +25,16 @@ from .viz import build_cyto_elements, render_html
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-# The exportable, versionable outputs of a finalized run (the same artifacts the
-# batch path writes). An allowlist, so run_id/name can't traverse out of runs/.
-EXPORT_FILES = ("brief.md", "brief.json", "brief.pptx", "graph.ttl", "usage.json")
+# The exportable, versionable outputs of a run: the batch-path artifacts plus the
+# discovery search trail. An allowlist, so run_id/name can't traverse out of runs/.
+EXPORT_FILES = (
+    "brief.md",
+    "brief.json",
+    "brief.pptx",
+    "graph.ttl",
+    "usage.json",
+    "discovery.json",
+)
 
 
 class AskIn(BaseModel):

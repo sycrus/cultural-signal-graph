@@ -1,28 +1,48 @@
-"""Source discovery — known index + context-dependent selection + live backfill (#4, #10).
+"""Source discovery — model-guided web search + known index (issues #4, #10, #28).
 
-Given an ask (category + question + window), select the contextually relevant
-sources from a known index. When the index has no coverage for the ask's category,
-backfill from the live web (Wikipedia search — free, keyless) with a bounded result
-cap (ADR-0004; enabled in v2 by #10).
+Given an ask (category + question + window + market), select the contextually
+relevant sources. The web search is *model-guided*: one cheap-model call turns the
+ask into 2-3 search queries (far better than token-matching the raw question), and
+the results are pooled and deduplicated. Every category gets a bounded web top-up —
+the known index contributes high-credibility sources when it has coverage, but
+discovery no longer depends on it.
+
+Discovery is itself auditable: `discover_with_trace` returns the queries used, the
+raw results examined, and what was selected (index vs web), for the run's
+`discovery.json`. The cheap-model call is a thin seam (`_call_query_model`) so tests
+inject queries directly; when generation fails (no key, API hiccup) discovery falls
+back to the question-derived query and keeps going.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import re
 import urllib.parse
 import urllib.request
 
-from .models import CSG_NS, GAMING_NS, TECH_NS, Ask, SourceDoc
+from .extraction import EXTRACTION_MODEL
+from .llm import extract_json, get_client
+from .models import CSG_NS, GAMING_NS, TECH_NS, Ask, SourceDoc, Usage
+from .tracing import get_tracer, model_span, record_usage
+
+logger = logging.getLogger(__name__)
 
 # Bound the selection so a category with many sources returns a focused subset
 # ("not all"), while a known category always yields at least one ("not none").
 MAX_SOURCES = 3
 
-# Live backfill: bounded Wikipedia results per run (the cost cap — free API, capped requests).
+# Live web search: bounded results per query (the cost cap — free API, capped
+# requests), a bounded take when augmenting an indexed category, and a bounded
+# number of generated queries.
 MAX_WEB_BACKFILL = 5
+MAX_WEB_SOURCES = 3
+MAX_QUERIES = 3
 _WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
 _WEB_SOURCE_CREDIBILITY = 0.6
+
+QUERY_MODEL = EXTRACTION_MODEL  # the cheap tier — a handful of queries, not prose
 
 SOURCE_INDEX: list[SourceDoc] = [
     # Tech
@@ -110,19 +130,98 @@ def _tokenize(question: str) -> set[str]:
     }
 
 
-def discover_sources(ask: Ask, index: list[SourceDoc] = SOURCE_INDEX) -> list[SourceDoc]:
-    """Select the sources relevant to the ask (category, then topic + credibility);
-    backfill from the web when the index has no coverage for the category."""
-    candidates = [source for source in index if source.category == ask.category]
-    if not candidates:
-        return _web_backfill(ask)[:MAX_SOURCES]
-    tokens = _tokenize(ask.question)
+def _rank(ask: Ask):
+    """Rank index candidates by ask-topic overlap, then credibility."""
 
     def rank(source: SourceDoc) -> tuple[int, float]:
-        return (len(set(source.topics) & tokens), source.credibility)
+        return (len(set(source.topics) & _tokenize(ask.question)), source.credibility)
 
-    ranked = sorted(candidates, key=rank, reverse=True)
-    return ranked[:MAX_SOURCES]
+    return rank
+
+
+# --- model-guided queries (issue #28) ----------------------------------------
+
+
+def _fallback_queries(ask: Ask) -> list[str]:
+    """The deterministic query when generation fails: the ask itself."""
+    return [ask.question if not ask.market else f"{ask.question} {ask.market}"]
+
+
+def _parse_queries(raw: str) -> list[str]:
+    """Parse + validate a model's JSON response into 2-3 search queries."""
+    data = json.loads(extract_json(raw))
+    if not isinstance(data, list):
+        raise ValueError("query JSON must be a top-level array")
+    queries: list[str] = []
+    for q in data:
+        if isinstance(q, str) and q.strip() and q.strip() not in queries:
+            queries.append(q.strip())
+    if not queries:
+        raise ValueError("no usable queries in the model response")
+    return queries[:MAX_QUERIES]
+
+
+def _build_prompt(ask: Ask) -> str:
+    lines = [
+        "Write web search queries to find sources for a trend forecast: recent news,",
+        "industry coverage, and cultural chatter — not encyclopedia definitions.",
+        "",
+        f"Category: {ask.category}",
+        f"Question: {ask.question}",
+        f"Window: {ask.window.start} to {ask.window.end}",
+    ]
+    if ask.market:
+        lines.append(f"Market: {ask.market}")
+    lines += ["", 'Return a JSON array like ["query one", "query two"].']
+    return "\n".join(lines)
+
+
+def _call_query_model(ask: Ask) -> tuple[str, Usage]:
+    """The seam. Returns (raw model text, usage); monkeypatched in tests."""
+    system_prompt = (
+        "You write web search queries for a trend-forecast source search. "
+        "Return a single JSON array of 2-3 short query strings only — no prose, "
+        "no markdown fences."
+    )
+    response = get_client().messages.create(
+        model=QUERY_MODEL,
+        max_tokens=1000,
+        thinking={"type": "disabled"},
+        system=system_prompt,
+        messages=[{"role": "user", "content": _build_prompt(ask)}],
+    )
+    text = "".join(block.text for block in response.content if block.type == "text")
+    input_tokens = response.usage.input_tokens or 0
+    output_tokens = response.usage.output_tokens or 0
+    usage = Usage(
+        model=QUERY_MODEL,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=input_tokens + output_tokens,
+    )
+    return text, usage
+
+
+def _queries_with_source(ask: Ask, given: list[str] | None) -> tuple[list[str], str]:
+    """The queries to search with, and where they came from (the trace label)."""
+    if given is not None:
+        return list(given), "given"
+    try:
+        with get_tracer().start_as_current_span("discover_queries") as span:
+            text, usage = _call_query_model(ask)
+            record_usage(span, usage)
+        return _parse_queries(text), "model"
+    except Exception as exc:
+        logger.warning("query generation failed (%s); falling back to the ask", exc)
+        return _fallback_queries(ask), "fallback"
+
+
+def search_queries(ask: Ask) -> list[str]:
+    """2-3 search queries for an ask; falls back to the ask when generation fails."""
+    return _queries_with_source(ask, None)[0]
+
+
+# --- web search ---------------------------------------------------------------
 
 
 def _strip_html(text: str) -> str:
@@ -154,19 +253,96 @@ def _fetch_search_results(query: str, limit: int) -> list[dict]:
     ]
 
 
-def _web_backfill(ask: Ask, limit: int = MAX_WEB_BACKFILL) -> list[SourceDoc]:
-    """Backfill relevant sources from the live web when the known index has none."""
-    query = ask.question if not ask.market else f"{ask.question} {ask.market}"
-    results = _fetch_search_results(query, limit)
-    topics = tuple(sorted(_tokenize(ask.question)))
-    return [
-        SourceDoc(
-            uri=r["url"],
-            source_type=CSG_NS + "Source",
-            credibility=_WEB_SOURCE_CREDIBILITY,
-            category=ask.category,
-            text=r["snippet"],
-            topics=topics,
-        )
-        for r in results[:limit]
+def _search_records(queries: list[str], limit: int = MAX_WEB_BACKFILL) -> list[dict]:
+    """Run every query and pool the results, deduplicated by URL, each attributed
+    to the query that found it. A failing query is skipped, not fatal."""
+    records: list[dict] = []
+    seen: set[str] = set()
+    for query in queries:
+        try:
+            results = _fetch_search_results(query, limit)
+        except Exception as exc:
+            logger.warning("web search failed for %r: %s", query, exc)
+            continue
+        for record in results:
+            if record["url"] in seen:
+                continue
+            seen.add(record["url"])
+            records.append({**record, "query": query})
+    return records
+
+
+def _record_to_source(record: dict, ask: Ask) -> SourceDoc:
+    return SourceDoc(
+        uri=record["url"],
+        source_type=CSG_NS + "Source",
+        credibility=_WEB_SOURCE_CREDIBILITY,
+        category=ask.category,
+        text=record["snippet"],
+        topics=tuple(sorted(_tokenize(ask.question))),
+    )
+
+
+def _web_backfill(
+    ask: Ask, queries: list[str] | None = None, limit: int = MAX_WEB_BACKFILL
+) -> list[SourceDoc]:
+    """Backfill relevant sources from the live web. `queries=None` searches for the
+    ask itself (the deterministic, offline-testable path)."""
+    used = queries if queries is not None else _fallback_queries(ask)
+    records = _search_records(used, limit)
+    return [_record_to_source(record, ask) for record in records[:limit]]
+
+
+# --- selection ----------------------------------------------------------------
+
+
+def discover_sources(ask: Ask, index: list[SourceDoc] = SOURCE_INDEX) -> list[SourceDoc]:
+    """Select the sources relevant to the ask from a known index (ask-dependent
+    ranking); backfill from the web when the index has no coverage for the
+    category. The offline-compatible path — see `discover_with_trace` for the
+    model-guided, audited variant the run store uses."""
+    candidates = [source for source in index if source.category == ask.category]
+    if not candidates:
+        return _web_backfill(ask)[:MAX_SOURCES]
+    return sorted(candidates, key=_rank(ask), reverse=True)[:MAX_SOURCES]
+
+
+def discover_with_trace(
+    ask: Ask, index: list[SourceDoc] = SOURCE_INDEX, queries: list[str] | None = None
+) -> dict:
+    """Discover the sources for an ask with the full search trail attached.
+
+    Returns {"sources", "queries", "query_source", "results", "selected", "mode"}:
+    the selected corpus (index selection plus a bounded web top-up, or web-only for
+    unindexed categories), the queries actually searched, every unique result
+    examined, and per-source origin — the payload for `discovery.json`.
+    """
+    candidates = [source for source in index if source.category == ask.category]
+    index_selected = sorted(candidates, key=_rank(ask), reverse=True)[:MAX_SOURCES]
+
+    used, query_source = _queries_with_source(ask, queries)
+    records = _search_records(used)
+
+    index_uris = {source.uri for source in index_selected}
+    web_sources: list[SourceDoc] = []
+    for record in records:
+        if record["url"] in index_uris:
+            continue
+        web_sources.append(_record_to_source(record, ask))
+        if len(web_sources) >= MAX_WEB_SOURCES:
+            break
+
+    sources = index_selected + web_sources if candidates else web_sources
+    mode = "web" if not candidates else ("index+web" if web_sources else "index")
+    selected = [
+        {"uri": source.uri, "credibility": source.credibility, "origin": "web" if source not in index_selected else "index"}
+        for source in sources
     ]
+    return {
+        "sources": sources,
+        "queries": used,
+        "query_source": query_source,
+        "results": records,
+        "selected": selected,
+        "mode": mode,
+    }

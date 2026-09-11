@@ -15,8 +15,10 @@ cross-domain alignment edges **stop for human sign-off**.
 sources → extract (deepseek-v4-flash) → align (deepseek-v4-pro) → ⛔ sign-off → draft (deepseek-v4-pro) → brief + graph
 ```
 
-- **Source discovery** — select sources from a known index, or backfill from the live web
-  (Wikipedia) for an unfamiliar category.
+- **Source discovery** — the ask drives model-guided web search (a cheap-model call
+  writes 2-3 queries; free Wikipedia API), pooled and deduplicated; the known index
+  contributes high-credibility sources when it covers the category. The search trail
+  (queries, results examined, what was selected) is stored per run as `discovery.json`.
 - **Extraction** (cheap model) — sources → typed entities + signals with confidence and
   temporal validity.
 - **Alignment** (premium model) — propose cross-domain equivalence edges.
@@ -52,10 +54,11 @@ until the strategist signs off, which is the moment the product adds judgment.
 Ask  →  Sources  →  Run  →  ⛔ Sign-off  →  Brief  →  Graph / Metrics
 ```
 
-- **Ask** — category, question, window, optional market; source discovery selects
-  the sources (index, or live backfill for an unfamiliar category).
-- **Sources** — collapsed by default, auditable; add, remove, or reset before
-  extraction runs. Sources lock once the run starts.
+- **Ask** — category, question, window, optional market; discovery searches the web
+  with cheap-model-generated queries and supplements from the known index.
+- **Sources** — collapsed by default, auditable (the discovery trace shows the
+  queries and what they returned); add, remove, or reset before extraction runs.
+  Sources lock once the run starts.
 - **Run** — each stage reports its tokens + latency, recorded at the stage boundary.
 - **Sign-off** — the run stops at the gate; approve or reject each proposed
   cross-domain equivalence edge (approve → "real", reject → dropped). The decision
@@ -95,6 +98,7 @@ are file reads, never a database:
 | `run.json` | the ask, sources, stage status with per-stage tokens/latency, sign-off state |
 | `checkpoints.sqlite` | the LangGraph checkpoint — a paused run resumes across restarts |
 | `state-pause.json` / `state-final.json` | the state at the gate / at finalize (undo, metrics, reopen) |
+| `discovery.json` | the search trail: queries, results examined, what was selected |
 | `brief.md` … `usage.json` | the same six artifacts as the batch path, per run |
 | `trends.json` | recorded trends, checked later for prediction accuracy |
 | `notes.json` | the annotations overlay |

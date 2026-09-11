@@ -1,19 +1,25 @@
-"""Issue #4 acceptance tests for source discovery."""
+"""Issue #4/#28 acceptance tests for source discovery (index + model-guided web)."""
 
 from cultural_signal_graph.discovery import (
+    MAX_QUERIES,
     MAX_SOURCES,
     MAX_WEB_BACKFILL,
+    MAX_WEB_SOURCES,
     SOURCE_INDEX,
+    _fallback_queries,
+    _parse_queries,
     _web_backfill,
     discover_sources,
+    discover_with_trace,
+    search_queries,
 )
-from cultural_signal_graph.models import Ask, TimeWindow
+from cultural_signal_graph.models import Ask, TimeWindow, Usage
 
 WINDOW = TimeWindow(start="2026-01-01", end="2026-06-30")
 
 
-def _ask(category: str, question: str) -> Ask:
-    return Ask(category=category, question=question, window=WINDOW)
+def _ask(category: str, question: str, market: str | None = None) -> Ask:
+    return Ask(category=category, question=question, window=WINDOW, market=market)
 
 
 def test_selection_is_proper_subset():
@@ -87,3 +93,109 @@ def test_discover_sources_backfills_when_index_empty(monkeypatch):
     selected = discover_sources(_ask("fashion", "Foo"))  # fashion not in SOURCE_INDEX
     assert selected
     assert selected[0].category == "fashion"
+
+
+# --- model-guided queries (#28) ------------------------------------------------
+
+
+def test_parse_queries_validates_and_caps():
+    assert _parse_queries('["quiet luxury", "stealth wealth brands", "  ", 42, "quiet luxury"]') == [
+        "quiet luxury",
+        "stealth wealth brands",
+    ]
+    assert _parse_queries('["a", "b", "c", "d"]') == ["a", "b", "c"]  # capped at MAX_QUERIES
+    assert len(_parse_queries('["a", "b", "c", "d"]')) <= MAX_QUERIES
+
+
+def test_search_queries_uses_the_model_seam(monkeypatch):
+    calls = []
+
+    def fake_model(ask):
+        calls.append(ask)
+        return '["quiet luxury fashion 2026", "stealth wealth brands"]', Usage("m", 10, 5, 15)
+
+    monkeypatch.setattr("cultural_signal_graph.discovery._call_query_model", fake_model)
+    assert search_queries(_ask("fashion", "quiet luxury adoption")) == [
+        "quiet luxury fashion 2026",
+        "stealth wealth brands",
+    ]
+    assert calls == [_ask("fashion", "quiet luxury adoption")]
+
+
+def test_search_queries_falls_back_to_the_ask(monkeypatch):
+    def broken(ask):
+        raise RuntimeError("no key")
+
+    monkeypatch.setattr("cultural_signal_graph.discovery._call_query_model", broken)
+    assert search_queries(_ask("fashion", "quiet luxury adoption")) == _fallback_queries(
+        _ask("fashion", "quiet luxury adoption")
+    )
+    assert search_queries(_ask("fashion", "quiet luxury", market="SEA")) == [
+        "quiet luxury SEA"
+    ]
+
+
+# --- discovery with a trace ------------------------------------------------------
+
+
+def _stub_fetch(monkeypatch, results):
+    monkeypatch.setattr(
+        "cultural_signal_graph.discovery._fetch_search_results", lambda query, limit: results
+    )
+
+
+def test_discover_with_trace_unions_index_and_web(monkeypatch):
+    _stub_fetch(
+        monkeypatch,
+        [
+            {"title": "Web hit", "url": "https://en.wikipedia.org/wiki/Web_hit", "snippet": "fresh"},
+            # a URL the index already covers: selected as index, never duplicated
+            {"title": "Index dup", "url": "https://example.com/release-notes/ai-wearables", "snippet": "dup"},
+        ],
+    )
+    found = discover_with_trace(_ask("tech", "AI wearables adoption"), queries=["ai wearables news"])
+
+    origins = {s["uri"]: s["origin"] for s in found["selected"]}
+    assert found["mode"] == "index+web"
+    assert origins["https://example.com/release-notes/ai-wearables"] == "index"
+    assert origins["https://en.wikipedia.org/wiki/Web_hit"] == "web"
+    assert found["query_source"] == "given"
+    assert found["results"][0]["query"] == "ai wearables news"  # attribution kept
+    assert len({r["url"] for r in found["results"]}) == len(found["results"])  # deduped
+
+
+def test_discover_with_trace_web_only_for_unindexed_categories(monkeypatch):
+    results = [{"title": f"T{i}", "url": f"https://en.wikipedia.org/wiki/T{i}", "snippet": "x"} for i in range(10)]
+    monkeypatch.setattr(
+        "cultural_signal_graph.discovery._fetch_search_results", lambda query, limit: results[:limit]
+    )
+    found = discover_with_trace(_ask("fashion", "quiet luxury"), queries=["quiet luxury"])
+    assert found["mode"] == "web"
+    assert len(found["sources"]) <= MAX_WEB_SOURCES
+    assert len(found["results"]) <= MAX_WEB_BACKFILL
+    assert all(s["origin"] == "web" for s in found["selected"])
+
+
+def test_discover_with_trace_survives_a_failing_query(monkeypatch):
+    def flaky(query, limit):
+        if query == "broken":
+            raise OSError("network down")
+        return [{"title": "OK", "url": "https://en.wikipedia.org/wiki/OK", "snippet": "x"}]
+
+    monkeypatch.setattr("cultural_signal_graph.discovery._fetch_search_results", flaky)
+    found = discover_with_trace(_ask("fashion", "x"), queries=["broken", "works"])
+    assert found["mode"] == "web"
+    assert [r["query"] for r in found["results"]] == ["works"]
+
+
+def test_web_backfill_accepts_queries_arg(monkeypatch):
+    seen = []
+
+    def fetch(query, limit):
+        seen.append(query)
+        return [{"title": "T", "url": "https://en.wikipedia.org/wiki/T", "snippet": "x"}]
+
+    monkeypatch.setattr("cultural_signal_graph.discovery._fetch_search_results", fetch)
+    sources = _web_backfill(_ask("fashion", "q"), queries=["one", "two"])
+    assert seen == ["one", "two"]
+    assert sources

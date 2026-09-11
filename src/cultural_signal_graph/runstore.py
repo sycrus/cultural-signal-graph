@@ -29,7 +29,7 @@ from langgraph.types import Command
 
 from .checkpoint import dump_state, file_checkpointer
 from .config import load_dotenv
-from .discovery import SOURCE_INDEX, discover_sources
+from .discovery import SOURCE_INDEX, discover_with_trace
 from .eval import DEFAULT_THRESHOLDS, check, evaluate
 from .fixtures import ALIGNED_EDGES, DRAFTED_REASONING, EXTRACTED, SEED_CORPUS
 from .golden import SEED_CASE
@@ -99,7 +99,9 @@ class RunStore:
         self,
         root: str | Path = "runs",
         stage_fns: StateFns | None = None,
+        mode: str | None = None,
         index: list[SourceDoc] | None = None,
+        discover=None,
     ):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
@@ -108,8 +110,9 @@ class RunStore:
         self._extract_fn, self._align_fn, self._draft_fn = stage_fns
         # mode records which stages a run will actually execute (function identity,
         # since live_stage_fns() hands back the module-level functions).
-        self.mode = "live" if stage_fns == live_stage_fns() else "fixture"
+        self.mode = mode or ("live" if stage_fns == live_stage_fns() else "fixture")
         self._index = index if index is not None else SOURCE_INDEX
+        self._discover = discover if discover is not None else discover_with_trace
 
     # --- lifecycle ---------------------------------------------------------
 
@@ -129,7 +132,11 @@ class RunStore:
             window=TimeWindow(start=window_start, end=window_end),
             market=market or None,
         )
-        sources = self._select_sources(ask)
+        # discovery may invoke the cheap model (query generation); its usage belongs
+        # to this run's cost, alongside the stage calls
+        before = len(get_usage())
+        sources, trace = self._select_sources(ask)
+        usage_delta = get_usage()[before:]
         run = {
             "id": run_id,
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -145,12 +152,14 @@ class RunStore:
             "stages": {name: {"status": "pending"} for name in STAGES},
             "pending": [],
             "decisions": {},
-            "usage_calls": [],
+            "usage_calls": [asdict(u) for u in usage_delta],
             "thread_gen": 0,
         }
         run["stages"]["ask"] = {"status": "done"}
         run["stages"]["sources"] = {"status": "done"}
         self._save(run)
+        if trace is not None:
+            self._save_trace(run_id, trace)
         return self.snapshot(run_id)
 
     def start(self, run_id: str) -> dict:
@@ -256,21 +265,32 @@ class RunStore:
         return self.snapshot(run_id)
 
     def reset_sources(self, run_id: str) -> dict:
-        """Restore the auto-discovered source set."""
+        """Restore the auto-discovered source set (and its search trail)."""
         run = self._require(run_id, "created")
-        run["sources"] = [
-            source_doc_to_dict(s) for s in self._select_sources(self._ask(run))
-        ]
+        before = len(get_usage())
+        sources, trace = self._select_sources(self._ask(run))
+        run["usage_calls"].extend(asdict(u) for u in get_usage()[before:])
+        run["sources"] = [source_doc_to_dict(s) for s in sources]
         self._save(run)
+        if trace is not None:
+            self._save_trace(run_id, trace)
         return self.snapshot(run_id)
 
-    def _select_sources(self, ask: Ask) -> list[SourceDoc]:
-        """The auto-discovered sources for an ask. Fixture runs pin the seed corpus:
-        the recorded outputs are authored against it, so discovery's index selection
-        would leave the fixture signals with nothing to cite. Live runs discover."""
+    def _select_sources(self, ask: Ask) -> tuple[list[SourceDoc], dict | None]:
+        """The auto-discovered sources for an ask, with the search trail (None in
+        fixture mode). Fixture runs pin the seed corpus: the recorded outputs are
+        authored against it, so discovery's selection would leave the fixture
+        signals with nothing to cite. Live runs discover."""
         if self.mode == "fixture":
-            return list(SEED_CORPUS)
-        return discover_sources(ask, self._index)
+            return list(SEED_CORPUS), None
+        found = self._discover(ask, self._index)
+        return found["sources"], {k: v for k, v in found.items() if k != "sources"}
+
+    def _save_trace(self, run_id: str, trace: dict) -> None:
+        """The discovery search trail — an audit artifact like the rest."""
+        self.artifact_path(run_id, "discovery.json").write_text(
+            json.dumps(trace, indent=2), encoding="utf-8"
+        )
 
     # --- metrics -------------------------------------------------------------
 
@@ -353,6 +373,7 @@ class RunStore:
         run = self._load(run_id)
         brief_path = self._dir(run_id) / "brief.json"
         usage_path = self._dir(run_id) / "usage.json"
+        discovery_path = self._dir(run_id) / "discovery.json"
         return {
             "id": run["id"],
             "created_at": run["created_at"],
@@ -368,6 +389,9 @@ class RunStore:
             else None,
             "usage": json.loads(usage_path.read_text(encoding="utf-8"))
             if usage_path.exists()
+            else None,
+            "discovery": json.loads(discovery_path.read_text(encoding="utf-8"))
+            if discovery_path.exists()
             else None,
         }
 
