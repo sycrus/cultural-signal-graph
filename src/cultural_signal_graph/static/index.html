@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cultural Signal Graph</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header id="topbar">
+  <span class="brand">Cultural Signal Graph</span>
+  <span id="mode-badge" class="badge" hidden title="Fixture stages run on recorded outputs — no model, no network"></span>
+  <span class="spacer"></span>
+  <button id="btn-runs" class="ghost" hidden>&larr; Runs</button>
+</header>
+<div id="layout">
+  <nav id="rail" aria-label="Pipeline stages"></nav>
+  <main id="canvas"></main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

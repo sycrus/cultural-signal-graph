@@ -35,8 +35,13 @@ uv sync                      # install dependencies
 
 cp .env.example .env         # then set DEEPSEEK_API_KEY=sk-...  (auto-loaded)
 
-python -m cultural_signal_graph
+python -m cultural_signal_graph         # batch run: writes the six files into out/
+python -m cultural_signal_graph.server  # UI: local web app, opens in the browser
 ```
+
+Without `DEEPSEEK_API_KEY`, the web app runs in **fixture mode** — the recorded demo
+outputs, no model calls — so the whole loop (ask → sources → run → sign-off → brief →
+graph → metrics) is explorable offline.
 
 The provider is **DeepSeek**, called through its Anthropic-compatible endpoint
 (`https://api.deepseek.com/anthropic`): `deepseek-v4-flash` for the cheap tier, `deepseek-v4-pro`
@@ -69,6 +74,7 @@ src/cultural_signal_graph/
   eval.py        eval harness + regression gate   golden.py  golden set
   tracing.py     OpenTelemetry spans           checkpoint.py  file-backed checkpoints
   llm.py         DeepSeek client + JSON/CURIE helpers
+  server.py      local web app (FastAPI)       runstore.py  runs/ dir state machine
   ontology/      upper.ttl, tech.ttl, gaming.ttl, shapes.ttl (SHACL)
 ```
 
@@ -78,7 +84,7 @@ src/cultural_signal_graph/
 uv run pytest
 ```
 
-60 tests, all fixture-based — no network or API key required. The eval harness
+72 tests, all fixture-based — no network or API key required. The eval harness
 (`python -m cultural_signal_graph.eval_main`) runs the golden set and enforces the regression
 gate.
 

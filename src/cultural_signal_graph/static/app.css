@@ -1,0 +1,150 @@
+/* Stepper shell — one left rail of stages, one canvas. */
+
+:root {
+  --border: #d1d5db;
+  --muted: #6b7280;
+  --ink: #111827;
+  --accent: #3b82f6;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --card: #ffffff;
+  --bg: #f5f6f8;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+#topbar .brand { font-weight: 650; font-size: 15px; }
+#topbar .spacer { flex: 1; }
+
+#layout { flex: 1; display: flex; min-height: 0; }
+
+#rail {
+  width: 200px;
+  flex: none;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-right: 1px solid var(--border);
+  background: var(--card);
+}
+.rail-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  color: var(--muted);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.rail-item .dot {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: var(--card);
+}
+.rail-item.done { color: var(--ink); }
+.rail-item.done .dot { background: var(--ok); border-color: var(--ok); }
+.rail-item.done .dot::after { content: "\2713"; }
+.rail-item.action { color: var(--ink); border-color: var(--warn); }
+.rail-item.action .dot { background: var(--warn); border-color: var(--warn); }
+.rail-item.action .dot::after { content: "\2691"; }
+.rail-item.active {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: #eff6ff;
+  cursor: pointer;
+}
+.rail-item.active .dot { border-color: var(--accent); }
+.rail-item.current .dot { border-color: var(--accent); box-shadow: 0 0 0 3px #bfdbfe; }
+.rail-item.blocked .dot::after { content: ""; }
+
+#canvas { flex: 1; overflow: auto; padding: 22px; }
+.canvas-narrow { max-width: 720px; margin: 0 auto; }
+
+h1 { font-size: 18px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 18px 0 8px; }
+.lede { color: var(--muted); margin: 0 0 18px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+button {
+  font: inherit;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  cursor: pointer;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.ghost { border-color: transparent; background: none; color: var(--muted); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+label { display: block; margin: 12px 0 4px; font-weight: 550; }
+input, select {
+  font: inherit;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+.hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 550; font-size: 12px; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: #f0f4ff; }
+
+.badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
+.status.created { color: var(--muted); }
+.status.paused { color: #92400e; background: #fef3c7; border-color: #fcd34d; }
+.status.completed { color: #166534; background: #dcfce7; border-color: #86efac; }
+.status.running { color: var(--accent); background: #eff6ff; border-color: #bfdbfe; }
+
+.error { color: var(--danger); margin-top: 10px; }

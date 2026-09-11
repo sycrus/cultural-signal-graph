@@ -27,3 +27,6 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local web app run state
+runs/
