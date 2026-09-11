@@ -84,7 +84,7 @@ src/cultural_signal_graph/
 uv run pytest
 ```
 
-72 tests, all fixture-based — no network or API key required. The eval harness
+84 tests, all fixture-based — no network or API key required. The eval harness
 (`python -m cultural_signal_graph.eval_main`) runs the golden set and enforces the regression
 gate.
 
