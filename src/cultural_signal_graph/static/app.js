@@ -20,6 +20,7 @@ const state = {
   runs: [],
   busy: false,
   error: null,
+  signoffDraft: {}, // edge id -> true(approve) | false(reject), before confirming
 };
 
 async function api(path, opts = {}) {
@@ -238,6 +239,75 @@ function renderRun() {
   </div>`;
 }
 
+function renderSignOff() {
+  const s = state.snap;
+  const undoable = s.status === "completed" && Object.keys(s.decisions || {}).length > 0;
+  if (s.status !== "paused" && !undoable) {
+    return renderPlaceholder(
+      "Sign-off",
+      "No cross-domain edges were proposed for this run, so nothing needed a decision.",
+    );
+  }
+
+  if (undoable) {
+    const rows = Object.entries(s.decisions)
+      .map(([id, approved]) => {
+        const edge = (s.pending || []).find((e) => e.id === id);
+        const label = edge ? `${escapeHtml(edge.left)} ≈ ${escapeHtml(edge.right)}` : id;
+        return `<div class="edge-card decided">
+          <div class="edge-head">${label}</div>
+          <div class="edge-verdict ${approved ? "approved" : "rejected"}">
+            ${approved ? "✓ approved — asserted as real" : "✕ rejected — dropped"}</div>
+        </div>`;
+      })
+      .join("");
+    return `
+    <div class="canvas-narrow">
+      <h1>Sign-off</h1>
+      <p class="lede">Your decision is recorded but stays editable until you export.
+      Undoing re-runs the downstream (draft → brief) and parks the run back here.</p>
+      ${rows}
+      ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
+      <div style="margin-top:14px">
+        <button id="btn-undo-signoff">Undo sign-off &amp; re-decide</button>
+      </div>
+    </div>`;
+  }
+
+  const decided = state.signoffDraft || {};
+  const all = s.pending.every((e) => e.id in decided);
+  const cards = s.pending
+    .map(
+      (e) => `
+    <div class="edge-card">
+      <div class="edge-head">${escapeHtml(e.left)} <span class="approx">≈</span> ${escapeHtml(e.right)}</div>
+      <div class="edge-meta">confidence ${e.confidence} · ${escapeHtml(e.left_category)} ⇄ ${escapeHtml(e.right_category)}</div>
+      <div class="edge-actions">
+        <button class="${decided[e.id] === true ? "primary" : ""}" data-decide="${e.id}" data-value="true"
+          ${decided[e.id] === false ? "disabled" : ""}>✓ Approve</button>
+        <button class="${decided[e.id] === false ? "danger-active" : ""}" data-decide="${e.id}" data-value="false"
+          ${decided[e.id] === true ? "disabled" : ""}>✕ Reject</button>
+        ${e.id in decided ? `<span class="edge-verdict ${decided[e.id] ? "approved" : "rejected"}">your call: ${decided[e.id] ? "real" : "dropped"} — reversible until export</span>` : ""}
+      </div>
+    </div>`,
+    )
+    .join("");
+  return `
+  <div class="canvas-narrow">
+    <h1>Sign-off</h1>
+    <p class="lede">The run is <b>paused</b> until you decide. Approving asserts a
+    cross-domain link as real; rejecting drops it and keeps the categories separate.</p>
+    <p class="review-count">◉ Review ${s.pending.length} cross-domain link${s.pending.length === 1 ? "" : "s"}</p>
+    ${cards}
+    ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
+    <div style="margin-top:14px; display:flex; gap:10px; align-items:center">
+      <button class="primary" id="btn-confirm-signoff" ${all && !state.busy ? "" : "disabled"}>
+        ${state.busy ? "Resuming the run…" : "Confirm sign-off →"}</button>
+      ${all ? "" : `<span class="hint">Decide every proposed link to resume the run.</span>`}
+    </div>
+  </div>`;
+}
+
 function renderPlaceholder(title, note) {
   return `<div class="canvas-narrow">
     <h1>${title}</h1>
@@ -250,7 +320,7 @@ const VIEWS = {
   ask: renderAsk,
   sources: renderSources,
   run: renderRun,
-  "sign-off": () => renderPlaceholder("Sign-off", "The sign-off loop lands next: approve or reject each proposed cross-domain edge."),
+  "sign-off": renderSignOff,
   brief: () => renderPlaceholder("Brief", "The brief review surface lands with the brief step."),
   graph: () => renderPlaceholder("Graph", "The graph explorer lands with the graph step."),
   metrics: () => renderPlaceholder("Metrics", "Eval scores, cost, and prediction accuracy land with the metrics step."),
@@ -302,6 +372,11 @@ function bind() {
   document.querySelectorAll("button[data-remove]").forEach((btn) => {
     btn.addEventListener("click", () => removeSource(Number(btn.dataset.remove)));
   });
+  document.querySelectorAll("button[data-decide]").forEach((btn) => {
+    btn.addEventListener("click", () => decide(btn.dataset.decide, btn.dataset.value === "true"));
+  });
+  on("btn-confirm-signoff", "click", confirmSignoff);
+  on("btn-undo-signoff", "click", undoSignoff);
 }
 
 /* --- actions ------------------------------------------------------------ */
@@ -369,6 +444,7 @@ async function startRun() {
   state.view = "run";
   state.busy = true;
   state.error = null;
+  state.signoffDraft = {};
   render();
   try {
     state.snap = await api(`/api/runs/${state.runId}/start`, { method: "POST" });
@@ -384,7 +460,45 @@ async function startRun() {
 async function openRun(runId) {
   state.snap = await api(`/api/runs/${runId}`);
   state.runId = runId;
+  state.signoffDraft = {};
   state.view = currentStage(state.snap);
+  render();
+}
+
+/* --- sign-off ------------------------------------------------------------ */
+
+function decide(edgeId, approved) {
+  state.signoffDraft = { ...state.signoffDraft, [edgeId]: approved };
+  render();
+}
+
+async function confirmSignoff() {
+  state.busy = true;
+  state.error = null;
+  render();
+  try {
+    state.snap = await api(`/api/runs/${state.runId}/signoff`, {
+      method: "POST",
+      body: { decisions: state.signoffDraft },
+    });
+    state.signoffDraft = {};
+    state.view = currentStage(state.snap);
+  } catch (err) {
+    state.error = String(err.message || err);
+  }
+  state.busy = false;
+  render();
+}
+
+async function undoSignoff() {
+  try {
+    state.snap = await api(`/api/runs/${state.runId}/signoff/undo`, { method: "POST" });
+    state.signoffDraft = {};
+    state.view = "sign-off";
+    state.error = null;
+  } catch (err) {
+    state.error = String(err.message || err);
+  }
   render();
 }
 

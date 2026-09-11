@@ -43,6 +43,10 @@ class SourcesIn(BaseModel):
     sources: list[SourceIn]
 
 
+class SignoffIn(BaseModel):
+    decisions: dict[str, bool]
+
+
 def create_app(store: RunStore | None = None) -> FastAPI:
     store = store or RunStore()
     app = FastAPI(title="Cultural Signal Graph")
@@ -95,6 +99,24 @@ def create_app(store: RunStore | None = None) -> FastAPI:
     def start_run(run_id: str) -> dict:
         try:
             return store.start(run_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown run: {run_id}") from None
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+
+    @app.post("/api/runs/{run_id}/signoff")
+    def signoff(run_id: str, body: SignoffIn) -> dict:
+        try:
+            return store.signoff(run_id, body.decisions)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown run: {run_id}") from None
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+
+    @app.post("/api/runs/{run_id}/signoff/undo")
+    def undo_signoff(run_id: str) -> dict:
+        try:
+            return store.undo_signoff(run_id)
         except KeyError:
             raise HTTPException(status_code=404, detail=f"unknown run: {run_id}") from None
         except ValueError as exc:

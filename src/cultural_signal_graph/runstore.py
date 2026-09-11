@@ -374,14 +374,20 @@ class RunStore:
     @staticmethod
     def _pending(payload: list[dict], extraction: dict) -> list[dict]:
         """The gate's sign_off payload, with entity ids resolved to display names."""
-        names = {e["id"]: e["name"] for e in extraction["entities"]}
+        by_id = {e["id"]: e for e in extraction["entities"]}
+
+        def field(entity_id: str, key: str, fallback: str) -> str:
+            return by_id.get(entity_id, {}).get(key, fallback)
+
         return [
             {
                 "id": e["id"],
                 "left_entity_id": e["left_entity_id"],
                 "right_entity_id": e["right_entity_id"],
-                "left": names.get(e["left_entity_id"], e["left_entity_id"]),
-                "right": names.get(e["right_entity_id"], e["right_entity_id"]),
+                "left": field(e["left_entity_id"], "name", e["left_entity_id"]),
+                "right": field(e["right_entity_id"], "name", e["right_entity_id"]),
+                "left_category": field(e["left_entity_id"], "category", "?"),
+                "right_category": field(e["right_entity_id"], "category", "?"),
                 "confidence": e["confidence"],
             }
             for e in payload

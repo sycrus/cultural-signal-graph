@@ -90,3 +90,58 @@ def test_start_pauses_at_the_gate_then_conflicts(client, run_id):
 
     res = client.post(f"/api/runs/{run_id}/start")
     assert res.status_code == 409
+
+
+EDGE_ID = "edge-ai-headset-wearables"
+
+
+def test_signoff_approve_resumes_and_finalizes(client, run_id):
+    client.post(f"/api/runs/{run_id}/start")
+
+    res = client.post(f"/api/runs/{run_id}/signoff", json={"decisions": {EDGE_ID: True}})
+    assert res.status_code == 200
+    snap = res.json()
+    assert snap["status"] == "completed"
+    assert snap["pending"] == []
+    assert snap["decisions"] == {EDGE_ID: True}
+    assert snap["brief"]["gated_edges"][0]["status"] == "real"
+
+    # the run is no longer at the gate
+    res = client.post(f"/api/runs/{run_id}/signoff", json={"decisions": {EDGE_ID: False}})
+    assert res.status_code == 409
+
+
+def test_signoff_undo_reopens_the_decision(client, run_id):
+    client.post(f"/api/runs/{run_id}/start")
+    client.post(f"/api/runs/{run_id}/signoff", json={"decisions": {EDGE_ID: True}})
+
+    res = client.post(f"/api/runs/{run_id}/signoff/undo")
+    assert res.status_code == 200
+    snap = res.json()
+    assert snap["status"] == "paused"
+    assert snap["decisions"] == {}
+    assert [e["id"] for e in snap["pending"]] == [EDGE_ID]
+    assert snap["pending"][0]["left_category"] == "gaming"
+
+    # the re-made decision goes through and the brief reflects it
+    res = client.post(f"/api/runs/{run_id}/signoff", json={"decisions": {EDGE_ID: False}})
+    assert res.status_code == 200
+    assert res.json()["brief"]["gated_edges"][0]["status"] == "rejected"
+
+
+def test_undo_without_a_pause_conflicts(tmp_path):
+    # the injected align proposes no edges, so the run never pauses at the gate
+    fns = fixture_stage_fns()
+    store = RunStore(tmp_path, stage_fns=(fns[0], lambda _e: [], fns[2]))
+    client = TestClient(create_app(store))
+    run = client.post(
+        "/api/runs",
+        json={
+            "category": "tech",
+            "question": "AI wearables adoption",
+            "window_start": "2026-01-01",
+            "window_end": "2026-06-30",
+        },
+    ).json()
+    client.post(f"/api/runs/{run['id']}/start")
+    assert client.post(f"/api/runs/{run['id']}/signoff/undo").status_code == 409
