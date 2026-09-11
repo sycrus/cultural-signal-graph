@@ -46,7 +46,7 @@ from .pipeline import build_forecast_graph, forecast_run_from_state, initial_sta
 from .slides import write_presentation
 from .tracking import record_trends, report_accuracy
 from .tracing import get_usage
-from .viz import write_graph_html
+from .viz import build_cyto_elements, write_graph_html
 
 load_dotenv()
 
@@ -384,10 +384,13 @@ class RunStore:
         self, run_id: str, target_id: str, text: str, author: str = "strategist", target_kind: str = "node"
     ) -> dict:
         """Attach a note to a node/edge. Appended with author + timestamp; nothing
-        about the run's reasoning, graph, or brief is touched."""
+        about the run's reasoning, graph, or brief is touched. The target must exist
+        in the run's graph (nodes and edges carry stable ids)."""
         self._load(run_id)  # notes attach to a real run
         if not text.strip():
             raise ValueError("note text is empty")
+        if target_id not in self._graph_ids(run_id):
+            raise ValueError(f"unknown note target: {target_id}")
         note = {
             "target_id": target_id,
             "target_kind": target_kind,
@@ -400,6 +403,14 @@ class RunStore:
         path = self._dir(run_id) / "notes.json"
         path.write_text(json.dumps(notes, indent=2), encoding="utf-8")
         return note
+
+    def _graph_ids(self, run_id: str) -> set[str]:
+        """Every node/edge id the graph exposes (the valid note targets)."""
+        state_path = self._dir(run_id) / "state-final.json"
+        if not state_path.exists():
+            return set()
+        elements = build_cyto_elements(forecast_run_from_state(json.loads(state_path.read_text(encoding="utf-8"))))
+        return {n["data"]["id"] for n in elements["nodes"]} | {e["data"]["id"] for e in elements["edges"]}
 
     # --- internals -----------------------------------------------------------
 
@@ -435,7 +446,11 @@ class RunStore:
         run_id = run["id"]
         out = self._dir(run_id)
         started = time.perf_counter()
-        run["stages"]["sign-off"] = {"status": "done"}
+        run["stages"]["sign-off"] = {
+            "status": "done",
+            "tokens": 0,  # the gate is a human decision, not a model call
+            "latency_ms": 0.0,
+        }
         forecast = forecast_run_from_state(values)
         dump_state(values, out / "state-final.json")
         (out / "brief.md").write_text(forecast.brief.to_markdown(), encoding="utf-8")
@@ -506,6 +521,10 @@ class RunStore:
 
     def _checkpointer(self, run_id: str):
         return file_checkpointer(str(self._dir(run_id) / "checkpoints.sqlite"))
+
+    def artifact_path(self, run_id: str, name: str) -> Path:
+        """A file inside the run's directory (state dumps, exports)."""
+        return self._dir(run_id) / name
 
     def _run_ids(self) -> list[str]:
         return sorted(p.name for p in self.root.iterdir() if (p / "run.json").exists())

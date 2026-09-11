@@ -1,4 +1,7 @@
-"""Issue #20 acceptance tests for the local web app server."""
+"""Server-level acceptance tests for the v3 UI (issues #20–#26).
+
+The RunStore lifecycle is covered in test_runstore.py; these exercise the HTTP
+seams — routing, status codes, and payloads — over a fixture-mode store."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -129,13 +132,21 @@ def test_graph_explorer_serves_for_the_embed(client, run_id):
 
 
 def test_notes_round_trip(client, run_id):
+    client.post(f"/api/runs/{run_id}/start")
+    client.post(f"/api/runs/{run_id}/signoff", json={"decisions": {EDGE_ID: True}})
+
     res = client.get(f"/api/runs/{run_id}/notes")
     assert res.status_code == 200
     assert res.json() == []
 
     res = client.post(
         f"/api/runs/{run_id}/notes",
-        json={"target_id": "sig-release-note", "target_kind": "node", "text": "check vs Q3 numbers", "author": "joe"},
+        json={
+            "target_id": "https://cultural-signal-graph.dev/example#sig-release-note",
+            "target_kind": "node",
+            "text": "check vs Q3 numbers",
+            "author": "joe",
+        },
     )
     assert res.status_code == 201
     note = res.json()
@@ -144,10 +155,27 @@ def test_notes_round_trip(client, run_id):
 
     assert client.get(f"/api/runs/{run_id}/notes").json() == [note]
 
-    assert (
-        client.post(f"/api/runs/{run_id}/notes", json={"target_id": "x", "text": "  "}).status_code
-        == 422
+    # empty text can't be applied to the run
+    res = client.post(
+        f"/api/runs/{run_id}/notes",
+        json={"target_id": "https://cultural-signal-graph.dev/example#sig-release-note", "text": "  "},
     )
+    assert res.status_code == 409
+
+
+def test_notes_must_target_a_graph_id(client, run_id):
+    client.post(f"/api/runs/{run_id}/start")
+    client.post(f"/api/runs/{run_id}/signoff", json={"decisions": {EDGE_ID: True}})
+
+    ok = client.post(
+        f"/api/runs/{run_id}/notes",
+        json={"target_id": "https://cultural-signal-graph.dev/example#edge-ai-headset-wearables", "target_kind": "edge", "text": "noted"},
+    )
+    assert ok.status_code == 201
+
+    res = client.post(f"/api/runs/{run_id}/notes", json={"target_id": "not-a-node", "text": "ghost"})
+    assert res.status_code == 409
+    assert "unknown note target" in res.json()["detail"]
 
 
 def test_metrics_report_for_a_completed_seed_run(client, run_id):

@@ -1,4 +1,5 @@
-"""Issues #20–#22 acceptance tests for the file-backed run store."""
+"""Acceptance tests for the file-backed run store: lifecycle (#20–#22), the notes
+overlay (#25), and reopen/metrics data (#26). All fixture-based, no network."""
 
 import pytest
 
@@ -160,12 +161,11 @@ def test_notes_are_an_append_only_overlay(tmp_path):
     brief_before = (tmp_path / run_id / "brief.json").read_bytes()
     graph_before = (tmp_path / run_id / "graph.ttl").read_bytes()
 
-    note = store.add_note(
-        run_id, target_id="ai_wearables", text="Watch Qwen roadmap here.", author="joe"
-    )
+    entity = "https://cultural-signal-graph.dev/example#ai_wearables"
+    note = store.add_note(run_id, target_id=entity, text="Watch Qwen roadmap here.", author="joe")
     assert note["author"] == "joe"
     assert note["created_at"]
-    store.add_note(run_id, target_id="ai_wearables", text="Second note.")
+    store.add_note(run_id, target_id=entity, text="Second note.")
 
     notes = store.notes(run_id)
     assert [n["text"] for n in notes] == ["Watch Qwen roadmap here.", "Second note."]
@@ -176,4 +176,6 @@ def test_notes_are_an_append_only_overlay(tmp_path):
     assert (tmp_path / run_id / "graph.ttl").read_bytes() == graph_before
 
     with pytest.raises(ValueError):
-        store.add_note(run_id, target_id="ai_wearables", text="   ")
+        store.add_note(run_id, target_id=entity, text="   ")
+    with pytest.raises(ValueError):
+        store.add_note(run_id, target_id="no-such-node", text="ghost note")

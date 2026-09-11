@@ -153,12 +153,12 @@ const cy = cytoscape({
 function detailHtml(id, kind) {
   const el = cy.getElementById(id);
   const d = el.data();
-  let html = '<b>' + d.kind + '</b><br>' + (d.statement || d.label);
-  if (d.kind === 'source') html += '<br><a href="' + d.id + '" target="_blank" rel="noopener">' + d.id + ' &#8599;</a>';
-  if (d.confidence) html += '<br>confidence: ' + d.confidence;
-  if (d.valid) html += '<br>valid: ' + d.valid;
-  if (d.credibility) html += '<br>source credibility: ' + d.credibility;
-  if (d.status) html += '<br>gate status: ' + d.status;
+  let html = '<b>' + escapeHtml(d.kind) + '</b><br>' + escapeHtml(d.statement || d.label);
+  if (d.kind === 'source') html += '<br><a href="' + escapeHtml(d.id) + '" target="_blank" rel="noopener">' + escapeHtml(d.id) + ' &#8599;</a>';
+  if (d.confidence) html += '<br>confidence: ' + escapeHtml(d.confidence);
+  if (d.valid) html += '<br>valid: ' + escapeHtml(d.valid);
+  if (d.credibility) html += '<br>source credibility: ' + escapeHtml(d.credibility);
+  if (d.status) html += '<br>gate status: ' + escapeHtml(d.status);
   if (NOTES_URL) html += renderNotes(id);
   return html;
 }

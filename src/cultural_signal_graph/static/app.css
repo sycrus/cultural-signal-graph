@@ -255,7 +255,7 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
   padding: 10px 16px;
   margin-bottom: 8px;
 }
-.gated-link { font-weight: 550; }
+.gated-edge { font-weight: 550; }
 .status.real { color: #166534; background: #dcfce7; border-color: #86efac; }
 .status.rejected { color: #991b1b; background: #fee2e2; border-color: #fca5a5; }
 .status.proposed { color: #92400e; background: #fef3c7; border-color: #fcd34d; }

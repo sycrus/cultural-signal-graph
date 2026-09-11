@@ -132,6 +132,22 @@ function renderHome() {
 }
 
 function renderAsk() {
+  /* Reopened runs show the recorded ask read-only — a resubmission would start a
+     different run, not re-enter this one. New asks come from the runs list. */
+  const a = state.snap && state.snap.ask;
+  if (a) {
+    return `
+    <div class="canvas-narrow">
+      <h1>Ask</h1>
+      <p class="lede">The ask this run answers. To ask again, start a new run from the runs list.</p>
+      <div class="card">
+        <label>Category</label><div>${escapeHtml(a.category)}</div>
+        <label>Question</label><div>${escapeHtml(a.question)}</div>
+        <label>Window</label><div>${escapeHtml(a.window.start)} → ${escapeHtml(a.window.end)}</div>
+        ${a.market ? `<label>Market</label><div>${escapeHtml(a.market)}</div>` : ""}
+      </div>
+    </div>`;
+  }
   return `
   <div class="canvas-narrow">
     <h1>Ask</h1>
@@ -183,6 +199,7 @@ function shortType(sourceType) {
 
 function renderSources() {
   const s = state.snap;
+  const editable = s.status === "created"; // sources lock once the run starts
   const rows = s.sources
     .map(
       (src, i) => `<tr data-index="${i}">
@@ -190,7 +207,7 @@ function renderSources() {
         <td>${escapeHtml(shortType(src.source_type))}</td>
         <td>${src.credibility}</td>
         <td style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(src.text)}</td>
-        <td><button class="ghost" data-remove="${i}">✕</button></td>
+        <td>${editable ? `<button class="ghost" data-remove="${i}">✕</button>` : ""}</td>
       </tr>`,
     )
     .join("");
@@ -198,24 +215,26 @@ function renderSources() {
   <div class="canvas-narrow">
     <h1>Sources</h1>
     <p class="lede">Discovered for “${escapeHtml(s.ask.question)}”. Auditable by
-    default — expand to review or override before extraction runs.</p>
+    default — expand to review${editable ? " or override before extraction runs" : ""}.</p>
     <details class="card" ${s.sources.length === 0 ? "open" : ""}>
       <summary>${s.sources.length} source${s.sources.length === 1 ? "" : "s"}</summary>
       <table>
         <thead><tr><th>Source</th><th>Type</th><th>Credibility</th><th>Text</th><th></th></tr></thead>
         <tbody>${rows || `<tr><td colspan="5" style="color:var(--muted)">None — add one below.</td></tr>`}</tbody>
       </table>
+      ${editable ? `
       <div style="display:flex; gap:8px; margin-top:12px">
         <input id="add-uri" placeholder="https://… (source URI)" style="flex:2">
         <input id="add-text" placeholder="What it says" style="flex:3">
         <button id="btn-add-source">+ Add</button>
-      </div>
+      </div>` : ""}
     </details>
     ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
+    ${editable ? `
     <div style="display:flex; justify-content:space-between; margin-top:14px">
       <button id="btn-reset-sources">Reset to discovered</button>
       <button class="primary" id="btn-start-run" ${s.sources.length === 0 ? "disabled" : ""}>Start run →</button>
-    </div>
+    </div>` : ""}
   </div>`;
 }
 
@@ -259,10 +278,15 @@ function renderSignOff() {
   }
 
   if (undoable) {
+    // pending is empty once the run resumes — resolve names from the brief's
+    // gated edges (which carry the display names and the resolved status)
+    const gated = Object.fromEntries((s.brief ? s.brief.gated_edges : []).map((g) => [g.id, g]));
     const rows = Object.entries(s.decisions)
       .map(([id, approved]) => {
-        const edge = (s.pending || []).find((e) => e.id === id);
-        const label = edge ? `${escapeHtml(edge.left)} ≈ ${escapeHtml(edge.right)}` : id;
+        const known = (s.pending || []).find((e) => e.id === id) || gated[id];
+        const label = known
+          ? `${escapeHtml(known.left_entity || known.left)} ≈ ${escapeHtml(known.right_entity || known.right)}`
+          : id;
         return `<div class="edge-card decided">
           <div class="edge-head">${label}</div>
           <div class="edge-verdict ${approved ? "approved" : "rejected"}">
@@ -305,14 +329,14 @@ function renderSignOff() {
   <div class="canvas-narrow">
     <h1>Sign-off</h1>
     <p class="lede">The run is <b>paused</b> until you decide. Approving asserts a
-    cross-domain link as real; rejecting drops it and keeps the categories separate.</p>
-    <p class="review-count">◉ Review ${s.pending.length} cross-domain link${s.pending.length === 1 ? "" : "s"}</p>
+    cross-domain equivalence edge as real; rejecting drops it and keeps the categories separate.</p>
+    <p class="review-count">◉ Review ${s.pending.length} proposed cross-domain edge${s.pending.length === 1 ? "" : "s"}</p>
     ${cards}
     ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
     <div style="margin-top:14px; display:flex; gap:10px; align-items:center">
       <button class="primary" id="btn-confirm-signoff" ${all && !state.busy ? "" : "disabled"}>
         ${state.busy ? "Resuming the run…" : "Confirm sign-off →"}</button>
-      ${all ? "" : `<span class="hint">Decide every proposed link to resume the run.</span>`}
+      ${all ? "" : `<span class="hint">Decide every proposed edge to resume the run.</span>`}
     </div>
   </div>`;
 }
@@ -372,7 +396,7 @@ function renderBrief() {
         .map(
           (g) => `
     <div class="gated-row">
-      <span class="gated-link">⛓ ${escapeHtml(g.left_entity)} ≈ ${escapeHtml(g.right_entity)}</span>
+      <span class="gated-edge">⛓ ${escapeHtml(g.left_entity)} ≈ ${escapeHtml(g.right_entity)}</span>
       <span class="hint">confidence ${g.confidence}</span>
       <span class="status ${g.status}">${g.status}</span>
       <button class="ghost" data-goto="sign-off">review</button>
