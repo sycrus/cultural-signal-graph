@@ -39,17 +39,44 @@ python -m cultural_signal_graph         # batch run: writes the six files into o
 python -m cultural_signal_graph.server  # UI: local web app, opens in the browser
 ```
 
-Without `DEEPSEEK_API_KEY`, the web app runs in **fixture mode** — the recorded demo
-outputs, no model calls — so the whole loop (ask → sources → run → sign-off → brief →
-graph → metrics) is explorable offline.
-
 The provider is **DeepSeek**, called through its Anthropic-compatible endpoint
 (`https://api.deepseek.com/anthropic`): `deepseek-v4-flash` for the cheap tier, `deepseek-v4-pro`
 for the premium tier.
 
+## The web app
+
+The pipeline as a guided workflow. The run *pauses* mid-flight — nothing proceeds
+until the strategist signs off, which is the moment the product adds judgment.
+
+```
+Ask  →  Sources  →  Run  →  ⛔ Sign-off  →  Brief  →  Graph / Metrics
+```
+
+- **Ask** — category, question, window, optional market; source discovery selects
+  the sources (index, or live backfill for an unfamiliar category).
+- **Sources** — collapsed by default, auditable; add, remove, or reset before
+  extraction runs. Sources lock once the run starts.
+- **Run** — each stage reports its tokens + latency, recorded at the stage boundary.
+- **Sign-off** — the run stops at the gate; approve or reject each proposed
+  cross-domain equivalence edge (approve → "real", reject → dropped). The decision
+  stays editable until export: undo re-parks the run at the gate, and the downstream
+  re-runs.
+- **Brief** — claims as headlines with confidence, expandable reasoning and sources,
+  flagged signals, gated edges with their resolved status; the artifacts download.
+- **Graph** — the embedded explorer (search, layout controls, click-to-trace) with a
+  notes overlay: annotate any node or edge (author + timestamp). An overlay only —
+  it never affects reasoning or provenance.
+- **Metrics** — cost (tokens, per-stage latency), eval scores against the golden
+  case, and prediction accuracy (soft, lagging telemetry — reported, never gating).
+- **Reopen** — past runs reload from `runs/`; jump to any completed stage.
+
+Without `DEEPSEEK_API_KEY`, the app runs in **fixture mode** (badge in the header):
+the recorded demo outputs on the pinned seed corpus, no model calls — the whole
+loop is explorable offline.
+
 ## Outputs
 
-A run writes six files into `out/`:
+A batch run writes six files into `out/`:
 
 | File | What it is |
 |---|---|
@@ -59,6 +86,18 @@ A run writes six files into `out/`:
 | `graph.html` | interactive graph explorer (search, layout controls, click-to-trace, offline) |
 | `graph.ttl` | the RDF audit graph (confidence, temporal validity, provenance) |
 | `usage.json` | token usage per model call |
+
+A web-app run is a directory under `runs/` — reopening, re-deciding, and metrics
+are file reads, never a database:
+
+| File | What it is |
+|---|---|
+| `run.json` | the ask, sources, stage status with per-stage tokens/latency, sign-off state |
+| `checkpoints.sqlite` | the LangGraph checkpoint — a paused run resumes across restarts |
+| `state-pause.json` / `state-final.json` | the state at the gate / at finalize (undo, metrics, reopen) |
+| `brief.md` … `usage.json` | the same six artifacts as the batch path, per run |
+| `trends.json` | recorded trends, checked later for prediction accuracy |
+| `notes.json` | the annotations overlay |
 
 ## Layout
 
@@ -75,6 +114,7 @@ src/cultural_signal_graph/
   tracing.py     OpenTelemetry spans           checkpoint.py  file-backed checkpoints
   llm.py         DeepSeek client + JSON/CURIE helpers
   server.py      local web app (FastAPI)       runstore.py  runs/ dir state machine
+  static/        the stepper UI (app.js/app.css, vendored cytoscape.min.js)
   ontology/      upper.ttl, tech.ttl, gaming.ttl, shapes.ttl (SHACL)
 ```
 
@@ -84,7 +124,7 @@ src/cultural_signal_graph/
 uv run pytest
 ```
 
-84 tests, all fixture-based — no network or API key required. The eval harness
+85 tests, all fixture-based — no network or API key required. The eval harness
 (`python -m cultural_signal_graph.eval_main`) runs the golden set and enforces the regression
 gate.
 
