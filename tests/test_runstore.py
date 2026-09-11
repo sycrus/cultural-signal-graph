@@ -150,3 +150,30 @@ def test_start_twice_is_rejected(tmp_path):
     store.start(run_id)
     with pytest.raises(ValueError):
         store.start(run_id)
+
+
+def test_notes_are_an_append_only_overlay(tmp_path):
+    store = _store(tmp_path)
+    run_id = _create(store)["id"]
+    store.start(run_id)
+    store.signoff(run_id, {EDGE_ID: True})
+    brief_before = (tmp_path / run_id / "brief.json").read_bytes()
+    graph_before = (tmp_path / run_id / "graph.ttl").read_bytes()
+
+    note = store.add_note(
+        run_id, target_id="ai_wearables", text="Watch Qwen roadmap here.", author="joe"
+    )
+    assert note["author"] == "joe"
+    assert note["created_at"]
+    store.add_note(run_id, target_id="ai_wearables", text="Second note.")
+
+    notes = store.notes(run_id)
+    assert [n["text"] for n in notes] == ["Watch Qwen roadmap here.", "Second note."]
+    assert notes[1]["author"] == "strategist"  # default author
+
+    # the overlay never touches the reasoning artifacts
+    assert (tmp_path / run_id / "brief.json").read_bytes() == brief_before
+    assert (tmp_path / run_id / "graph.ttl").read_bytes() == graph_before
+
+    with pytest.raises(ValueError):
+        store.add_note(run_id, target_id="ai_wearables", text="   ")

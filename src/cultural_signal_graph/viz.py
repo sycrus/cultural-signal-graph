@@ -5,6 +5,10 @@ temporal validity, provenance) and renders a self-contained `graph.html` using
 Cytoscape.js from a CDN — no server, matches the project's zero-infrastructure goal.
 Clicking a node highlights its neighborhood (claim -> sources -> provenance); flagged
 signals and gated cross-domain edges are visually distinct.
+
+When served by the web app (`notes_url`, issue #25) the detail panel also lists and
+accepts notes for the selected node/edge — a pure overlay. The exported artifact
+omits it, so the file stays offline and self-contained.
 """
 
 from __future__ import annotations
@@ -41,6 +45,13 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   #legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
   #detail { position: absolute; top: 12px; right: 12px; width: 300px; background: #fff;
     border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.12); display: none; }
+  .notes { margin-top: 10px; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+  .notes-title { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+  .note { font-size: 12px; margin: 4px 0; white-space: pre-wrap; }
+  .note-meta { display: block; font-size: 10px; color: #9ca3af; }
+  .note-form { display: flex; gap: 4px; margin-top: 6px; }
+  .note-form input { font-size: 11px; padding: 3px 6px; border: 1px solid #d1d5db; border-radius: 4px; min-width: 0; }
+  .note-form button { font-size: 11px; padding: 3px 8px; border: 1px solid #d1d5db; background: #fff; border-radius: 4px; cursor: pointer; }
   #toolbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
     display: flex; gap: 6px; align-items: center; }
   #toolbar input { padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; width: 160px; }
@@ -69,6 +80,54 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="detail"></div>
 <script>
 const data = __DATA__;
+const NOTES_URL = "__NOTES_URL__" || null;
+let NOTES = [];
+if (NOTES_URL) {
+  fetch(NOTES_URL).then((r) => r.json()).then((ns) => { NOTES = ns; });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text == null ? '' : String(text);
+  return div.innerHTML;
+}
+
+function renderNotes(targetId) {
+  const mine = NOTES.filter((n) => n.target_id === targetId);
+  const items = mine.map((n) =>
+    `<div class="note"><span class="note-meta">${escapeHtml(n.author)} · ${escapeHtml(n.created_at)}</span>${escapeHtml(n.text)}</div>`
+  ).join('');
+  return `<div class="notes">
+    <div class="notes-title">Notes (${mine.length})</div>
+    ${items}
+    <div class="note-form">
+      <input id="note-author" placeholder="Your name" style="width:90px">
+      <input id="note-text" placeholder="Add a note…" style="flex:1">
+      <button id="note-add">Add</button>
+    </div>
+  </div>`;
+}
+
+function bindNoteForm(targetId, targetKind) {
+  const btn = document.getElementById('note-add');
+  if (!btn) return;
+  btn.onclick = () => {
+    const author = document.getElementById('note-author').value.trim() || 'strategist';
+    const text = document.getElementById('note-text').value.trim();
+    if (!text) return;
+    fetch(NOTES_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_id: targetId, target_kind: targetKind, text, author }),
+    })
+      .then((r) => r.json())
+      .then((note) => {
+        NOTES.push(note);
+        document.getElementById('detail').innerHTML = detailHtml(targetId, targetKind);
+        bindNoteForm(targetId, targetKind);
+      });
+  };
+}
 
 const cy = cytoscape({
   container: document.getElementById('cy'),
@@ -91,22 +150,31 @@ const cy = cytoscape({
   layout: { name: 'cose', animate: false, fit: true, padding: 30, nodeRepulsion: 6000, idealEdgeLength: 90 },
 });
 
-function showDetail(node) {
-  const d = node.data();
+function detailHtml(id, kind) {
+  const el = cy.getElementById(id);
+  const d = el.data();
   let html = '<b>' + d.kind + '</b><br>' + (d.statement || d.label);
   if (d.kind === 'source') html += '<br><a href="' + d.id + '" target="_blank" rel="noopener">' + d.id + ' &#8599;</a>';
   if (d.confidence) html += '<br>confidence: ' + d.confidence;
   if (d.valid) html += '<br>valid: ' + d.valid;
   if (d.credibility) html += '<br>source credibility: ' + d.credibility;
-  document.getElementById('detail').innerHTML = html;
-  document.getElementById('detail').style.display = 'block';
+  if (d.status) html += '<br>gate status: ' + d.status;
+  if (NOTES_URL) html += renderNotes(id);
+  return html;
 }
 
-cy.on('tap', 'node', (evt) => {
-  const node = evt.target;
+function showDetail(ele) {
+  const d = ele.data();
+  document.getElementById('detail').innerHTML = detailHtml(d.id, d.kind);
+  document.getElementById('detail').style.display = 'block';
+  bindNoteForm(d.id, d.kind);
+}
+
+cy.on('tap', 'node, edge', (evt) => {
+  const ele = evt.target;
   cy.elements().addClass('dimmed');
-  node.closedNeighborhood().removeClass('dimmed');
-  showDetail(node);
+  ele.closedNeighborhood().removeClass('dimmed');
+  showDetail(ele);
 });
 
 cy.on('tap', (evt) => {
@@ -178,10 +246,14 @@ def build_cyto_elements(forecast: ForecastRun) -> dict:
         )
         about = _value(graph, signal, CSG.about)
         if about:
-            edges.append({"data": {"source": sid, "target": about, "kind": "about"}})
+            edges.append(
+                {"data": {"id": f"about:{sid}:{about}", "source": sid, "target": about, "kind": "about"}}
+            )
         source = _value(graph, signal, CSG.hasSource)
         if source:
-            edges.append({"data": {"source": sid, "target": source, "kind": "hasSource"}})
+            edges.append(
+                {"data": {"id": f"hasSource:{sid}:{source}", "source": sid, "target": source, "kind": "hasSource"}}
+            )
 
     for entity in graph.subjects(RDFS.label, None):
         if entity in signal_nodes:
@@ -214,6 +286,7 @@ def build_cyto_elements(forecast: ForecastRun) -> dict:
         edges.append(
             {
                 "data": {
+                    "id": str(edge_node),
                     "source": _value(graph, edge_node, CSG.leftEntity),
                     "target": _value(graph, edge_node, CSG.rightEntity),
                     "kind": "equivalence",
@@ -225,10 +298,14 @@ def build_cyto_elements(forecast: ForecastRun) -> dict:
     return {"nodes": nodes, "edges": edges}
 
 
-def render_html(elements: dict, usage: dict | None = None) -> str:
-    """Render a self-contained, offline HTML file around the elements."""
+def render_html(elements: dict, usage: dict | None = None, notes_url: str | None = None) -> str:
+    """Render a self-contained, offline HTML file around the elements.
+
+    `notes_url` opts the page into the annotations overlay (#25); the exported
+    artifact passes None so it stays self-contained."""
     html = _HTML_TEMPLATE.replace("__DATA__", json.dumps(elements))
     html = html.replace("__USAGE__", _usage_html(usage) if usage else "")
+    html = html.replace("__NOTES_URL__", notes_url or "")
     return html.replace("__CYTOSCAPE__", _read_cytoscape())
 
 

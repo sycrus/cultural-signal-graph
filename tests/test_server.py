@@ -122,6 +122,32 @@ def test_graph_explorer_serves_for_the_embed(client, run_id):
     assert "text/html" in res.headers["content-type"]
     assert "cytoscape" in res.text
     assert "ai_wearables" in res.text  # the data blob embeds the graph
+    # the served page carries the notes overlay; the exported artifact does not
+    assert f"/api/runs/{run_id}/notes" in res.text
+    exported = client.get(f"/api/runs/{run_id}/exports/graph.html")
+    assert exported.status_code == 404  # not in the export allowlist; artifact is offline
+
+
+def test_notes_round_trip(client, run_id):
+    res = client.get(f"/api/runs/{run_id}/notes")
+    assert res.status_code == 200
+    assert res.json() == []
+
+    res = client.post(
+        f"/api/runs/{run_id}/notes",
+        json={"target_id": "sig-release-note", "target_kind": "node", "text": "check vs Q3 numbers", "author": "joe"},
+    )
+    assert res.status_code == 201
+    note = res.json()
+    assert note["text"] == "check vs Q3 numbers"
+    assert note["created_at"]
+
+    assert client.get(f"/api/runs/{run_id}/notes").json() == [note]
+
+    assert (
+        client.post(f"/api/runs/{run_id}/notes", json={"target_id": "x", "text": "  "}).status_code
+        == 422
+    )
 
 
 def test_signoff_approve_resumes_and_finalizes(client, run_id):

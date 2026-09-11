@@ -54,6 +54,13 @@ class SignoffIn(BaseModel):
     decisions: dict[str, bool]
 
 
+class NoteIn(BaseModel):
+    target_id: str
+    target_kind: str = "node"
+    text: str
+    author: str = "strategist"
+
+
 def create_app(store: RunStore | None = None) -> FastAPI:
     store = store or RunStore()
     app = FastAPI(title="Cultural Signal Graph")
@@ -138,6 +145,28 @@ def create_app(store: RunStore | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="run has no exports yet")
         return FileResponse(path, filename=name)
 
+    @app.get("/api/runs/{run_id}/notes")
+    def list_notes(run_id: str) -> list[dict]:
+        try:
+            return store.notes(run_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown run: {run_id}") from None
+
+    @app.post("/api/runs/{run_id}/notes", status_code=201)
+    def add_note(run_id: str, note: NoteIn) -> dict:
+        try:
+            return store.add_note(
+                run_id,
+                target_id=note.target_id,
+                text=note.text,
+                author=note.author,
+                target_kind=note.target_kind,
+            )
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown run: {run_id}") from None
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+
     @app.get("/runs/{run_id}/graph.html", response_class=HTMLResponse)
     def graph_html(run_id: str) -> HTMLResponse:
         """The graph explorer, served for embedding in the Graph tab. Rebuilt from
@@ -149,7 +178,8 @@ def create_app(store: RunStore | None = None) -> FastAPI:
         elements = build_cyto_elements(forecast_run_from_state(values))
         usage_path = store.root / run_id / "usage.json"
         usage = json.loads(usage_path.read_text(encoding="utf-8")) if usage_path.is_file() else None
-        return HTMLResponse(render_html(elements, usage))
+        notes_url = f"/api/runs/{run_id}/notes"
+        return HTMLResponse(render_html(elements, usage, notes_url=notes_url))
 
     return app
 

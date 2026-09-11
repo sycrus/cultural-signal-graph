@@ -310,6 +310,36 @@ class RunStore:
             else None,
         }
 
+    # --- notes (annotations overlay) ------------------------------------------
+
+    def notes(self, run_id: str) -> list[dict]:
+        """The run's notes, append-only. An overlay: never read by the pipeline."""
+        path = self._dir(run_id) / "notes.json"
+        if not path.exists():
+            return []
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def add_note(
+        self, run_id: str, target_id: str, text: str, author: str = "strategist", target_kind: str = "node"
+    ) -> dict:
+        """Attach a note to a node/edge. Appended with author + timestamp; nothing
+        about the run's reasoning, graph, or brief is touched."""
+        self._load(run_id)  # notes attach to a real run
+        if not text.strip():
+            raise ValueError("note text is empty")
+        note = {
+            "target_id": target_id,
+            "target_kind": target_kind,
+            "text": text.strip(),
+            "author": author.strip() or "strategist",
+            "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        }
+        notes = self.notes(run_id)
+        notes.append(note)
+        path = self._dir(run_id) / "notes.json"
+        path.write_text(json.dumps(notes, indent=2), encoding="utf-8")
+        return note
+
     # --- internals -----------------------------------------------------------
 
     def _timed_fns(self, run: dict) -> StateFns:
