@@ -10,14 +10,17 @@ Sync route functions (not `async`) so the LangGraph runs execute on the threadpo
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from .pipeline import forecast_run_from_state
 from .runstore import RunStore
+from .viz import build_cyto_elements, render_html
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -134,6 +137,19 @@ def create_app(store: RunStore | None = None) -> FastAPI:
         if not path.is_file():
             raise HTTPException(status_code=404, detail="run has no exports yet")
         return FileResponse(path, filename=name)
+
+    @app.get("/runs/{run_id}/graph.html", response_class=HTMLResponse)
+    def graph_html(run_id: str) -> HTMLResponse:
+        """The graph explorer, served for embedding in the Graph tab. Rebuilt from
+        the finalized state so it always matches the run's audit artifacts."""
+        state_path = store.root / run_id / "state-final.json"
+        if not state_path.is_file():
+            raise HTTPException(status_code=404, detail="run has no graph yet")
+        values = json.loads(state_path.read_text(encoding="utf-8"))
+        elements = build_cyto_elements(forecast_run_from_state(values))
+        usage_path = store.root / run_id / "usage.json"
+        usage = json.loads(usage_path.read_text(encoding="utf-8")) if usage_path.is_file() else None
+        return HTMLResponse(render_html(elements, usage))
 
     return app
 

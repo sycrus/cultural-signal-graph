@@ -111,6 +111,19 @@ def test_exports_serve_after_finalize(client, run_id):
     assert client.get(f"/api/runs/{run_id}/exports/..%2Frun.json").status_code == 404
 
 
+def test_graph_explorer_serves_for_the_embed(client, run_id):
+    assert client.get(f"/runs/{run_id}/graph.html").status_code == 404  # not finalized
+
+    client.post(f"/api/runs/{run_id}/start")
+    client.post(f"/api/runs/{run_id}/signoff", json={"decisions": {EDGE_ID: True}})
+
+    res = client.get(f"/runs/{run_id}/graph.html")
+    assert res.status_code == 200
+    assert "text/html" in res.headers["content-type"]
+    assert "cytoscape" in res.text
+    assert "ai_wearables" in res.text  # the data blob embeds the graph
+
+
 def test_signoff_approve_resumes_and_finalizes(client, run_id):
     client.post(f"/api/runs/{run_id}/start")
 

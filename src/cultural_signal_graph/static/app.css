@@ -267,3 +267,12 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
   border-radius: 6px;
   padding: 2px 8px;
 }
+
+/* Graph tab: the embedded explorer fills the canvas */
+.graph-frame {
+  width: 100%;
+  height: calc(100vh - 150px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}

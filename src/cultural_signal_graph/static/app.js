@@ -409,6 +409,16 @@ function reviewPlaceholder(tab, note) {
   return `${tabsHtml(tab)}${renderPlaceholder(tab === "graph" ? "Graph" : "Metrics", note)}`;
 }
 
+function renderGraph() {
+  if (!state.snap || state.snap.status !== "completed") {
+    return reviewPlaceholder("graph", "The graph explorer appears once the run completes.");
+  }
+  return `
+  ${tabsHtml("graph")}
+  <iframe class="graph-frame" src="/runs/${state.runId}/graph.html"
+    title="Graph explorer — search, layout, click-to-trace"></iframe>`;
+}
+
 const VIEWS = {
   home: renderHome,
   ask: renderAsk,
@@ -416,7 +426,7 @@ const VIEWS = {
   run: renderRun,
   "sign-off": renderSignOff,
   brief: renderBrief,
-  graph: () => reviewPlaceholder("graph", "The embedded graph explorer lands with the graph step."),
+  graph: renderGraph,
   metrics: () => reviewPlaceholder("metrics", "Eval scores, cost, and prediction accuracy land with the metrics step."),
 };
 
