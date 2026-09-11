@@ -95,6 +95,22 @@ def test_start_pauses_at_the_gate_then_conflicts(client, run_id):
 EDGE_ID = "edge-ai-headset-wearables"
 
 
+def test_exports_serve_after_finalize(client, run_id):
+    # before finalize there is nothing to export
+    assert client.get(f"/api/runs/{run_id}/exports/brief.md").status_code == 404
+
+    client.post(f"/api/runs/{run_id}/start")
+    client.post(f"/api/runs/{run_id}/signoff", json={"decisions": {EDGE_ID: True}})
+
+    for name in ("brief.md", "brief.json", "brief.pptx", "graph.ttl", "usage.json"):
+        res = client.get(f"/api/runs/{run_id}/exports/{name}")
+        assert res.status_code == 200, name
+    assert "Forecast brief" in client.get(f"/api/runs/{run_id}/exports/brief.md").text
+    # unknown names (and traversal attempts) are not served
+    assert client.get(f"/api/runs/{run_id}/exports/run.json").status_code == 404
+    assert client.get(f"/api/runs/{run_id}/exports/..%2Frun.json").status_code == 404
+
+
 def test_signoff_approve_resumes_and_finalizes(client, run_id):
     client.post(f"/api/runs/{run_id}/start")
 

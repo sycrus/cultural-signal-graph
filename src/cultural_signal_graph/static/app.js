@@ -315,15 +315,109 @@ function renderPlaceholder(title, note) {
   </div>`;
 }
 
+function renderBrief() {
+  const b = state.snap && state.snap.brief;
+  if (!b) {
+    return renderPlaceholder(
+      "Brief",
+      "The brief appears once the run resolves sign-off and drafting finishes.",
+    );
+  }
+  const claims = b.claims
+    .map(
+      (c, i) => `
+    <div class="claim-card">
+      <div class="claim-head">
+        <span class="claim-num">${i + 1}.</span>
+        <span class="claim-statement">${escapeHtml(c.statement)}</span>
+        <span class="conf-chip" title="Confidence — how much we trust this, not a calibrated probability">${c.confidence}</span>
+      </div>
+      <div class="claim-valid">valid ${escapeHtml(c.temporal_validity.valid_from.slice(0, 10))}
+        → ${escapeHtml(c.temporal_validity.valid_until.slice(0, 10))}</div>
+      <details><summary>▸ reasoning</summary><p>${escapeHtml(c.reasoning)}</p></details>
+      <details><summary>▸ sources (${c.sources.length})</summary>
+        <ul>${c.sources
+          .map(
+            (src) => `<li><a href="${escapeHtml(src.uri)}" target="_blank" rel="noopener">${escapeHtml(shortUri(src.uri))}</a>
+            <span class="hint">(${escapeHtml(shortType(src.source_type))}, credibility ${src.credibility})</span></li>`,
+          )
+          .join("")}</ul>
+      </details>
+    </div>`,
+    )
+    .join("");
+  const flags = b.flags.length
+    ? b.flags
+        .map(
+          (f) => `
+    <div class="flag-card">
+      <span class="reason-chip ${f.reason === "conflict" ? "conflict" : "low"}">${f.reason}</span>
+      <span>${escapeHtml(f.statement)}</span>
+      <span class="hint">confidence ${f.confidence} · <a href="${escapeHtml(f.source_uri)}" target="_blank" rel="noopener">source</a></span>
+    </div>`,
+        )
+        .join("")
+    : `<div class="hint" style="margin:6px 0">None.</div>`;
+  const gated = b.gated_edges.length
+    ? b.gated_edges
+        .map(
+          (g) => `
+    <div class="gated-row">
+      <span class="gated-link">⛓ ${escapeHtml(g.left_entity)} ≈ ${escapeHtml(g.right_entity)}</span>
+      <span class="hint">confidence ${g.confidence}</span>
+      <span class="status ${g.status}">${g.status}</span>
+      <button class="ghost" data-goto="sign-off">review</button>
+    </div>`,
+        )
+        .join("")
+    : `<div class="hint" style="margin:6px 0">No cross-domain edges were proposed.</div>`;
+  const exports = ["brief.md", "brief.json", "brief.pptx", "graph.ttl", "usage.json"]
+    .map((name) => `<a class="export-link" href="/api/runs/${state.runId}/exports/${name}" download>${name}</a>`)
+    .join(" ");
+  return `
+  ${tabsHtml("brief")}
+  <div class="canvas-narrow">
+    <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap">
+      <h1>Forecast brief — ${escapeHtml(b.category)}</h1>
+      <span class="hint">as of ${escapeHtml(b.as_of)}</span>
+    </div>
+    <p class="lede">${b.claims.length} claim${b.claims.length === 1 ? "" : "s"}, ${b.flags.length} flagged.
+    Exports: ${exports}</p>
+
+    <h2>Trends</h2>
+    ${claims || `<div class="hint">No confident trends.</div>`}
+
+    <h2>⚠ Flagged signals</h2>
+    <p class="hint" style="margin-top:0">Surfaced, never averaged away — they stay in the graph but are not claims.</p>
+    ${flags}
+
+    <h2>⛓ Gated cross-domain edges</h2>
+    ${gated}
+  </div>`;
+}
+
+function tabsHtml(active) {
+  return `<div class="tabs">${[["brief", "Brief"], ["graph", "Graph"], ["metrics", "Metrics"]]
+    .map(
+      ([key, label]) =>
+        `<button class="tab ${key === active ? "active" : ""}" data-tab="${key}">${label}</button>`,
+    )
+    .join("")}</div>`;
+}
+
+function reviewPlaceholder(tab, note) {
+  return `${tabsHtml(tab)}${renderPlaceholder(tab === "graph" ? "Graph" : "Metrics", note)}`;
+}
+
 const VIEWS = {
   home: renderHome,
   ask: renderAsk,
   sources: renderSources,
   run: renderRun,
   "sign-off": renderSignOff,
-  brief: () => renderPlaceholder("Brief", "The brief review surface lands with the brief step."),
-  graph: () => renderPlaceholder("Graph", "The graph explorer lands with the graph step."),
-  metrics: () => renderPlaceholder("Metrics", "Eval scores, cost, and prediction accuracy land with the metrics step."),
+  brief: renderBrief,
+  graph: () => reviewPlaceholder("graph", "The embedded graph explorer lands with the graph step."),
+  metrics: () => reviewPlaceholder("metrics", "Eval scores, cost, and prediction accuracy land with the metrics step."),
 };
 
 function render() {
@@ -377,6 +471,12 @@ function bind() {
   });
   on("btn-confirm-signoff", "click", confirmSignoff);
   on("btn-undo-signoff", "click", undoSignoff);
+  document.querySelectorAll("[data-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => showStage(btn.dataset.tab));
+  });
+  document.querySelectorAll("[data-goto]").forEach((btn) => {
+    btn.addEventListener("click", () => showStage(btn.dataset.goto));
+  });
 }
 
 /* --- actions ------------------------------------------------------------ */

@@ -21,6 +21,10 @@ from .runstore import RunStore
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
+# The exportable, versionable outputs of a finalized run (the same artifacts the
+# batch path writes). An allowlist, so run_id/name can't traverse out of runs/.
+EXPORT_FILES = ("brief.md", "brief.json", "brief.pptx", "graph.ttl", "usage.json")
+
 
 class AskIn(BaseModel):
     category: str
@@ -121,6 +125,15 @@ def create_app(store: RunStore | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"unknown run: {run_id}") from None
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from None
+
+    @app.get("/api/runs/{run_id}/exports/{name}")
+    def export(run_id: str, name: str) -> FileResponse:
+        if name not in EXPORT_FILES:
+            raise HTTPException(status_code=404, detail=f"unknown export: {name}")
+        path = store.root / run_id / name
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="run has no exports yet")
+        return FileResponse(path, filename=name)
 
     return app
 

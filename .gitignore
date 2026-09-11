@@ -30,3 +30,6 @@ Thumbs.db
 
 # Local web app run state
 runs/
+
+# Editor (personal workspace styling)
+.vscode/

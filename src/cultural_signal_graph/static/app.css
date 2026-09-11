@@ -196,3 +196,74 @@ tbody tr:hover { background: #f0f4ff; }
 .edge-verdict.approved { color: #166534; background: #dcfce7; }
 .edge-verdict.rejected { color: #991b1b; background: #fee2e2; }
 button.danger-active { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* Review tabs: [Brief] [Graph] [Metrics] */
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+.tab {
+  border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+  border-bottom: none;
+  background: var(--card);
+  color: var(--muted);
+  padding: 8px 18px;
+}
+.tab.active { color: var(--ink); font-weight: 600; border-bottom: 2px solid var(--accent); }
+
+/* Brief */
+.claim-card, .flag-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+}
+.flag-card { border-left: 4px solid var(--danger); background: #fff7f7; }
+.claim-head { display: flex; gap: 8px; align-items: baseline; }
+.claim-num { color: var(--muted); }
+.claim-statement { font-size: 15px; font-weight: 600; flex: 1; }
+.conf-chip {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e40af;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.claim-valid { color: var(--muted); font-size: 12px; margin: 4px 0 6px 22px; }
+.claim-card details { margin: 4px 0 0 22px; }
+.claim-card summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+.claim-card p { margin: 6px 0; }
+.claim-card ul { margin: 6px 0; padding-left: 18px; }
+.reason-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-right: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.reason-chip.conflict { background: #fee2e2; color: #991b1b; }
+.reason-chip.low { background: #fef3c7; color: #92400e; }
+.gated-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-bottom: 8px;
+}
+.gated-link { font-weight: 550; }
+.status.real { color: #166534; background: #dcfce7; border-color: #86efac; }
+.status.rejected { color: #991b1b; background: #fee2e2; border-color: #fca5a5; }
+.status.proposed { color: #92400e; background: #fef3c7; border-color: #fcd34d; }
+.export-link {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
