@@ -30,7 +30,9 @@ from langgraph.types import Command
 from .checkpoint import dump_state, file_checkpointer
 from .config import load_dotenv
 from .discovery import SOURCE_INDEX, discover_sources
+from .eval import DEFAULT_THRESHOLDS, check, evaluate
 from .fixtures import ALIGNED_EDGES, DRAFTED_REASONING, EXTRACTED, SEED_CORPUS
+from .golden import SEED_CASE
 from .models import (
     Ask,
     Extraction,
@@ -42,7 +44,7 @@ from .models import (
 )
 from .pipeline import build_forecast_graph, forecast_run_from_state, initial_state
 from .slides import write_presentation
-from .tracking import record_trends
+from .tracking import record_trends, report_accuracy
 from .tracing import get_usage
 from .viz import write_graph_html
 
@@ -269,6 +271,65 @@ class RunStore:
         if self.mode == "fixture":
             return list(SEED_CORPUS)
         return discover_sources(ask, self._index)
+
+    # --- metrics -------------------------------------------------------------
+
+    def metrics(self, run_id: str) -> dict:
+        """The Metrics tab's data: cost (tokens), per-stage latency, eval scores
+        (when a golden case matches the corpus), and prediction accuracy.
+
+        Accuracy is soft, lagging telemetry (#17): trends are recorded at finalize
+        and marked materialized later, so an unchecked run reports null accuracy —
+        never a gate."""
+        run = self._load(run_id)
+        usage_path = self._dir(run_id) / "usage.json"
+        trends_path = self._dir(run_id) / "trends.json"
+        report: dict = {
+            "usage": json.loads(usage_path.read_text(encoding="utf-8"))
+            if usage_path.exists()
+            else self._aggregate(run["usage_calls"]),
+            "stages": {k: v for k, v in run["stages"].items() if v.get("status") == "done"},
+            "eval": None,
+            "accuracy": None,
+        }
+
+        state_path = self._dir(run_id) / "state-final.json"
+        if not state_path.exists():
+            return report  # not finalized: tokens/stages only
+
+        # The golden case measures the pipeline's correctness *before* human judgment
+        # (a batch run's edges are all held at the gate). For an interactive run the
+        # faithful scoring point is therefore the pause state, when there was one;
+        # the strategist's decisions live in the Brief, not in the pipeline score.
+        pause_path = self._dir(run_id) / "state-pause.json"
+        if pause_path.exists():
+            eval_values = json.loads(pause_path.read_text(encoding="utf-8"))
+            scored_at = "gate (pre-sign-off)"
+        else:
+            eval_values = json.loads(state_path.read_text(encoding="utf-8"))
+            scored_at = "finalize"
+        forecast = forecast_run_from_state(eval_values)
+
+        seed_uris = sorted(source.uri for source in SEED_CORPUS)
+        run_uris = sorted(s["uri"] for s in run["sources"])
+        if run_uris == seed_uris:
+            scores = evaluate(forecast, SEED_CASE)
+            report["eval"] = {
+                "case": SEED_CASE.name,
+                "scored_at": scored_at,
+                "scores": scores,
+                "below_threshold": check(scores, DEFAULT_THRESHOLDS),
+            }
+        else:
+            report["eval"] = {
+                "case": None,
+                "scores": None,
+                "reason": "no golden case matches this run's corpus",
+            }
+
+        if trends_path.exists():
+            report["accuracy"] = report_accuracy(trends_path)
+        return report
 
     # --- reads ---------------------------------------------------------------
 

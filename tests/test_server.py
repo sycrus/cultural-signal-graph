@@ -150,6 +150,44 @@ def test_notes_round_trip(client, run_id):
     )
 
 
+def test_metrics_report_for_a_completed_seed_run(client, run_id):
+    client.post(f"/api/runs/{run_id}/start")
+    client.post(f"/api/runs/{run_id}/signoff", json={"decisions": {EDGE_ID: True}})
+
+    res = client.get(f"/api/runs/{run_id}/metrics")
+    assert res.status_code == 200
+    metrics = res.json()
+
+    # fixture stages make no model calls, so the usage structure is present but zero
+    assert metrics["usage"]["total_tokens"] == 0
+    assert metrics["usage"]["calls"] == []
+    assert "extract" in metrics["stages"] and "latency_ms" in metrics["stages"]["extract"]
+
+    # the pinned demo corpus matches the golden case, so the run is scoreable —
+    # at the gate, where the batch-path metric applies (the edge was held)
+    assert metrics["eval"]["case"] == "seed"
+    assert metrics["eval"]["scored_at"] == "gate (pre-sign-off)"
+    assert metrics["eval"]["scores"]["gate_correctness"] == 1.0
+    assert metrics["eval"]["below_threshold"] == []
+
+    # soft, lagging telemetry: trends recorded, none checked yet
+    assert metrics["accuracy"]["trends_total"] == 2
+    assert metrics["accuracy"]["checked"] == 0
+    assert metrics["accuracy"]["accuracy"] is None
+
+
+def test_metrics_eval_skipped_when_corpus_has_no_golden_case(client, run_id):
+    created = client.get(f"/api/runs/{run_id}").json()
+    edited = [dict(created["sources"][0])]
+    client.put(f"/api/runs/{run_id}/sources", json={"sources": edited})
+    client.post(f"/api/runs/{run_id}/start")
+    client.post(f"/api/runs/{run_id}/signoff", json={"decisions": {EDGE_ID: True}})
+
+    metrics = client.get(f"/api/runs/{run_id}/metrics").json()
+    assert metrics["eval"]["scores"] is None
+    assert "no golden case" in metrics["eval"]["reason"]
+
+
 def test_signoff_approve_resumes_and_finalizes(client, run_id):
     client.post(f"/api/runs/{run_id}/start")
 

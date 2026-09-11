@@ -145,6 +145,13 @@ def create_app(store: RunStore | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="run has no exports yet")
         return FileResponse(path, filename=name)
 
+    @app.get("/api/runs/{run_id}/metrics")
+    def run_metrics(run_id: str) -> dict:
+        try:
+            return store.metrics(run_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown run: {run_id}") from None
+
     @app.get("/api/runs/{run_id}/notes")
     def list_notes(run_id: str) -> list[dict]:
         try:

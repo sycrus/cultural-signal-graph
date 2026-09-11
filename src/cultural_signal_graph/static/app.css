@@ -276,3 +276,16 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
   border-radius: 10px;
   background: #fff;
 }
+
+/* Metrics */
+.metric-big { font-size: 26px; font-weight: 650; }
+.metric-big small { font-size: 13px; font-weight: 400; color: var(--muted); }
+.score-chip {
+  display: inline-block;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin: 2px;
+}
+.score-chip.ok { background: #dcfce7; color: #166534; }
+.score-chip.low { background: #fee2e2; color: #991b1b; }

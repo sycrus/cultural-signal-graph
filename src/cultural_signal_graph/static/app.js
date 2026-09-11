@@ -21,6 +21,7 @@ const state = {
   busy: false,
   error: null,
   signoffDraft: {}, // edge id -> true(approve) | false(reject), before confirming
+  metrics: null, // the /metrics report for the open run
 };
 
 async function api(path, opts = {}) {
@@ -88,6 +89,14 @@ function showStage(key) {
   state.view = key;
   state.error = null;
   render();
+  if (key === "metrics" && state.snap && !state.metrics) {
+    fetchMetrics();
+  }
+}
+
+async function fetchMetrics() {
+  state.metrics = await api(`/api/runs/${state.runId}/metrics`).catch(() => null);
+  if (state.view === "metrics") render();
 }
 
 /* --- canvas views ------------------------------------------------------ */
@@ -419,6 +428,76 @@ function renderGraph() {
     title="Graph explorer — search, layout, click-to-trace"></iframe>`;
 }
 
+function renderMetrics() {
+  if (!state.metrics) {
+    return reviewPlaceholder("metrics", "Loading metrics…");
+  }
+  const m = state.metrics;
+  const usage = m.usage || { total_tokens: 0, input_tokens: 0, output_tokens: 0, calls: [] };
+  const calls = (usage.calls || [])
+    .map(
+      (c) => `<tr><td>${escapeHtml(c.model)}</td><td>${c.input_tokens}</td><td>${c.output_tokens}</td><td>${c.total_tokens}</td></tr>`,
+    )
+    .join("");
+  const stageRows = Object.entries(m.stages || {})
+    .filter(([name]) => RUN_STAGES.includes(name))
+    .map(([name, st]) => `<tr><td>${name}</td><td>${st.tokens} tok</td><td>${fmtDuration(st.latency_ms)}</td></tr>`)
+    .join("");
+
+  let evalHtml;
+  const ev = m.eval;
+  if (!ev) {
+    evalHtml = `<div class="hint">Eval scores appear once the run is finalized.</div>`;
+  } else if (ev.scores == null) {
+    evalHtml = `<div class="hint">${escapeHtml(ev.reason)}</div>`;
+  } else {
+    const below = new Set(ev.below_threshold || []);
+    const scores = Object.entries(ev.scores)
+      .map(
+        ([metric, score]) =>
+          `<span class="score-chip ${below.has(metric) ? "low" : "ok"}">${metric} ${score}${below.has(metric) ? " ⚠" : ""}</span>`,
+      )
+      .join("");
+    evalHtml = `<div>${scores}</div>
+      <p class="hint">Scored against the golden case “${escapeHtml(ev.case)}” ${escapeHtml(ev.scored_at || "at finalize")}
+      — the pipeline's correctness before your sign-off decisions. Below-threshold metrics are the regression gate.</p>`;
+  }
+
+  const acc = m.accuracy;
+  let accHtml;
+  if (!acc) {
+    accHtml = `<div class="hint">Appears once the run is finalized.</div>`;
+  } else if (acc.accuracy == null) {
+    accHtml = `<div class="hint">${acc.trends_total} trends recorded, ${acc.checked} checked — accuracy is
+      lagging telemetry: it fills in as each trend is marked materialized later. Reported, never gating.</div>`;
+  } else {
+    accHtml = `<div class="metric-big">${Math.round(acc.accuracy * 100)}%</div>
+      <div class="hint">${acc.materialized} of ${acc.checked} checked trends materialized (${acc.trends_total} recorded).</div>`;
+  }
+
+  return `
+  ${tabsHtml("metrics")}
+  <div class="canvas-narrow">
+    <h1>Metrics</h1>
+    <p class="lede">Cost and latency are live-run measurements; eval scores gate regressions;
+    prediction accuracy is soft, lagging telemetry.</p>
+
+    <h2>Cost &amp; latency</h2>
+    <div class="card">
+      <div class="metric-big">${usage.total_tokens} <small>tokens</small></div>
+      <div class="hint">${usage.input_tokens} in / ${usage.output_tokens} out across ${(usage.calls || []).length} model calls</div>
+      ${calls ? `<table style="margin-top:10px"><thead><tr><th>Model</th><th>In</th><th>Out</th><th>Total</th></tr></thead><tbody>${calls}</tbody></table>` : ""}
+      ${stageRows ? `<table style="margin-top:14px"><thead><tr><th>Stage</th><th>Tokens</th><th>Latency</th></tr></thead><tbody>${stageRows}</tbody></table>` : ""}
+    </div>
+
+    <h2>Eval scores</h2>
+    <div class="card">${evalHtml}</div>
+
+    <h2>Prediction accuracy</h2>
+    <div class="card">${accHtml}</div>
+  </div>`;
+}
+
 const VIEWS = {
   home: renderHome,
   ask: renderAsk,
@@ -427,7 +506,7 @@ const VIEWS = {
   "sign-off": renderSignOff,
   brief: renderBrief,
   graph: renderGraph,
-  metrics: () => reviewPlaceholder("metrics", "Eval scores, cost, and prediction accuracy land with the metrics step."),
+  metrics: renderMetrics,
 };
 
 function render() {
@@ -571,8 +650,10 @@ async function openRun(runId) {
   state.snap = await api(`/api/runs/${runId}`);
   state.runId = runId;
   state.signoffDraft = {};
+  state.metrics = null;
   state.view = currentStage(state.snap);
   render();
+  if (state.view === "metrics") fetchMetrics();
 }
 
 /* --- sign-off ------------------------------------------------------------ */
