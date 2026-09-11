@@ -148,3 +148,31 @@ tbody tr:hover { background: #f0f4ff; }
 .status.running { color: var(--accent); background: #eff6ff; border-color: #bfdbfe; }
 
 .error { color: var(--danger); margin-top: 10px; }
+
+/* Run stage chips */
+.stage-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--card);
+}
+.stage-chip small { color: var(--muted); font-size: 11px; }
+.stage-chip.done { color: var(--ink); border-color: #86efac; background: #f0fdf4; }
+.stage-chip.done small { color: var(--ok); }
+.stage-chip.paused { border-color: #fcd34d; background: #fffbeb; }
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -2px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

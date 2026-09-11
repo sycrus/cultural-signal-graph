@@ -11,7 +11,16 @@ const RAIL_STAGES = [
   { key: "metrics", label: "Metrics" },
 ];
 
-const state = { view: "home", runId: null, snap: null, runs: [] };
+const RUN_STAGES = ["extract", "align", "sign-off", "draft", "brief"];
+
+const state = {
+  view: "home",
+  runId: null,
+  snap: null,
+  runs: [],
+  busy: false,
+  error: null,
+};
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -74,7 +83,9 @@ function renderRail() {
 }
 
 function showStage(key) {
-  state.view = state.snap ? key : "home";
+  if (!state.snap) return;
+  state.view = key;
+  state.error = null;
   render();
 }
 
@@ -87,7 +98,7 @@ function renderHome() {
         <td>${r.id}</td>
         <td>${escapeHtml(r.ask.category)} — ${escapeHtml(r.ask.question)}</td>
         <td><span class="status ${r.status}">${r.status}</span></td>
-        <td>${r.created_at.replace("T", " ")}</td>
+        <td>${r.created_at.replace("T", " ").slice(0, 16)}</td>
       </tr>`,
     )
     .join("");
@@ -96,9 +107,9 @@ function renderHome() {
     <h1>Forecast runs</h1>
     <p class="lede">Start a forecast by entering an ask — or reopen a past run to
     audit its brief, graph, and metrics.</p>
-    <div class="card">
-      <h2 style="margin-top:0">New run</h2>
-      <p class="hint">Coming up: the ask form (category, question, window, market).</p>
+    <div class="card" style="display:flex; align-items:center; gap:14px">
+      <button class="primary" id="btn-new-run">New run</button>
+      <span class="hint">Category, question, window, market.</span>
     </div>
     <h2>Past runs</h2>
     <div class="card" style="padding:0">
@@ -110,11 +121,140 @@ function renderHome() {
   </div>`;
 }
 
-function renderRun() {
-  /* Filled in by the Ask -> Sources -> Run flow. */
-  return `<div class="canvas-narrow"><h1>${state.runId}</h1>
-    <p class="lede">Stage views land with the Ask → Sources → Run flow.</p></div>`;
+function renderAsk() {
+  return `
+  <div class="canvas-narrow">
+    <h1>Ask</h1>
+    <p class="lede">What should the forecast cover? The ask drives source discovery
+    and selects the sub-ontology to reason over.</p>
+    <div class="card">
+      <label for="ask-category">Category</label>
+      <input id="ask-category" list="categories" value="tech">
+      <datalist id="categories">
+        <option value="tech"></option>
+        <option value="gaming"></option>
+      </datalist>
+      <div class="hint">An unfamiliar category is backfilled from the live web.</div>
+
+      <label for="ask-question">Question</label>
+      <input id="ask-question" placeholder="AI wearables adoption">
+
+      <label>Window</label>
+      <div style="display:flex; gap:8px; align-items:center">
+        <input id="ask-start" type="date" value="2026-01-01" style="flex:1">
+        <span>→</span>
+        <input id="ask-end" type="date" value="2026-06-30" style="flex:1">
+      </div>
+
+      <label for="ask-market">Market <span style="font-weight:400; color:var(--muted)">(optional)</span></label>
+      <input id="ask-market" list="markets" placeholder="SEA">
+      <datalist id="markets"><option value="SEA"></option></datalist>
+
+      ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
+      <div style="margin-top:16px; text-align:right">
+        <button class="primary" id="btn-submit-ask">Run →</button>
+      </div>
+    </div>
+  </div>`;
 }
+
+function shortUri(uri) {
+  try {
+    const u = new URL(uri);
+    return u.hostname + (u.pathname.length > 1 ? "/…" : "");
+  } catch {
+    return uri;
+  }
+}
+
+function shortType(sourceType) {
+  return sourceType.split("#").pop();
+}
+
+function renderSources() {
+  const s = state.snap;
+  const rows = s.sources
+    .map(
+      (src, i) => `<tr data-index="${i}">
+        <td title="${escapeHtml(src.uri)}">${escapeHtml(shortUri(src.uri))}</td>
+        <td>${escapeHtml(shortType(src.source_type))}</td>
+        <td>${src.credibility}</td>
+        <td style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(src.text)}</td>
+        <td><button class="ghost" data-remove="${i}">✕</button></td>
+      </tr>`,
+    )
+    .join("");
+  return `
+  <div class="canvas-narrow">
+    <h1>Sources</h1>
+    <p class="lede">Discovered for “${escapeHtml(s.ask.question)}”. Auditable by
+    default — expand to review or override before extraction runs.</p>
+    <details class="card" ${s.sources.length === 0 ? "open" : ""}>
+      <summary>${s.sources.length} source${s.sources.length === 1 ? "" : "s"}</summary>
+      <table>
+        <thead><tr><th>Source</th><th>Type</th><th>Credibility</th><th>Text</th><th></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="5" style="color:var(--muted)">None — add one below.</td></tr>`}</tbody>
+      </table>
+      <div style="display:flex; gap:8px; margin-top:12px">
+        <input id="add-uri" placeholder="https://… (source URI)" style="flex:2">
+        <input id="add-text" placeholder="What it says" style="flex:3">
+        <button id="btn-add-source">+ Add</button>
+      </div>
+    </details>
+    ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
+    <div style="display:flex; justify-content:space-between; margin-top:14px">
+      <button id="btn-reset-sources">Reset to discovered</button>
+      <button class="primary" id="btn-start-run" ${s.sources.length === 0 ? "disabled" : ""}>Start run →</button>
+    </div>
+  </div>`;
+}
+
+function stageChip(name, st) {
+  const done = st && st.status === "done";
+  const paused = st && st.status === "paused";
+  const mark = done ? "✓" : paused ? "…" : "·";
+  const metric = done ? `${st.tokens} tok · ${fmtDuration(st.latency_ms)}` : "";
+  return `<span class="stage-chip ${done ? "done" : paused ? "paused" : ""}">
+    ${name} ${mark}${metric ? ` <small>${metric}</small>` : ""}</span>`;
+}
+
+function renderRun() {
+  const s = state.snap;
+  const chips = RUN_STAGES.map((name) => stageChip(name, s.stages[name])).join("");
+  if (state.busy) {
+    return `
+    <div class="canvas-narrow">
+      <h1>Run</h1>
+      <p class="lede">Extracting signals and proposing cross-domain edges…</p>
+      <div class="card run-busy"><span class="spinner"></span> ${chips}</div>
+    </div>`;
+  }
+  return `
+  <div class="canvas-narrow">
+    <h1>Run</h1>
+    <p class="lede">Per-stage tokens and latency, recorded at each stage boundary.</p>
+    <div class="card" style="display:flex; gap:8px; flex-wrap:wrap">${chips}</div>
+    ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
+  </div>`;
+}
+
+function renderPlaceholder(title, note) {
+  return `<div class="canvas-narrow">
+    <h1>${title}</h1>
+    <p class="lede">${note}</p>
+  </div>`;
+}
+
+const VIEWS = {
+  home: renderHome,
+  ask: renderAsk,
+  sources: renderSources,
+  run: renderRun,
+  "sign-off": () => renderPlaceholder("Sign-off", "The sign-off loop lands next: approve or reject each proposed cross-domain edge."),
+  brief: () => renderPlaceholder("Brief", "The brief review surface lands with the brief step."),
+  graph: () => renderPlaceholder("Graph", "The graph explorer lands with the graph step."),
+  metrics: () => renderPlaceholder("Metrics", "Eval scores, cost, and prediction accuracy land with the metrics step."),
+};
 
 function render() {
   document.getElementById("btn-runs").hidden = state.view === "home";
@@ -125,15 +265,121 @@ function render() {
   } else {
     badge.hidden = true;
   }
-  document.getElementById("canvas").innerHTML =
-    state.view === "home" || !state.snap ? renderHome() : renderRun();
-  document.getElementById("canvas").querySelectorAll("tr[data-run]").forEach((tr) => {
-    tr.addEventListener("click", () => openRun(tr.dataset.run));
-  });
+  document.getElementById("canvas").innerHTML = (VIEWS[state.view] || renderHome)();
+  bind();
   renderRail();
 }
 
+function bind() {
+  document.getElementById("canvas").querySelectorAll("tr[data-run]").forEach((tr) => {
+    tr.addEventListener("click", () => openRun(tr.dataset.run));
+  });
+  const on = (id, event, handler) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(event, handler);
+  };
+
+  on("btn-new-run", "click", () => {
+    state.view = "ask";
+    state.error = null;
+    render();
+  });
+  on("btn-submit-ask", "click", submitAsk);
+  on("ask-question", "keydown", (e) => {
+    if (e.key === "Enter") submitAsk();
+  });
+  on("btn-add-source", "click", addSource);
+  on("btn-reset-sources", "click", async () => {
+    try {
+      state.snap = await api(`/api/runs/${state.runId}/sources/reset`, { method: "POST" });
+      render();
+    } catch (err) {
+      state.error = String(err.message || err);
+      render();
+    }
+  });
+  on("btn-start-run", "click", startRun);
+  document.querySelectorAll("button[data-remove]").forEach((btn) => {
+    btn.addEventListener("click", () => removeSource(Number(btn.dataset.remove)));
+  });
+}
+
 /* --- actions ------------------------------------------------------------ */
+
+async function submitAsk() {
+  const body = {
+    category: val("ask-category") || "tech",
+    question: val("ask-question"),
+    window_start: val("ask-start") || "2026-01-01",
+    window_end: val("ask-end") || "2026-06-30",
+    market: val("ask-market") || null,
+  };
+  if (!body.question.trim()) {
+    state.error = "Enter a question for the forecast.";
+    render();
+    return;
+  }
+  try {
+    state.snap = await api("/api/runs", { method: "POST", body });
+    state.runId = state.snap.id;
+    state.view = "sources";
+    state.error = null;
+  } catch (err) {
+    state.error = String(err.message || err);
+  }
+  render();
+}
+
+async function addSource() {
+  const uri = val("add-uri").trim();
+  const text = val("add-text").trim();
+  if (!uri || !text) return;
+  const sources = state.snap.sources.concat([
+    {
+      uri,
+      text,
+      source_type: "https://cultural-signal-graph.dev/ontology#Source",
+      credibility: 0.6,
+      category: state.snap.ask.category,
+      topics: [],
+    },
+  ]);
+  await putSources(sources);
+}
+
+async function removeSource(index) {
+  const sources = state.snap.sources.filter((_, i) => i !== index);
+  await putSources(sources);
+}
+
+async function putSources(sources) {
+  try {
+    state.snap = await api(`/api/runs/${state.runId}/sources`, {
+      method: "PUT",
+      body: { sources },
+    });
+    state.error = null;
+  } catch (err) {
+    state.error = String(err.message || err);
+  }
+  render();
+}
+
+async function startRun() {
+  state.view = "run";
+  state.busy = true;
+  state.error = null;
+  render();
+  try {
+    state.snap = await api(`/api/runs/${state.runId}/start`, { method: "POST" });
+    state.busy = false;
+    state.view = currentStage(state.snap);
+  } catch (err) {
+    state.busy = false;
+    state.error = String(err.message || err);
+  }
+  render();
+}
 
 async function openRun(runId) {
   state.snap = await api(`/api/runs/${runId}`);
@@ -155,11 +401,24 @@ async function goHome() {
   state.view = "home";
   state.snap = null;
   state.runId = null;
+  state.error = null;
   render();
 }
 
 document.getElementById("btn-runs").addEventListener("click", goHome);
 goHome();
+
+/* --- helpers ------------------------------------------------------------ */
+
+function val(id) {
+  const el = document.getElementById(id);
+  return el ? el.value : "";
+}
+
+function fmtDuration(ms) {
+  if (ms == null) return "";
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
+}
 
 function escapeHtml(text) {
   const div = document.createElement("div");

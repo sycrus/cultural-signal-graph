@@ -13,6 +13,20 @@ def client(tmp_path):
     return TestClient(create_app(store))
 
 
+@pytest.fixture()
+def run_id(client):
+    res = client.post(
+        "/api/runs",
+        json={
+            "category": "tech",
+            "question": "AI wearables adoption",
+            "window_start": "2026-01-01",
+            "window_end": "2026-06-30",
+        },
+    )
+    return res.json()["id"]
+
+
 def test_root_serves_the_stepper_shell(client):
     res = client.get("/")
     assert res.status_code == 200
@@ -46,3 +60,33 @@ def test_runs_api_round_trip(client):
 
 def test_unknown_run_is_404(client):
     assert client.get("/api/runs/nope").status_code == 404
+
+
+def test_sources_edit_and_reset(client, run_id):
+    created = client.get(f"/api/runs/{run_id}").json()
+    first = created["sources"][0]
+
+    res = client.put(f"/api/runs/{run_id}/sources", json={"sources": [first]})
+    assert res.status_code == 200
+    assert [s["uri"] for s in res.json()["sources"]] == [first["uri"]]
+
+    res = client.post(f"/api/runs/{run_id}/sources/reset")
+    assert res.status_code == 200
+    assert res.json()["sources"] == created["sources"]
+
+
+def test_sources_edit_rejects_malformed_sources(client, run_id):
+    res = client.put(f"/api/runs/{run_id}/sources", json={"sources": [{"uri": "x"}]})
+    assert res.status_code == 422
+
+
+def test_start_pauses_at_the_gate_then_conflicts(client, run_id):
+    res = client.post(f"/api/runs/{run_id}/start")
+    assert res.status_code == 200
+    snap = res.json()
+    assert snap["status"] == "paused"
+    assert snap["pending"], "the demo corpus proposes one cross-domain edge"
+    assert snap["stages"]["extract"]["status"] == "done"
+
+    res = client.post(f"/api/runs/{run_id}/start")
+    assert res.status_code == 409

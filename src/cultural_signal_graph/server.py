@@ -30,6 +30,19 @@ class AskIn(BaseModel):
     market: str | None = None
 
 
+class SourceIn(BaseModel):
+    uri: str
+    source_type: str
+    credibility: float
+    category: str
+    text: str
+    topics: list[str] = []
+
+
+class SourcesIn(BaseModel):
+    sources: list[SourceIn]
+
+
 def create_app(store: RunStore | None = None) -> FastAPI:
     store = store or RunStore()
     app = FastAPI(title="Cultural Signal Graph")
@@ -59,6 +72,33 @@ def create_app(store: RunStore | None = None) -> FastAPI:
             return store.snapshot(run_id)
         except KeyError:
             raise HTTPException(status_code=404, detail=f"unknown run: {run_id}") from None
+
+    @app.put("/api/runs/{run_id}/sources")
+    def edit_sources(run_id: str, body: SourcesIn) -> dict:
+        try:
+            return store.edit_sources(run_id, [s.model_dump() for s in body.sources])
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown run: {run_id}") from None
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+
+    @app.post("/api/runs/{run_id}/sources/reset")
+    def reset_sources(run_id: str) -> dict:
+        try:
+            return store.reset_sources(run_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown run: {run_id}") from None
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+
+    @app.post("/api/runs/{run_id}/start")
+    def start_run(run_id: str) -> dict:
+        try:
+            return store.start(run_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown run: {run_id}") from None
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
 
     return app
 
