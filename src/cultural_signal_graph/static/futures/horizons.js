@@ -8,6 +8,7 @@ import { h } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import { lineage } from "./layout.js";
+import { marksText } from "./hints.js";
 
 const html = htm.bind(h);
 
@@ -115,7 +116,7 @@ export function Horizons({ snap, selectedId, onSelect, onRetag }) {
         return html`<g key=${it.id} class=${`h-node ${curveOf(v)} ${v === "H2-" ? "captured" : ""} ${it.anchor ? "anchor" : ""} ${selectedId === it.id ? "selected" : ""} ${path.size && !path.has(it.id) ? "faded" : ""} ${it.tag?.source === "human" ? "by-human" : ""}`}
           onPointerDown=${startDrag(it)}>
           ${it.anchor ? html`<rect x=${x - 6} y=${y - 6} width="12" height="12" rx="2" />` : html`<circle cx=${x} cy=${y} r="6.5" />`}
-          <title>${it.text}${v ? ` — ${v}${it.tag.source === "human" ? " (set by you)" : ""}` : " — untagged"}${it.anchor ? " · evidence" : ""}</title>
+          <title>${marksText(it) ? marksText(it) + "\n" : ""}${it.text}${v ? ` — ${v}${it.tag.source === "human" ? " (set by you)" : ""}` : " — untagged"}${it.anchor ? " · evidence" : ""}</title>
         </g>`;
       })}
       ${selected ? html`<text x=${Math.min(pos[selected.id][0] + 10, width - 10)} y=${pos[selected.id][1] - 10}

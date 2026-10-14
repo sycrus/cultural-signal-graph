@@ -8,6 +8,7 @@ import { h } from "preact";
 import { useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
+import { marksText } from "./hints.js";
 
 const html = htm.bind(h);
 
@@ -78,7 +79,7 @@ export function Matrix({ snap, selectedId, onSelect, onRetag }) {
   const chip = (p) => html`<span key=${p.id} draggable="true"
     class=${`m-chip ${p.origin} ${selectedId === p.id ? "selected" : ""} ${p.tags.matrix?.source === "human" ? "by-human" : ""}`}
     onDragStart=${(ev) => ev.dataTransfer.setData("text/plain", p.id)}
-    onClick=${() => onSelect(p.id)} title=${`${p.statement} (${p.window[0]}–${p.window[1]}) — drag to another world`}>
+    onClick=${() => onSelect(p.id)} title=${`${marksText(p) ? marksText(p) + "\n" : ""}${p.statement} (${p.window[0]}–${p.window[1]}) — drag to another world`}>
     <span class="order-badge">${p.order}</span>${p.statement}</span>`;
 
   const cell = (q) => {

@@ -8,6 +8,7 @@
 import { h } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
+import { TAG_HINTS, nodeTitle } from "./hints.js";
 import { layoutLanes, lineage } from "./layout.js";
 
 const html = htm.bind(h);
@@ -162,12 +163,12 @@ export function Scroll({ snap, selectedId, onSelect, laneKey = null, laneLabel =
         return html`<div key=${p.id}
           class=${`proj-node ${p.baseline ? "baseline" : ""} ${p.discontinuity ? "discontinuity" : ""} ${p.stale ? "stale" : ""} ${p.origin} ${selectedId === p.id ? "selected" : ""} ${path.size && !path.has(p.id) ? "faded" : ""} ${dimmed(p) ? "dimmed" : ""} ${shown ? "" : "rolled"}`}
           style=${{ left: `${left}px`, top: `${top}px`, width: `${CARD_W}px`, height: `${CARD_H}px`, ...(drag?.id === p.id ? { transition: "none", zIndex: 4, cursor: "grabbing" } : {}) }}
-          onPointerDown=${laneDrag} onClick=${laneDrag ? null : () => onSelect(p.id)} title=${p.statement}>
+          onPointerDown=${laneDrag} onClick=${laneDrag ? null : () => onSelect(p.id)} title=${nodeTitle(p)}>
           <div class="proj-meta">
             <span class="order-badge">${p.order}</span>
             <span class="years">${p.window[0] === p.window[1] ? p.window[0] : `${p.window[0]}–${p.window[1]}`}</span>
-            ${p.timing_conflict ? html`<span class="warn-mark" title="Timing conflict: starts before what it grows from">⚠</span>` : null}
-            ${p.stale ? html`<span class="stale-mark" title="Stale: an ancestor or anchor changed after this was generated">stale</span>` : null}
+            ${p.timing_conflict ? html`<span class="warn-mark" title=${TAG_HINTS["timing conflict"]}>⚠</span>` : null}
+            ${p.stale ? html`<span class="stale-mark" title=${TAG_HINTS.stale}>stale</span>` : null}
             ${p.parents.length + p.anchors.length > 1 ? html`<span class="converge-mark" title="Convergence">⋈</span>` : null}
             ${chips ? chips(p) : null}
           </div>

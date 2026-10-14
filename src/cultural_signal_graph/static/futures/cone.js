@@ -8,6 +8,7 @@ import { h } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import { lineage } from "./layout.js";
+import { marksText } from "./hints.js";
 
 const html = htm.bind(h);
 
@@ -132,10 +133,11 @@ export function Cone({ snap, selectedId, onSelect, onRetag }) {
     ${snap.projections.map((p) => {
       const [nx, ny] = posOf[p.id];
       const tag = p.tags.cone;
+      const marks = marksText(p);
       return html`<div key=${p.id}
         class=${`cone-node ${tag?.value || "untagged"} ${p.origin} ${selectedId === p.id ? "selected" : ""} ${path.size && !path.has(p.id) ? "faded" : ""} ${drag?.id === p.id ? "dragging" : ""}`}
         style=${{ left: `${nx}px`, top: `${ny - NODE_H / 2}px`, width: `${NODE_W}px`, height: `${NODE_H}px` }}
-        onPointerDown=${startDrag(p)} title=${`${p.statement}\n${tag ? `${tag.value}${tag.source === "human" ? " (set by you)" : ""}` : "untagged"} — drag to another band to re-class`}>
+        onPointerDown=${startDrag(p)} title=${`${marks ? marks + "\n" : ""}${p.statement}\n${tag ? `${tag.value}${tag.source === "human" ? " (set by you)" : ""}` : "untagged"} — drag to another band to re-class`}>
         ${tag?.preferable ? html`<span class="pref" title="Preferable: serves the goal">★</span>` : null}
         ${tag?.source === "human" ? html`<span class="by-you" title="Set by you">✎</span>` : null}
         <span class="cone-text">${p.statement}</span>

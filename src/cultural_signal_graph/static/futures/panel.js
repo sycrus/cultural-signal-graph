@@ -9,6 +9,7 @@ import * as S from "./store.js";
 import { TagEditor } from "./lenses.js";
 import { PromoteAction } from "./promote.js";
 import { GroundSection, STANCE_MARK } from "./ground.js";
+import { TAG_HINTS } from "./hints.js";
 
 const html = htm.bind(h);
 const opCache = {};
@@ -77,10 +78,10 @@ export function DetailPanel({ id, onSelect, onClose, actions = null }) {
     <h3>${p.statement}</h3>
     <div class="proj-tags">
       <span class="tag">${p.window[0] === p.window[1] ? p.window[0] : `${p.window[0]}–${p.window[1]}`}</span>
-      ${p.baseline ? html`<span class="tag baseline">baseline</span>` : null}
-      ${p.discontinuity ? html`<span class="tag discontinuity">discontinuity</span>` : null}
-      ${p.timing_conflict ? html`<span class="tag warn">timing conflict</span>` : null}
-      ${p.stale ? html`<span class="tag warn">stale</span>` : null}
+      ${p.baseline ? html`<span class="tag baseline" title=${TAG_HINTS.baseline}>baseline</span>` : null}
+      ${p.discontinuity ? html`<span class="tag discontinuity" title=${TAG_HINTS.discontinuity}>discontinuity</span>` : null}
+      ${p.timing_conflict ? html`<span class="tag warn" title=${TAG_HINTS["timing conflict"]}>timing conflict</span>` : null}
+      ${p.stale ? html`<span class="tag warn" title=${TAG_HINTS.stale}>stale</span>` : null}
     </div>
     ${p.timing_conflict ? html`<div class="hint">Starts before something it grows from — the dates are off, the content still stands.</div>` : null}
     ${p.stale ? html`<div class="hint">Something it grows from changed after it was generated.</div>` : null}

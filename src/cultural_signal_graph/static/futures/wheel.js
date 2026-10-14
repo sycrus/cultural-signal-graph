@@ -7,6 +7,7 @@ import { h } from "preact";
 import { useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import { lineage } from "./layout.js";
+import { nodeTitle } from "./hints.js";
 
 const html = htm.bind(h);
 const TAU = Math.PI * 2;
@@ -131,7 +132,7 @@ export function Wheel({ snap, selectedId, onSelect, dimmed = () => false }) {
           class=${`wheel-node ${p.baseline ? "baseline" : ""} ${p.discontinuity ? "discontinuity" : ""} ${p.origin} ${p.stale ? "stale" : ""} ${selectedId === p.id ? "selected" : ""} ${path.size && !path.has(p.id) ? "faded" : ""} ${dimmed(p) ? "dimmed" : ""}`}>
           <circle cx=${x} cy=${y} r=${selectedId === p.id ? 8 : 6} />
           ${labelAll || p.order === 1 || path.has(p.id) ? label(p.statement, x, y) : null}
-          <title>${p.statement} (${p.window[0]}–${p.window[1]})</title>
+          <title>${nodeTitle(p)} (${p.window[0]}–${p.window[1]})</title>
         </g>`;
       })}
     </svg>
