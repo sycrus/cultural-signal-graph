@@ -182,3 +182,5 @@ export const regenerateDownstream = (pid) =>
   mutate(`/projections/${pid}/regenerate`, { method: "POST", body: { author: author.value } });
 export const undo = () => mutate("/undo", { method: "POST" });
 export const redo = () => mutate("/redo", { method: "POST" });
+export const forkProjection = (pid, hint) =>
+  mutate(`/projections/${pid}/fork`, { method: "POST", body: { hint: hint || null, author: author.value } });

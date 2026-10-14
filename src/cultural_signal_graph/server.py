@@ -85,6 +85,11 @@ class ProjectionEditIn(BaseModel):
     author: str = "strategist"
 
 
+class ForkIn(BaseModel):
+    hint: str | None = None
+    author: str = "strategist"
+
+
 class AuthorIn(BaseModel):
     author: str = "strategist"
 
@@ -245,6 +250,10 @@ def create_app(
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}/regenerate")
     def regenerate_downstream(run_id: str, exp_id: str, pid: str, body: AuthorIn | None = None) -> dict:
         return futures.regenerate(run_id, exp_id, pid, author=(body.author if body else "strategist"))
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}/fork")
+    def fork_projection(run_id: str, exp_id: str, pid: str, body: ForkIn) -> dict:
+        return futures.fork(run_id, exp_id, pid, hint=body.hint, author=body.author)
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/undo")
     def undo_exploration(run_id: str, exp_id: str) -> dict:

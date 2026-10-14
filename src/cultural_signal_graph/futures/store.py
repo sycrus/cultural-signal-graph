@@ -216,6 +216,21 @@ class ExplorationStore:
         log.append({"op": "regenerate", "root": pid, "removed": removed, "orders": orders}, author=author)
         return self.snapshot(run_id, exp_id)
 
+    def fork(self, run_id: str, exp_id: str, pid: str, hint: str | None = None, author: str = "strategist") -> dict:
+        """A sibling branch from `pid` down to the depth limit, optionally steered by a
+        "what if" hint. The original branch is kept; a fork never carries the baseline."""
+        log, state = self._mutable(run_id, exp_id)
+        root = self._projection(state, pid)
+        depth = state["exploration"]["orders"] - root["order"]
+        if depth < 1:
+            raise ValueError("this projection is at the depth limit; there is no order left to fork into")
+        hint = (hint or "").strip() or None
+        orders = self._grow(state, {**root, "baseline": False}, depth, kind="fork", hint=hint)
+        if not orders:
+            raise ValueError("the fork produced nothing")
+        log.append({"op": "fork", "root": pid, "hint": hint, "orders": orders}, author=author)
+        return self.snapshot(run_id, exp_id)
+
     def _grow(self, state: dict, root: dict, depth: int, kind: str, removed=(), hint=None) -> list[dict]:
         """Grow a branch from `root`, one branch-generator call per order."""
         working = {**state, "projections": {k: v for k, v in state["projections"].items() if k not in set(removed)}}

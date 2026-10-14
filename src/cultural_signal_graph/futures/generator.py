@@ -176,7 +176,11 @@ def build_prompt(state: dict, order: int, branch: dict | None = None) -> str:
             "- Mark a break from trend as a discontinuity (`discontinuity: true`).",
         ]
         if branch.get("hint"):
-            rules.insert(1, f"- The strategist asks: what if {branch['hint']}? Explore that possibility.")
+            rules.insert(
+                1,
+                f"- The strategist asks: what if {branch['hint']}? Treat it as the premise of this whole "
+                "branch: every projection plays out in a world where it happened.",
+            )
     lines += [
         "",
         *rules,
