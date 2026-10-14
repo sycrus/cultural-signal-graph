@@ -123,8 +123,13 @@ class RunStore:
         window_start: str,
         window_end: str,
         market: str | None = None,
+        sources: list[SourceDoc] | None = None,
+        origin: dict | None = None,
     ) -> dict:
-        """A new run: record the ask, run source discovery, park at 'created'."""
+        """A new run: record the ask, run source discovery, park at 'created'.
+
+        `sources` skips discovery (a promotion re-runs a forecast on known sources
+        plus one more); `origin` records where such a run came from."""
         run_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
         ask = Ask(
             category=category,
@@ -135,7 +140,10 @@ class RunStore:
         # discovery may invoke the cheap model (query generation); its usage belongs
         # to this run's cost, alongside the stage calls
         before = len(get_usage())
-        sources, trace = self._select_sources(ask)
+        if sources is None:
+            sources, trace = self._select_sources(ask)
+        else:
+            trace = None
         usage_delta = get_usage()[before:]
         run = {
             "id": run_id,
@@ -154,6 +162,7 @@ class RunStore:
             "decisions": {},
             "usage_calls": [asdict(u) for u in usage_delta],
             "thread_gen": 0,
+            "origin": origin,
         }
         run["stages"]["ask"] = {"status": "done"}
         run["stages"]["sources"] = {"status": "done"}
@@ -393,6 +402,7 @@ class RunStore:
             "discovery": json.loads(discovery_path.read_text(encoding="utf-8"))
             if discovery_path.exists()
             else None,
+            "origin": run.get("origin"),
         }
 
     # --- notes (annotations overlay) ------------------------------------------

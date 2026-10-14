@@ -22,7 +22,7 @@ def node_uri(state: dict, node_id: str) -> URIRef:
     """Evidence anchors keep their graph URI (`ex:<id>`); projections and
     futures-scoped references live under the exploration."""
     anchor = state["anchors"].get(node_id)
-    if anchor is not None and anchor.get("scope") != "futures":
+    if anchor is not None and anchor.get("scope") not in ("futures", "promoted"):
         return EX[node_id]
     return URIRef(f"{exploration_uri(state['exploration']['id'])}#{node_id}")
 
@@ -39,7 +39,7 @@ def exploration_graph(state: dict, graph: Graph | None = None) -> Graph:
     g.add((exp, CSGF.orders, Literal(e["orders"], datatype=XSD.integer)))
     g.add((exp, CSGF.startYear, Literal(e["start_year"], datatype=XSD.integer)))
     for a in state["anchors"].values():
-        if a.get("scope") == "futures":
+        if a.get("scope") in ("futures", "promoted"):
             ref = node_uri(state, a["id"])
             g.add((ref, RDF.type, CSGF.Reference))
             g.add((ref, RDFS.label, Literal(a["text"])))

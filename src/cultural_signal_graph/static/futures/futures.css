@@ -290,3 +290,5 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 .label-row { display: flex; align-items: center; justify-content: space-between; }
 .anchor-row.suggested { background: #faf5ff; }
 .tag-multi { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+
+a.btn { display: inline-block; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); text-decoration: none; color: var(--ink); font-size: 12.5px; }

@@ -247,3 +247,14 @@ export async function loadAnchorPestle() {
 export async function suggestAnchors(goal) {
   return api(`${base()}/futures/suggest`, { method: "POST", body: { goal } });
 }
+
+/* --- promotion: the deliberate crossing back into the forecast --- */
+export const promoted = signal(null); // {run, exploration} after a promotion
+export async function promoteReference(refId) {
+  await guarded(async () => {
+    promoted.value = await api(`${base()}/explorations/${snap.value.exploration.id}/references/${refId}/promote`, {
+      method: "POST",
+      body: { author: author.value },
+    });
+  });
+}

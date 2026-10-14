@@ -294,3 +294,5 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
 
 .futures-toggle { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px 4px; font-weight: 400; color: #7c3aed; }
 .futures-toggle input { width: auto; margin: 0; }
+
+.origin-note { border-left: 3px solid #7c3aed; color: #4c1d95; }

@@ -20,6 +20,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .futures.promote import promote
 from .futures.store import ExplorationStore
 from .pipeline import forecast_run_from_state
 from .runstore import RunStore
@@ -392,6 +393,11 @@ def create_app(
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/pestle/{dimension}/seed")
     def seed_dimension(run_id: str, exp_id: str, dimension: str) -> dict:
         return futures.seed_dimension(run_id, exp_id, dimension)
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/references/{ref_id}/promote", status_code=201)
+    def promote_reference(run_id: str, exp_id: str, ref_id: str, body: AuthorIn | None = None) -> dict:
+        """The deliberate crossing: a new forecast run with the reference as a source."""
+        return promote(store, futures, run_id, exp_id, ref_id, author=(body.author if body else "strategist"))
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/undo")
     def undo_exploration(run_id: str, exp_id: str) -> dict:

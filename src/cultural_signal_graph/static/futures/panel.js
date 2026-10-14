@@ -7,6 +7,7 @@ import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
 import { TagEditor } from "./lenses.js";
+import { PromoteAction } from "./promote.js";
 
 const html = htm.bind(h);
 const opCache = {};
@@ -46,13 +47,14 @@ export function DetailPanel({ id, onSelect, onClose, actions = null }) {
   if (a) {
     return html`<aside class="detail-panel">
       <button class="ghost close" onClick=${onClose}>✕</button>
-      <div class=${`panel-kind ${a.kind}`}>${a.scope === "futures" ? "futures-scoped reference" : `evidence · ${a.kind}`}${a.flag ? ` · ${a.flag}` : ""}${a.status ? ` · ${a.status === "proposed" ? "pending sign-off" : a.status}` : ""}</div>
+      <div class=${`panel-kind ${a.kind}`}>${a.scope === "futures" ? "futures-scoped reference" : a.scope === "promoted" ? "promoted reference" : `evidence · ${a.kind}`}${a.flag ? ` · ${a.flag}` : ""}${a.status ? ` · ${a.status === "proposed" ? "pending sign-off" : a.status}` : ""}</div>
       ${a.status === "rejected" ? html`<div class="human-root">Rejected at the sign-off gate: everything resting on it is stale.</div>` : null}
       ${a.pending ? html`<div class="hint">Proposed cross-domain edge, not yet signed off. If it is rejected, what grows from it goes stale.</div>` : null}
       <h3>${a.text}</h3>
       ${a.entity ? html`<div class="hint">about ${a.entity}${a.confidence != null ? ` · confidence ${a.confidence}` : ""}</div>` : null}
       ${a.source_uri ? html`<div><a href=${a.source_uri} target="_blank" rel="noopener">source ↗</a></div>` : null}
       ${a.excerpt ? html`<blockquote>${a.excerpt}</blockquote>` : null}
+      <${PromoteAction} a=${a} />
       <${TagEditor} p=${a} anchorsOnly=${true} />
       ${children.length ? html`<h4>Grows into</h4><ul class="refs">${children.map((c) => html`<${Ref} key=${c.id} id=${c.id} onSelect=${onSelect} />`)}</ul>` : null}
       ${actions}

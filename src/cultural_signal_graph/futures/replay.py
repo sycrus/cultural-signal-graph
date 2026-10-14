@@ -218,6 +218,14 @@ def _annotate(state: dict, op: dict) -> None:
     }
 
 
+def _promote(state: dict, op: dict) -> None:
+    """The reference is now evidence in this (new) run; a branch grows from it."""
+    ref = state["anchors"].get(op["reference"])
+    if ref is not None:
+        state["anchors"][op["reference"]] = {**ref, "scope": "promoted", "promoted_from": op["promoted_from"]}
+    _branch(state, op)
+
+
 _HANDLERS = {
     "create": _create,
     "propose_axes": _propose_axes,
@@ -234,4 +242,5 @@ _HANDLERS = {
     "delete": _delete,
     "regenerate": _branch,
     "fork": _branch,
+    "promote": _promote,
 }

@@ -251,6 +251,10 @@ function renderSources() {
       </div>` : ""}
     </details>
     ${traceBlock}
+    ${s.origin && s.origin.promoted_from ? `<div class="card origin-note">↗ This run was created by promoting a reference from
+      <a href="/futures?run=${encodeURIComponent(s.origin.promoted_from.run)}&x=${encodeURIComponent(s.origin.promoted_from.exploration)}">an exploration</a>
+      on run ${escapeHtml(s.origin.promoted_from.run)}: <a href="${escapeHtml(s.origin.promoted_from.url)}" target="_blank" rel="noopener">${escapeHtml(shortUri(s.origin.promoted_from.url))}</a>
+      is the last source below.</div>` : ""}
     ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
     ${editable ? `
     <div style="display:flex; justify-content:space-between; margin-top:14px">
@@ -751,6 +755,7 @@ async function undoSignoff() {
 }
 
 function currentStage(snap) {
+  if (snap.status === "created") return "sources"; // not started: review sources, then run
   const states = railStates(snap);
   const action = RAIL_STAGES.find((s) => states[s.key] === "action");
   if (action) return action.key;
