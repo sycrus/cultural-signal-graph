@@ -5,6 +5,8 @@ import { h, render } from "preact";
 import { useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
+import { Scroll } from "./scroll.js";
+import { DetailPanel } from "./panel.js";
 
 const html = htm.bind(h);
 
@@ -141,38 +143,15 @@ function NewExploration() {
   </div>`;
 }
 
-function ProjectionCard({ p }) {
-  const anchors = S.anchorsById.value;
-  const projections = S.projectionsById.value;
-  return html`<div class="proj-card ${p.baseline ? "baseline" : ""}">
-    <div class="proj-head">
-      <span class="proj-window">${p.window[0] === p.window[1] ? p.window[0] : `${p.window[0]}–${p.window[1]}`}</span>
-      <span class="proj-statement">${p.statement}</span>
-    </div>
-    <div class="proj-tags">
-      ${p.baseline ? html`<span class="tag baseline">baseline</span>` : null}
-      ${p.discontinuity ? html`<span class="tag discontinuity">discontinuity</span>` : null}
-      ${p.parents.length > 1 ? html`<span class="tag converge">converges ${p.parents.length}</span>` : null}
-    </div>
-    <div class="proj-from hint">
-      from ${[
-        ...p.anchors.map((id) => `▪ ${anchors[id]?.text || id}`),
-        ...p.parents.map((id) => `● ${projections[id]?.statement || id}`),
-      ].join("  ·  ")}
-    </div>
-  </div>`;
-}
-
 function ExplorationView() {
   const s = S.snap.value;
   if (!s) return null;
   const e = s.exploration;
-  const byOrder = {};
-  for (const p of s.projections) (byOrder[p.order] ||= []).push(p);
-  return html`<div class="canvas-wide">
+  const select = (id) => (S.selectedId.value = S.selectedId.value === id ? null : id);
+  return html`<div class="exploration">
     <div class="exp-head">
       <h1>${e.goal}</h1>
-      <span class="hint">${e.start_year} → ${e.start_year + e.horizon} · ${e.orders} orders · ${s.anchors.length} anchors</span>
+      <span class="hint">${e.start_year} → ${e.start_year + e.horizon} · ${e.orders} orders · ${s.anchors.length} anchors · ${s.projections.length} projections</span>
     </div>
     <${ErrorLine} />
     ${s.can_continue && !S.busy.value
@@ -182,20 +161,13 @@ function ExplorationView() {
           <span class="hint">${s.orders_generated} of ${e.orders} orders generated.</span>
         </div>`
       : null}
-    ${S.busy.value && !s.projections.length ? html`<div class="card"><span class="spinner"></span> Generating…</div>` : null}
-    <section class="present">
-      <h2>Present</h2>
-      ${s.anchors.map(
-        (a) => html`<div key=${a.id} class="anchor-chip ${a.kind}">▪ ${a.text}
-          ${a.flag ? html`<span class="hint"> (${a.flag})</span>` : null}</div>`,
-      )}
-    </section>
-    ${Object.keys(byOrder).map(
-      (order) => html`<section key=${order}>
-        <h2>Order ${order}</h2>
-        ${byOrder[order].map((p) => html`<${ProjectionCard} key=${p.id} p=${p} />`)}
-      </section>`,
-    )}
+    ${S.busy.value ? html`<div class="card"><span class="spinner"></span> Generating…</div>` : null}
+    <div class="exp-body">
+      <div class="exp-main"><${Scroll} snap=${s} selectedId=${S.selectedId.value} onSelect=${select} /></div>
+      ${S.selectedId.value
+        ? html`<${DetailPanel} id=${S.selectedId.value} onSelect=${select} onClose=${() => (S.selectedId.value = null)} />`
+        : null}
+    </div>
   </div>`;
 }
 

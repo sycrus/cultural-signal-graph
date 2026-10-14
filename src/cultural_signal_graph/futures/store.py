@@ -17,7 +17,7 @@ from ..flags import detect_flags
 from ..models import extraction_from_dict
 from .generator import fixture_generator, live_generator
 from .log import OperationLog
-from .replay import replay
+from .replay import derive, replay
 
 _EXPLORATION_ID = re.compile(r"^x-\d{8}-\d{6}-[0-9a-f]{6}$")
 _RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
@@ -155,7 +155,11 @@ class ExplorationStore:
     def snapshot(self, run_id: str, exp_id: str) -> dict:
         log = self._log(run_id, exp_id)
         state = replay(log.active())
-        projections = sorted(state["projections"].values(), key=lambda p: (p["order"], p["window"][0], p["id"]))
+        flags = derive(state)
+        projections = sorted(
+            ({**p, **flags[p["id"]]} for p in state["projections"].values()),
+            key=lambda p: (p["order"], p["window"][0], p["id"]),
+        )
         return {
             "exploration": state["exploration"],
             "anchors": list(state["anchors"].values()),
@@ -183,6 +187,13 @@ class ExplorationStore:
 
     def ops(self, run_id: str, exp_id: str) -> list[dict]:
         return self._log(run_id, exp_id).active()
+
+    def op(self, run_id: str, exp_id: str, seq: int) -> dict:
+        """One op in effect — the provenance behind a projection (full model I/O)."""
+        ops = self.ops(run_id, exp_id)
+        if not 0 <= seq < len(ops):
+            raise KeyError(f"unknown op: {seq}")
+        return ops[seq]
 
     # --- internals -----------------------------------------------------------
 

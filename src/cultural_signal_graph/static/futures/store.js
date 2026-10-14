@@ -107,3 +107,7 @@ export async function continueGeneration() {
     snap.value = await api(`${base()}/explorations/${expId}/generate`, { method: "POST" });
   });
 }
+
+export async function fetchOp(seq) {
+  return api(`${base()}/explorations/${snap.value.exploration.id}/ops/${seq}`);
+}

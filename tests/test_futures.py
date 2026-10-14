@@ -154,3 +154,27 @@ def test_bad_requests(client, extracted_run):
     assert client.get(f"/api/runs/{extracted_run}/explorations/x-bad").status_code == 404
     assert client.get(f"/api/runs/{extracted_run}/explorations/..%2F..").status_code == 404
     assert client.get("/api/runs/unknown/explorations").status_code == 404
+
+
+def test_provenance_op_is_fetchable(client, extracted_run):
+    exp_id = _explore(client, extracted_run)["exploration"]["id"]
+    snap = client.post(f"/api/runs/{extracted_run}/explorations/{exp_id}/generate").json()
+    p = next(p for p in snap["projections"] if p["id"] == "o2-audio-only")
+    op = client.get(f"/api/runs/{extracted_run}/explorations/{exp_id}/ops/{p['op']}").json()
+    assert op["op"] == "generate_order" and op["order"] == 2
+    assert "o2-audio-only" in op["output"]
+    assert client.get(f"/api/runs/{extracted_run}/explorations/{exp_id}/ops/99").status_code == 404
+
+
+def test_timing_conflict_is_derived():
+    from cultural_signal_graph.futures.replay import derive
+
+    state = {
+        "projections": {
+            "a": {"window": [2030, 2031], "parents": []},
+            "b": {"window": [2028, 2029], "parents": ["a"]},  # before its parent
+            "c": {"window": [2031, 2032], "parents": ["a"]},
+        }
+    }
+    flags = derive(state)
+    assert flags["b"]["timing_conflict"] and not flags["c"]["timing_conflict"]

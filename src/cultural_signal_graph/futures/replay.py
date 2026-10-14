@@ -24,6 +24,19 @@ def replay(ops: list[dict]) -> dict:
     return state
 
 
+def derive(state: dict) -> dict[str, dict]:
+    """Per-projection flags computed from the DAG, not stored in any op:
+    `timing_conflict` — it starts before something it grows from."""
+    projections = state["projections"]
+    out = {}
+    for pid, p in projections.items():
+        parents = [projections[q] for q in p["parents"] if q in projections]
+        out[pid] = {
+            "timing_conflict": any(p["window"][0] < q["window"][0] for q in parents),
+        }
+    return out
+
+
 def apply(state: dict, op: dict) -> None:
     handler = _HANDLERS.get(op["op"])
     if handler is None:

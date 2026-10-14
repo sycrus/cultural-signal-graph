@@ -190,6 +190,10 @@ def create_app(store: RunStore | None = None, futures: ExplorationStore | None =
     def get_exploration(run_id: str, exp_id: str) -> dict:
         return futures.snapshot(run_id, exp_id)
 
+    @app.get("/api/runs/{run_id}/explorations/{exp_id}/ops/{seq}")
+    def get_exploration_op(run_id: str, exp_id: str, seq: int) -> dict:
+        return futures.op(run_id, exp_id, seq)
+
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/generate")
     def generate_exploration(run_id: str, exp_id: str) -> dict:
         return futures.generate(run_id, exp_id)
