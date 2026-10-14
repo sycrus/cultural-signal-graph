@@ -1,0 +1,41 @@
+/* Futures mode — layered on app.css (the design system replaces both later, #46). */
+
+:root {
+  --futures: #7c3aed;
+  --futures-soft: #ede9fe;
+  --evidence: #0f766e;
+  --evidence-soft: #ccfbf1;
+}
+
+#app { display: flex; flex-direction: column; height: 100%; }
+#futures-canvas { flex: 1; overflow: auto; padding: 24px; }
+.canvas-wide { max-width: 1100px; margin: 0 auto; }
+
+.mode-switch { display: inline-flex; gap: 2px; margin-left: 8px; border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+.mode-switch a, .mode-switch span { padding: 3px 10px; border-radius: 6px; text-decoration: none; color: var(--muted); }
+.mode-switch .active { background: var(--futures-soft); color: var(--futures); font-weight: 600; }
+
+.anchor-list { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; max-height: 280px; overflow: auto; }
+.anchor-row { display: flex; align-items: baseline; gap: 8px; font-weight: 400; margin: 0; padding: 4px 6px; border-radius: 6px; }
+.anchor-row:hover { background: var(--bg); }
+.anchor-row input { width: auto; margin: 0; }
+.anchor-text { flex: 1; }
+.anchor-kind { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: var(--evidence-soft); color: var(--evidence); white-space: nowrap; }
+.anchor-kind.flagged { background: #fef3c7; color: var(--warn); }
+.anchor-kind.claim { background: #dcfce7; color: var(--ok); }
+
+.exp-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.present { margin-bottom: 8px; }
+.anchor-chip { display: inline-block; margin: 3px 6px 3px 0; padding: 4px 9px; border-radius: 8px; background: var(--evidence-soft); color: var(--evidence); }
+.anchor-chip.flagged { background: #fef3c7; color: #92400e; }
+
+.proj-card { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--futures); border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+.proj-card.baseline { border-left-color: var(--muted); }
+.proj-head { display: flex; gap: 10px; align-items: baseline; }
+.proj-window { font-variant-numeric: tabular-nums; color: var(--futures); font-weight: 600; white-space: nowrap; }
+.proj-statement { flex: 1; }
+.proj-tags { margin: 4px 0; display: flex; gap: 6px; }
+.tag { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: var(--futures-soft); color: var(--futures); }
+.tag.baseline { background: #e5e7eb; color: var(--ink); }
+.tag.discontinuity { background: #fee2e2; color: var(--danger); }
+.proj-from { font-size: 12px; }

@@ -1,0 +1,204 @@
+/* Futures mode — Preact + htm + signals, vendored ES modules, no build step.
+   Explorations list → new exploration form → the exploration view. */
+
+import { h, render } from "preact";
+import { useState } from "preact/hooks";
+import htm from "htm";
+import * as S from "./store.js";
+
+const html = htm.bind(h);
+
+const KIND_LABEL = { claim: "claim", signal: "signal", flagged: "flagged" };
+
+function TopBar() {
+  const r = S.run.value;
+  return html`<header id="topbar">
+    <span class="brand">Cultural Signal Graph</span>
+    <span class="mode-switch">
+      <a href=${S.runId.value ? `/?run=${S.runId.value}` : "/"}>Forecast</a>
+      <span class="active">Futures</span>
+    </span>
+    ${S.snap.value?.mode === "fixture" || r?.mode === "fixture"
+      ? html`<span class="badge" title="Recorded outputs — no model, no network">fixture mode</span>`
+      : null}
+    <span class="spacer"></span>
+    ${S.view.value !== "list" && S.runId.value
+      ? html`<button class="ghost" onClick=${S.showList}>← Explorations</button>`
+      : null}
+  </header>`;
+}
+
+function ErrorLine() {
+  return S.error.value ? html`<div class="error">${S.error.value}</div>` : null;
+}
+
+function ExplorationList() {
+  const r = S.run.value;
+  const items = S.explorations.value;
+  return html`<div class="canvas-narrow">
+    <h1>Futures</h1>
+    <p class="lede">
+      Speculative futures grown from ${r ? html`the evidence of “${r.ask.question}”` : "this run"}.
+      Projections carry no probability — only where they came from.
+    </p>
+    <div class="card" style="display:flex; align-items:center; gap:14px">
+      <button class="primary" onClick=${() => S.newExploration()} disabled=${!S.anchors.value.length}>
+        New exploration
+      </button>
+      <span class="hint">Goal, initial anchors, horizon, orders.</span>
+    </div>
+    <${ErrorLine} />
+    <h2>Explorations</h2>
+    <div class="card" style="padding:0">
+      <table>
+        <thead><tr><th>Goal</th><th>Horizon</th><th>Orders</th><th>Projections</th><th></th></tr></thead>
+        <tbody>
+          ${items.length
+            ? items.map(
+                (e) => html`<tr key=${e.id}>
+                  <td><a href="#" onClick=${(ev) => { ev.preventDefault(); S.openExploration(e.id); }}>${e.goal}</a></td>
+                  <td>${e.horizon} yr</td>
+                  <td>${e.orders}</td>
+                  <td>${e.projections}</td>
+                  <td><button class="ghost" title="Start a new exploration from these settings"
+                    onClick=${() => S.newExploration({ goal: e.goal, anchor_ids: e.anchor_ids, horizon: e.horizon, orders: e.orders })}>
+                    Duplicate with changes</button></td>
+                </tr>`,
+              )
+            : html`<tr><td colspan="5" class="hint">No explorations yet.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function AnchorRow({ a, checked, onToggle }) {
+  return html`<label class="anchor-row">
+    <input type="checkbox" checked=${checked} onChange=${onToggle} />
+    <span class=${`anchor-kind ${a.kind}`}>${KIND_LABEL[a.kind]}${a.flag ? ` · ${a.flag}` : ""}</span>
+    <span class="anchor-text">${a.text}</span>
+    <span class="hint">${a.entity}</span>
+  </label>`;
+}
+
+function NewExploration() {
+  const d = S.draft.value || {};
+  const all = S.anchors.value;
+  const [goal, setGoal] = useState(d.goal || "");
+  const [picked, setPicked] = useState(new Set(d.anchor_ids || all.filter((a) => a.kind !== "flagged").map((a) => a.id)));
+  const [horizon, setHorizon] = useState(d.horizon || 10);
+  const [orders, setOrders] = useState(d.orders || 5);
+  const toggle = (id) => {
+    const next = new Set(picked);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setPicked(next);
+  };
+  const submit = () => {
+    if (!goal.trim()) {
+      S.error.value = "Give the exploration a goal.";
+      return;
+    }
+    S.createAndGenerate({
+      goal,
+      anchor_ids: all.filter((a) => picked.has(a.id)).map((a) => a.id),
+      horizon: Number(horizon),
+      orders: Number(orders),
+    });
+  };
+  return html`<div class="canvas-narrow">
+    <h1>New exploration</h1>
+    <p class="lede">The goal steers the generator; the anchors are the evidence it grows from.</p>
+    <div class="card">
+      <label for="goal">Goal</label>
+      <input id="goal" value=${goal} onInput=${(e) => setGoal(e.target.value)}
+        placeholder="the direction of AR/VR wearables" />
+
+      <label>Initial state — ${picked.size} anchor${picked.size === 1 ? "" : "s"}</label>
+      <div class="anchor-list">
+        ${all.map((a) => html`<${AnchorRow} key=${a.id} a=${a} checked=${picked.has(a.id)} onToggle=${() => toggle(a.id)} />`)}
+      </div>
+      <div class="hint">Flagged signals are allowed: weak or contested evidence can still seed a possible future.</div>
+
+      <div style="display:flex; gap:16px">
+        <div style="flex:1">
+          <label for="horizon">Horizon (years)</label>
+          <input id="horizon" type="number" min="1" max="50" value=${horizon} onInput=${(e) => setHorizon(e.target.value)} />
+          <div class="hint">The time limit.</div>
+        </div>
+        <div style="flex:1">
+          <label for="orders">Orders</label>
+          <input id="orders" type="number" min="1" max="8" value=${orders} onInput=${(e) => setOrders(e.target.value)} />
+          <div class="hint">Causal depth — not time.</div>
+        </div>
+      </div>
+      <${ErrorLine} />
+      <div style="margin-top:16px; text-align:right">
+        <button class="primary" onClick=${submit} disabled=${S.busy.value || picked.size === 0}>
+          ${S.busy.value ? "Generating…" : "Generate →"}
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function ProjectionCard({ p }) {
+  const anchors = S.anchorsById.value;
+  const projections = S.projectionsById.value;
+  return html`<div class="proj-card ${p.baseline ? "baseline" : ""}">
+    <div class="proj-head">
+      <span class="proj-window">${p.window[0] === p.window[1] ? p.window[0] : `${p.window[0]}–${p.window[1]}`}</span>
+      <span class="proj-statement">${p.statement}</span>
+    </div>
+    <div class="proj-tags">
+      ${p.baseline ? html`<span class="tag baseline">baseline</span>` : null}
+      ${p.discontinuity ? html`<span class="tag discontinuity">discontinuity</span>` : null}
+      ${p.parents.length > 1 ? html`<span class="tag converge">converges ${p.parents.length}</span>` : null}
+    </div>
+    <div class="proj-from hint">
+      from ${[
+        ...p.anchors.map((id) => `▪ ${anchors[id]?.text || id}`),
+        ...p.parents.map((id) => `● ${projections[id]?.statement || id}`),
+      ].join("  ·  ")}
+    </div>
+  </div>`;
+}
+
+function ExplorationView() {
+  const s = S.snap.value;
+  if (!s) return null;
+  const e = s.exploration;
+  const byOrder = {};
+  for (const p of s.projections) (byOrder[p.order] ||= []).push(p);
+  return html`<div class="canvas-wide">
+    <div class="exp-head">
+      <h1>${e.goal}</h1>
+      <span class="hint">${e.start_year} → ${e.start_year + e.horizon} · ${e.orders} orders · ${s.anchors.length} anchors</span>
+    </div>
+    <${ErrorLine} />
+    ${S.busy.value && !s.projections.length ? html`<div class="card"><span class="spinner"></span> Generating…</div>` : null}
+    <section class="present">
+      <h2>Present</h2>
+      ${s.anchors.map(
+        (a) => html`<div key=${a.id} class="anchor-chip ${a.kind}">▪ ${a.text}
+          ${a.flag ? html`<span class="hint"> (${a.flag})</span>` : null}</div>`,
+      )}
+    </section>
+    ${Object.keys(byOrder).map(
+      (order) => html`<section key=${order}>
+        <h2>Order ${order}</h2>
+        ${byOrder[order].map((p) => html`<${ProjectionCard} key=${p.id} p=${p} />`)}
+      </section>`,
+    )}
+  </div>`;
+}
+
+function App() {
+  const v = S.view.value;
+  return html`<${TopBar} />
+    <main id="futures-canvas">
+      ${v === "new" ? html`<${NewExploration} />` : v === "exploration" ? html`<${ExplorationView} />` : html`<${ExplorationList} />`}
+    </main>`;
+}
+
+render(html`<${App} />`, document.getElementById("app"));
+S.load();

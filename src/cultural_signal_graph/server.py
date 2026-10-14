@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from .futures.store import ExplorationStore
 from .pipeline import forecast_run_from_state
 from .runstore import RunStore
 from .viz import build_cyto_elements, render_html
@@ -69,8 +70,17 @@ class NoteIn(BaseModel):
     author: str = "strategist"
 
 
-def create_app(store: RunStore | None = None) -> FastAPI:
+class ExplorationIn(BaseModel):
+    goal: str
+    anchor_ids: list[str]
+    horizon: int = 10
+    orders: int = 5
+    author: str = "strategist"
+
+
+def create_app(store: RunStore | None = None, futures: ExplorationStore | None = None) -> FastAPI:
     store = store or RunStore()
+    futures = futures or ExplorationStore(store.root, mode=store.mode)
     app = FastAPI(title="Cultural Signal Graph")
     app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
@@ -150,6 +160,39 @@ def create_app(store: RunStore | None = None) -> FastAPI:
         if not path.is_file():
             raise HTTPException(status_code=404, detail="run has no exports yet")
         return FileResponse(path, filename=name)
+
+    # --- futures mode (PRD-futures.md) ----------------------------------------
+
+    @app.get("/futures")
+    def futures_page() -> FileResponse:
+        return FileResponse(_STATIC_DIR / "futures.html")
+
+    @app.get("/api/runs/{run_id}/futures/anchors")
+    def futures_anchors(run_id: str) -> list[dict]:
+        return futures.anchors(run_id)
+
+    @app.get("/api/runs/{run_id}/explorations")
+    def list_explorations(run_id: str) -> list[dict]:
+        return futures.list(run_id)
+
+    @app.post("/api/runs/{run_id}/explorations", status_code=201)
+    def create_exploration(run_id: str, body: ExplorationIn) -> dict:
+        return futures.create(
+            run_id,
+            goal=body.goal,
+            anchor_ids=body.anchor_ids,
+            horizon=body.horizon,
+            orders=body.orders,
+            author=body.author,
+        )
+
+    @app.get("/api/runs/{run_id}/explorations/{exp_id}")
+    def get_exploration(run_id: str, exp_id: str) -> dict:
+        return futures.snapshot(run_id, exp_id)
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/generate")
+    def generate_exploration(run_id: str, exp_id: str) -> dict:
+        return futures.generate(run_id, exp_id)
 
     @app.get("/runs/{run_id}/graph.html", response_class=HTMLResponse)
     def graph_html(run_id: str) -> HTMLResponse:

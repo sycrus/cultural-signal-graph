@@ -563,6 +563,10 @@ function render() {
   } else {
     badge.hidden = true;
   }
+  // Futures mode opens once extraction has run (the run paused at the gate or finished)
+  const futures = document.getElementById("btn-futures");
+  futures.hidden = !state.snap || !["paused", "completed"].includes(state.snap.status);
+  if (state.snap) futures.href = `/futures?run=${encodeURIComponent(state.snap.id)}`;
   document.getElementById("canvas").innerHTML = (VIEWS[state.view] || renderHome)();
   bind();
   renderRail();
@@ -756,7 +760,11 @@ async function goHome() {
 }
 
 document.getElementById("btn-runs").addEventListener("click", goHome);
-goHome();
+goHome().then(() => {
+  // deep link from Futures mode back to its run
+  const linked = new URLSearchParams(location.search).get("run");
+  if (linked) openRun(linked);
+});
 
 /* --- helpers ------------------------------------------------------------ */
 
