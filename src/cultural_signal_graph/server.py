@@ -85,6 +85,27 @@ class ProjectionEditIn(BaseModel):
     author: str = "strategist"
 
 
+class ReferenceIn(BaseModel):
+    url: str
+    excerpt: str
+    author: str = "strategist"
+
+
+class NewReferenceIn(BaseModel):
+    url: str
+    excerpt: str
+
+
+class HumanProjectionIn(BaseModel):
+    kind: str
+    statement: str
+    window: list[int]
+    parent_id: str | None = None
+    reference: NewReferenceIn | None = None
+    reference_id: str | None = None
+    author: str = "strategist"
+
+
 class ForkIn(BaseModel):
     hint: str | None = None
     author: str = "strategist"
@@ -254,6 +275,24 @@ def create_app(
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}/fork")
     def fork_projection(run_id: str, exp_id: str, pid: str, body: ForkIn) -> dict:
         return futures.fork(run_id, exp_id, pid, hint=body.hint, author=body.author)
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/references")
+    def add_reference(run_id: str, exp_id: str, body: ReferenceIn) -> dict:
+        return futures.add_reference(run_id, exp_id, url=body.url, excerpt=body.excerpt, author=body.author)
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/projections")
+    def add_projection(run_id: str, exp_id: str, body: HumanProjectionIn) -> dict:
+        return futures.add_projection(
+            run_id,
+            exp_id,
+            kind=body.kind,
+            statement=body.statement,
+            window=body.window,
+            parent_id=body.parent_id,
+            reference=body.reference.model_dump() if body.reference else None,
+            reference_id=body.reference_id,
+            author=body.author,
+        )
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/undo")
     def undo_exploration(run_id: str, exp_id: str) -> dict:

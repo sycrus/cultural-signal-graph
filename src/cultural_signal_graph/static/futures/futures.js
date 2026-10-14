@@ -8,6 +8,7 @@ import * as S from "./store.js";
 import { Scroll } from "./scroll.js";
 import { DetailPanel } from "./panel.js";
 import { HistoryBar, ProjectionActions } from "./actions.js";
+import { AddPanel } from "./add.js";
 
 const html = htm.bind(h);
 
@@ -148,12 +149,17 @@ function ExplorationView() {
   const s = S.snap.value;
   if (!s) return null;
   const e = s.exploration;
-  const select = (id) => (S.selectedId.value = S.selectedId.value === id ? null : id);
+  const select = (id) => {
+    S.adding.value = null;
+    S.selectedId.value = S.selectedId.value === id ? null : id;
+  };
   return html`<div class="exploration">
     <div class="exp-head">
       <h1>${e.goal}</h1>
       <span class="hint">${e.start_year} → ${e.start_year + e.horizon} · ${e.orders} orders · ${s.anchors.length} anchors · ${s.projections.length} projections</span>
       <span class="spacer"></span>
+      <button onClick=${() => { S.selectedId.value = null; S.adding.value = { kind: "assumption" }; }}
+        disabled=${S.generating.value}>+ Add</button>
       <${HistoryBar} />
     </div>
     <${ErrorLine} />
@@ -174,7 +180,9 @@ function ExplorationView() {
         : null}
     <div class="exp-body">
       <div class="exp-main"><${Scroll} snap=${s} selectedId=${S.selectedId.value} onSelect=${select} /></div>
-      ${S.selectedId.value
+      ${S.adding.value
+        ? html`<${AddPanel} key=${JSON.stringify(S.adding.value)} />`
+        : S.selectedId.value
         ? html`<${DetailPanel} id=${S.selectedId.value} onSelect=${select} onClose=${() => (S.selectedId.value = null)}
             actions=${S.projectionsById.value[S.selectedId.value]
               ? html`<${ProjectionActions} p=${S.projectionsById.value[S.selectedId.value]} />`

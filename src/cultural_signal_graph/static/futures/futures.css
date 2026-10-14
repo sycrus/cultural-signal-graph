@@ -135,3 +135,16 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 .action-form .row { display: flex; gap: 6px; align-items: center; }
 .action-form .row input { flex: 1; min-width: 0; }
 .action-form .row.right { justify-content: flex-end; }
+
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px; margin: 8px 0; flex-wrap: wrap; }
+.seg button { border: 0; background: none; padding: 4px 10px; border-radius: 6px; font: inherit; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+.seg button.on { background: var(--futures-soft); color: var(--futures); font-weight: 600; }
+.seg.small button { padding: 2px 8px; font-size: 12px; }
+.add-panel label { margin-top: 8px; }
+.add-panel textarea, .add-panel select { width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; }
+.add-panel .row { display: flex; gap: 6px; align-items: center; }
+.add-panel .row input { flex: 1; min-width: 0; }
+.add-panel .row.right { justify-content: flex-end; }
+.human-root { margin: 8px 0; padding: 6px 9px; border-radius: 6px; font-size: 12.5px; background: #f3f4f6; color: #374151; }
+.human-root.assumption { background: var(--evidence-soft); color: #134e4a; }
+.anchor-card.reference .anchor-kind-dot { border-radius: 50%; }

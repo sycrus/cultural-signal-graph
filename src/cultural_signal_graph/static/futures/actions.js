@@ -77,6 +77,8 @@ export function ProjectionActions({ p, extra = null }) {
     <button onClick=${() => setMode("fork")} disabled=${busy || p.order >= S.snap.value.exploration.orders}
       title=${p.order >= S.snap.value.exploration.orders ? "At the depth limit" : "Explore an alternative from here"}>⑂ Fork</button>
     ${extra}
+    <button onClick=${() => { S.adding.value = { kind: "assumption", parent_id: p.id }; }} disabled=${busy}
+      title="Add your own assumption or wild card growing from this one">+ After this</button>
     <button class="ghost" onClick=${() => setMode("delete")} disabled=${busy}>Delete</button>
     ${staleBelow
       ? html`<button class="primary" onClick=${() => S.regenerateDownstream(p.id)} disabled=${busy}

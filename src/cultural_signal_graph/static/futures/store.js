@@ -184,3 +184,10 @@ export const undo = () => mutate("/undo", { method: "POST" });
 export const redo = () => mutate("/redo", { method: "POST" });
 export const forkProjection = (pid, hint) =>
   mutate(`/projections/${pid}/fork`, { method: "POST", body: { hint: hint || null, author: author.value } });
+
+export const adding = signal(null); // {kind, parent_id} while the Add drawer is open
+
+export const addReference = (url, excerpt) =>
+  mutate("/references", { method: "POST", body: { url, excerpt, author: author.value } });
+export const addProjection = (body) =>
+  mutate("/projections", { method: "POST", body: { ...body, author: author.value } });

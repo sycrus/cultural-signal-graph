@@ -17,6 +17,7 @@ from pathlib import Path
 from ..flags import detect_flags
 from ..models import extraction_from_dict
 from .generator import (
+    summarize_reference,
     fixture_branch_generator,
     fixture_generator,
     live_branch_generator,
@@ -230,6 +231,89 @@ class ExplorationStore:
             raise ValueError("the fork produced nothing")
         log.append({"op": "fork", "root": pid, "hint": hint, "orders": orders}, author=author)
         return self.snapshot(run_id, exp_id)
+
+    # --- the strategist's own additions --------------------------------------
+
+    def add_reference(self, run_id: str, exp_id: str, url: str, excerpt: str, author: str = "strategist") -> dict:
+        """A futures-scoped anchor in the Present column: never forecast evidence."""
+        log, state = self._mutable(run_id, exp_id)
+        ref, summary = self._reference(state, url, excerpt)
+        log.append({"op": "add_reference", "reference": ref, "summary": summary}, author=author)
+        return self.snapshot(run_id, exp_id)
+
+    def add_projection(
+        self,
+        run_id: str,
+        exp_id: str,
+        kind: str,
+        statement: str,
+        window: list[int],
+        parent_id: str | None = None,
+        reference: dict | None = None,
+        reference_id: str | None = None,
+        author: str = "strategist",
+    ) -> dict:
+        """A grounded assumption (needs a reference: a new one or an existing one) or a
+        wild card (no reference). Its order follows from its parent, or 1."""
+        if kind not in ("assumption", "wildcard"):
+            raise ValueError("kind must be 'assumption' or 'wildcard'")
+        log, state = self._mutable(run_id, exp_id)
+        if not statement.strip():
+            raise ValueError("a projection needs a statement")
+        if len(window) != 2 or int(window[0]) > int(window[1]):
+            raise ValueError("window must be [start_year, end_year] with start <= end")
+        parent = self._projection(state, parent_id) if parent_id else None
+        op: dict = {"op": "add_wildcard" if kind == "wildcard" else "add_assumption"}
+        anchors: list[str] = []
+        if kind == "assumption":
+            if reference:
+                ref, summary = self._reference(state, reference.get("url", ""), reference.get("excerpt", ""))
+                op["reference"], op["summary"] = ref, summary
+                anchors = [ref["id"]]
+            elif reference_id:
+                if state["anchors"].get(reference_id, {}).get("kind") != "reference":
+                    raise ValueError(f"unknown reference: {reference_id}")
+                anchors = [reference_id]
+            else:
+                raise ValueError("a grounded assumption needs a reference; without one it is a wild card")
+        taken = set(state["projections"]) | set(state["anchors"]) | set(state["removed"])
+        n = 1
+        while f"{kind}-{n}" in taken:
+            n += 1
+        op["projection"] = {
+            "id": f"{kind}-{n}",
+            "statement": statement.strip(),
+            "order": parent["order"] + 1 if parent else 1,
+            "window": [int(window[0]), int(window[1])],
+            "parents": [parent["id"]] if parent else [],
+            "anchors": anchors,
+            "origin": kind,
+            "baseline": False,
+            "discontinuity": False,
+        }
+        log.append(op, author=author)
+        return self.snapshot(run_id, exp_id)
+
+    def _reference(self, state: dict, url: str, excerpt: str) -> tuple[dict, dict]:
+        url, excerpt = url.strip(), excerpt.strip()
+        if not url.startswith(("http://", "https://")):
+            raise ValueError("a reference needs an http(s) URL")
+        if not excerpt:
+            raise ValueError("a reference needs an excerpt: what the source says")
+        summary = summarize_reference(url, excerpt, live=self.mode == "live")
+        n = 1
+        while f"ref-{n}" in state["anchors"]:
+            n += 1
+        ref = {
+            "id": f"ref-{n}",
+            "kind": "reference",
+            "scope": "futures",
+            "text": summary["text"],
+            "excerpt": excerpt,
+            "source_uri": url,
+            "flag": None,
+        }
+        return ref, summary
 
     def _grow(self, state: dict, root: dict, depth: int, kind: str, removed=(), hint=None) -> list[dict]:
         """Grow a branch from `root`, one branch-generator call per order."""

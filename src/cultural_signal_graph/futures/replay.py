@@ -48,6 +48,23 @@ def derive(state: dict) -> dict[str, dict]:
         latest[node_id] = value
         return value
 
+    human: dict[str, str | None] = {}
+
+    def human_root(node_id: str, seen: frozenset = frozenset()) -> str | None:
+        """The nearest strategist-written origin upstream: 'assumption' or 'wildcard'."""
+        if node_id in human:
+            return human[node_id]
+        p = projections.get(node_id)
+        found = None
+        if p is not None and node_id not in seen:
+            if p.get("origin") in ("assumption", "wildcard"):
+                found = p["origin"]
+            else:
+                for src in p["parents"]:
+                    found = found or human_root(src, seen | {node_id})
+        human[node_id] = found
+        return found
+
     out = {}
     for pid, p in projections.items():
         parents = [projections[q] for q in p["parents"] if q in projections]
@@ -55,6 +72,7 @@ def derive(state: dict) -> dict[str, dict]:
         out[pid] = {
             "timing_conflict": any(p["window"][0] < q["window"][0] for q in parents),
             "stale": upstream > p["op"],
+            "human_root": human_root(pid),
         }
     return out
 
@@ -134,8 +152,24 @@ def _branch(state: dict, op: dict) -> None:
         _add(state, payload["projections"], op["seq"])
 
 
+def _add_reference(state: dict, op: dict) -> None:
+    ref = op["reference"]
+    state["anchors"][ref["id"]] = copy.deepcopy(ref)
+
+
+def _add_human_projection(state: dict, op: dict) -> None:
+    """add_assumption / add_wildcard: a strategist-written projection (plus, for an
+    assumption, the new reference it rests on)."""
+    if op.get("reference"):
+        _add_reference(state, op)
+    _add(state, [op["projection"]], op["seq"])
+
+
 _HANDLERS = {
     "create": _create,
+    "add_reference": _add_reference,
+    "add_assumption": _add_human_projection,
+    "add_wildcard": _add_human_projection,
     "generate_order": _generate_order,
     "stop": _stop,
     "edit": _edit,

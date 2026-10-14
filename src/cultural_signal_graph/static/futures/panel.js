@@ -68,6 +68,11 @@ export function DetailPanel({ id, onSelect, onClose, actions = null }) {
     ${p.timing_conflict ? html`<div class="hint">Starts before something it grows from — the dates are off, the content still stands.</div>` : null}
     ${p.stale ? html`<div class="hint">Something it grows from changed after it was generated.</div>` : null}
     ${p.hint ? html`<div class="hint">Fork hint: “${p.hint}”</div>` : null}
+    ${p.human_root
+      ? html`<div class="human-root ${p.human_root}">${p.origin === p.human_root
+          ? p.human_root === "wildcard" ? "Wild card — written by the strategist, no evidence behind it." : "Grounded assumption — written by the strategist, resting on the reference below."
+          : `Grows from a ${p.human_root === "wildcard" ? "wild card" : "grounded assumption"}: it traces back to a human assumption, not only to evidence.`}</div>`
+      : null}
     ${actions}
     <h4>Grows from</h4>
     <ul class="refs">${[...p.anchors, ...p.parents].map((s) => html`<${Ref} key=${s} id=${s} onSelect=${onSelect} />`)}</ul>

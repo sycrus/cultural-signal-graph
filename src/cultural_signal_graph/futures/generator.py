@@ -319,3 +319,30 @@ def fixture_branch_generator(state: dict, order: int, branch: dict) -> dict:
         if branch.get("hint"):
             p["hint"] = branch["hint"]
     return {"order": order, "model": "fixture", "input": {"fixture": True, "branch": branch}, "output": raw, "projections": projections}
+
+
+SUMMARY_SYSTEM = (
+    "You condense a source excerpt into one plain sentence (at most 25 words) stating "
+    "what it says, for use as evidence. No opinions, no prose around it."
+)
+
+
+def summarize_reference(url: str, excerpt: str, live: bool) -> dict:
+    """One line the generator can use, with the call's full input/output kept for the
+    op. Fixture mode (no model) takes the excerpt's first sentence."""
+    if not live:
+        first = excerpt.strip().split(". ")[0].strip().rstrip(".")
+        return {"text": (first[:157] + "...") if len(first) > 160 else first, "model": None}
+    prompt = f"Source: {url}\nExcerpt:\n{excerpt.strip()}"
+    model, temperature = futures_model("summarize")
+    with get_tracer().start_as_current_span("futures_summarize_reference"):
+        with model_span() as model_call:
+            text, usage = call_model(model, SUMMARY_SYSTEM, prompt, max_tokens=200, temperature=temperature)
+            record_usage(model_call, usage)
+    return {
+        "text": text.strip().strip('"'),
+        "model": model,
+        "temperature": temperature,
+        "input": {"system": SUMMARY_SYSTEM, "prompt": prompt},
+        "output": text,
+    }
