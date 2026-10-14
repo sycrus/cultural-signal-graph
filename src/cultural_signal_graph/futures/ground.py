@@ -55,8 +55,7 @@ def _queries_prompt(goal: str, statement: str, tried: list[str]) -> str:
         f"Projection to ground: {statement}",
         "",
         "Write 2-3 short web search queries that would find evidence for it AND against it "
-        "(news, government forecasts or plans, studies). Encyclopedic search works best with "
-        "topic words, not questions.",
+        "(news, government forecasts or plans, studies).",
     ]
     if tried:
         lines.append("Already tried (found nothing usable): " + "; ".join(tried))
@@ -70,9 +69,10 @@ def _judge_prompt(statement: str, results: list[dict], can_retry: bool) -> str:
         lines.append(f"[{i}] {r['title']} ({r['url']}): {r['snippet']}")
     lines += [
         "",
-        "For each result that bears on the projection, say whether it supports or contradicts "
-        "it, quote or paraphrase the relevant part as a short excerpt, and say why in one line. "
-        "Skip irrelevant results.",
+        "For each result that genuinely bears on the projection, say whether it supports or "
+        "contradicts it, quote or paraphrase ONE COMPLETE sentence or clause as the excerpt — "
+        "never a fragment — and say why in one line. Skip irrelevant results: returning no "
+        "judgments is better than stretching a keyword match.",
         'Return JSON: {"judgments": [{"index", "stance": "support"|"contradict", "excerpt", "why"}]'
         + (', "more_queries": [...] only if nothing above is usable}' if can_retry else "}"),
     ]
@@ -90,6 +90,7 @@ def ground(state: dict, target: dict, live: bool) -> dict:
             "queries": [statement[:60]],
             "results": [],
             "steps": [],
+            "errors": [],
             "proposals": [
                 {"url": f"https://example.org/evidence/{slug}/for", "title": "Fixture: supporting evidence",
                  "excerpt": f"A recent plan points toward this: {statement[:80]}", "stance": "support",
@@ -105,12 +106,13 @@ def ground(state: dict, target: dict, live: bool) -> dict:
     tried: list[str] = []
     examined: list[dict] = []
     proposals: list[dict] = []
+    errors: list[dict] = []  # per-query search failures — an empty round explains itself
     data, step = _call(_queries_prompt(goal, statement, tried), "queries")
     steps.append(step)
     queries = [str(q) for q in data.get("queries", [])][:3] or [statement[:80]]
     for round_no in range(MAX_ROUNDS):
         tried += queries
-        results = discovery._search_records(queries, limit=MAX_RESULTS)
+        results = discovery._search_records(queries, limit=MAX_RESULTS, errors=errors)
         seen = {r["url"] for r in examined}
         results = [r for r in results if r["url"] not in seen][: MAX_RESULTS * 2]
         examined += results
@@ -124,11 +126,15 @@ def ground(state: dict, target: dict, live: bool) -> dict:
                 r = results[int(j["index"])]
             except (KeyError, ValueError, IndexError, TypeError):
                 continue
-            if j.get("stance") not in ("support", "contradict") or not str(j.get("excerpt", "")).strip():
+            excerpt = str(j.get("excerpt", "")).strip()
+            # a fragment like "the government antitrust action, which" is keyword
+            # noise, not evidence — demand a complete clause (the judge is told too)
+            if j.get("stance") not in ("support", "contradict") or len(excerpt.split()) < 8:
                 continue
             proposals.append({
-                "url": r["url"], "title": r["title"], "excerpt": str(j["excerpt"]).strip(),
-                "stance": j["stance"], "why": str(j.get("why", "")).strip(), "query": r.get("query"),
+                "url": r["url"], "title": r["title"], "excerpt": excerpt,
+                "stance": j["stance"], "why": str(j.get("why", "")).strip(),
+                "query": r.get("query"), "backend": r.get("backend"),
             })
         if proposals or not can_retry or not data.get("more_queries"):
             break
@@ -139,4 +145,5 @@ def ground(state: dict, target: dict, live: bool) -> dict:
         "results": examined,
         "steps": steps,
         "proposals": proposals[:MAX_PROPOSALS],
+        "errors": errors,
     }

@@ -232,6 +232,7 @@ def _ground(state: dict, op: dict) -> None:
         "proposals": copy.deepcopy(op["proposals"]),
         "queries": list(op.get("queries", [])),
         "examined": len(op.get("results", [])),
+        "errors": list(op.get("errors", [])),
         "op": op["seq"],
     }
 

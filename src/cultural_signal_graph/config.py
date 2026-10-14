@@ -59,3 +59,9 @@ def futures_cap(name: str, default: int) -> int:
     """A generation cap (`CSG_FUTURES_<NAME>`), tunable once the system runs."""
     value = os.environ.get(f"CSG_FUTURES_{name.upper()}")
     return int(value) if value else default
+
+
+def brave_api_key() -> str | None:
+    """The Brave Search API key (BRAVE_API_KEY in .env), or None when unset —
+    discovery then searches Wikipedia full-text only."""
+    return os.environ.get("BRAVE_API_KEY") or None

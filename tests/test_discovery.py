@@ -7,7 +7,10 @@ from cultural_signal_graph.discovery import (
     MAX_WEB_SOURCES,
     SOURCE_INDEX,
     _fallback_queries,
+    _fetch_brave_results,
+    _fetch_search_results,
     _parse_queries,
+    _search_records,
     _web_backfill,
     discover_sources,
     discover_with_trace,
@@ -199,3 +202,68 @@ def test_web_backfill_accepts_queries_arg(monkeypatch):
     sources = _web_backfill(_ask("fashion", "q"), queries=["one", "two"])
     assert seen == ["one", "two"]
     assert sources
+
+
+# --- search backends: Brave when keyed, Wikipedia fallback (#48) -----------------
+
+
+def test_fetch_dispatches_on_brave_key(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "cultural_signal_graph.discovery._fetch_brave_results",
+        lambda query, limit: calls.append("brave") or [],
+    )
+    monkeypatch.setattr(
+        "cultural_signal_graph.discovery._fetch_wikipedia_results",
+        lambda query, limit: calls.append("wiki") or [],
+    )
+    monkeypatch.delenv("BRAVE_API_KEY", raising=False)
+    _fetch_search_results("q", 5)
+    monkeypatch.setenv("BRAVE_API_KEY", "test-key")
+    _fetch_search_results("q", 5)
+    assert calls == ["wiki", "brave"]
+
+
+def test_brave_fetch_merges_web_and_news(monkeypatch):
+    payload = {
+        "web": {"results": [
+            {"title": "FTC bans fake AI reviews", "url": "https://ftc.example/1",
+             "description": "<strong>FTC</strong> bans fake AI-generated reviews"},
+            {"title": "Dup", "url": "https://ftc.example/1", "description": "same story"},
+        ]},
+        "news": {"results": [
+            {"title": "Dup", "url": "https://ftc.example/1", "description": "same story, news bucket"},
+            {"title": "Regulator probes ad claims", "url": "https://gov.example/2", "description": "probe opened"},
+        ]},
+    }
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            import json
+            return json.dumps(payload).encode()
+
+    monkeypatch.setenv("BRAVE_API_KEY", "test-key")
+    monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout=10: FakeResponse())
+    records = _fetch_brave_results("ai advertising fake reviews regulation", 5)
+    assert [r["url"] for r in records] == ["https://ftc.example/1", "https://gov.example/2"]
+    assert all(r["backend"] == "brave" for r in records)
+    assert "<strong>" not in records[0]["snippet"]
+
+
+def test_search_records_records_per_query_errors(monkeypatch):
+    def flaky(query, limit):
+        if "bad" in query:
+            raise RuntimeError("boom")
+        return [{"title": "T", "url": "https://example.com/t", "snippet": "s", "backend": "brave"}]
+
+    monkeypatch.setattr("cultural_signal_graph.discovery._fetch_search_results", flaky)
+    errors: list[dict] = []
+    records = _search_records(["good", "bad one"], errors=errors)
+    assert [r["query"] for r in records] == ["good"]
+    assert errors == [{"query": "bad one", "error": "boom"}]

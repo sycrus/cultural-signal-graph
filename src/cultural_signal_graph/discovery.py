@@ -22,6 +22,7 @@ import re
 import urllib.parse
 import urllib.request
 
+from .config import brave_api_key
 from .extraction import EXTRACTION_MODEL
 from .llm import call_model, extract_json
 from .models import CSG_NS, GAMING_NS, TECH_NS, Ask, SourceDoc, Usage
@@ -40,6 +41,7 @@ MAX_WEB_BACKFILL = 5
 MAX_WEB_SOURCES = 3
 MAX_QUERIES = 3
 _WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
+_BRAVE_API = "https://api.search.brave.com/res/v1/web/search"
 _WEB_SOURCE_CREDIBILITY = 0.6
 
 QUERY_MODEL = EXTRACTION_MODEL  # the cheap tier — a handful of queries, not prose
@@ -212,8 +214,9 @@ def _strip_html(text: str) -> str:
     return re.sub(r"<[^>]+>", "", text).strip()
 
 
-def _fetch_search_results(query: str, limit: int) -> list[dict]:
-    """Search the web (Wikipedia) for a query. Returns [{title, url, snippet}]. The seam."""
+def _fetch_wikipedia_results(query: str, limit: int) -> list[dict]:
+    """Search Wikipedia full-text for a query. The no-key fallback: encyclopedic
+    AND-match on keywords — usable coverage, weak as sole evidence for news."""
     params = {
         "action": "query",
         "list": "search",
@@ -232,14 +235,53 @@ def _fetch_search_results(query: str, limit: int) -> list[dict]:
             "url": "https://en.wikipedia.org/wiki/"
             + urllib.parse.quote(r["title"].replace(" ", "_")),
             "snippet": _strip_html(r.get("snippet", "")),
+            "backend": "wikipedia",
         }
         for r in results
     ]
 
 
-def _search_records(queries: list[str], limit: int = MAX_WEB_BACKFILL) -> list[dict]:
+def _fetch_brave_results(query: str, limit: int) -> list[dict]:
+    """Search Brave's independent index for a query; the same response usually
+    carries a news bucket, merged in (deduped) — the evidence class grounding
+    asks for. Returns [{title, url, snippet, backend}] with backend="brave"."""
+    request = urllib.request.Request(
+        _BRAVE_API + "?" + urllib.parse.urlencode({"q": query, "count": str(limit)}),
+        headers={"Accept": "application/json", "X-Subscription-Token": brave_api_key()},
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    buckets = (payload.get("web", {}) or {}).get("results") or []
+    buckets += (payload.get("news", {}) or {}).get("results") or []
+    records, seen = [], set()
+    for r in buckets:
+        record = {
+            "title": r.get("title", ""),
+            "url": r.get("url", ""),
+            "snippet": _strip_html(r.get("description", "")),
+            "backend": "brave",
+        }
+        if record["url"] and record["url"] not in seen:
+            seen.add(record["url"])
+            records.append(record)
+    return records
+
+
+def _fetch_search_results(query: str, limit: int) -> list[dict]:
+    """Search the web for a query. Returns [{title, url, snippet, backend}]. The seam:
+    Brave when BRAVE_API_KEY is set, else Wikipedia full-text."""
+    if brave_api_key():
+        return _fetch_brave_results(query, limit)
+    return _fetch_wikipedia_results(query, limit)
+
+
+def _search_records(
+    queries: list[str], limit: int = MAX_WEB_BACKFILL, errors: list[dict] | None = None
+) -> list[dict]:
     """Run every query and pool the results, deduplicated by URL, each attributed
-    to the query that found it. A failing query is skipped, not fatal."""
+    to the query that found it. A failing query is skipped, not fatal; when `errors`
+    is a list, each failure is appended as {query, error} so the caller can show
+    why a round came back empty."""
     records: list[dict] = []
     seen: set[str] = set()
     for query in queries:
@@ -247,6 +289,8 @@ def _search_records(queries: list[str], limit: int = MAX_WEB_BACKFILL) -> list[d
             results = _fetch_search_results(query, limit)
         except Exception as exc:
             logger.warning("web search failed for %r: %s", query, exc)
+            if errors is not None:
+                errors.append({"query": query, "error": str(exc)})
             continue
         for record in results:
             if record["url"] in seen:

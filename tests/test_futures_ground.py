@@ -63,8 +63,8 @@ def test_finds_support_and_contradiction_with_a_full_trail(monkeypatch, runs, ru
     calls, searches = script(monkeypatch, [
         {"queries": ["AI Act biometric", "smart glasses sales"]},
         {"judgments": [
-            {"index": 0, "stance": "support", "excerpt": "rules on biometric capture in public", "why": "regulation"},
-            {"index": 1, "stance": "contradict", "excerpt": "sales grew sharply", "why": "no stall"},
+            {"index": 0, "stance": "support", "excerpt": "rules on biometric capture in public spaces from next year", "why": "regulation"},
+            {"index": 1, "stance": "contradict", "excerpt": "sales grew sharply through the holiday quarter in every region", "why": "no stall"},
             {"index": 9, "stance": "support", "excerpt": "out of range"},
         ]},
     ], [R1, R2])
@@ -93,6 +93,38 @@ def test_refines_once_when_nothing_is_usable_then_stops(monkeypatch, runs, run_i
     assert searches == ["vague", "sharper"]  # bounded: at most two search rounds
     assert len(calls) == 3
     assert snap["grounding"]["o1-backlash"]["proposals"] == []
+
+
+def test_fragment_excerpts_are_rejected(monkeypatch, runs, run_id):
+    store = ExplorationStore(runs.root, mode="live", generator=gen.fixture_generator)
+    x = _explore(store, run_id)
+    script(monkeypatch, [
+        {"queries": ["one query"]},
+        {"judgments": [
+            {"index": 0, "stance": "support", "excerpt": "the government antitrust action, which", "why": "keyword match"},
+            {"index": 1, "stance": "support", "excerpt": "regulators now require third-party audits of ad-targeting models", "why": "on point"},
+        ]},
+    ], [R1 + R2])
+    snap = store.ground(run_id, x, "o1-backlash")
+    proposals = snap["grounding"]["o1-backlash"]["proposals"]
+    assert [p["excerpt"] for p in proposals] == ["regulators now require third-party audits of ad-targeting models"]
+
+
+def test_search_errors_explain_an_empty_round(monkeypatch, runs, run_id):
+    store = ExplorationStore(runs.root, mode="live", generator=gen.fixture_generator)
+    x = _explore(store, run_id)
+
+    def broken(query, limit):
+        raise RuntimeError("search timed out")
+
+    monkeypatch.setattr(ground, "call_model", lambda *a, **k: ('{"queries": ["q1"]}', Usage("m", 1, 1, 2)))
+    monkeypatch.setattr(discovery, "_fetch_search_results", broken)
+    snap = store.ground(run_id, x, "o1-backlash")
+    g = snap["grounding"]["o1-backlash"]
+    assert g["proposals"] == [] and g["examined"] == 0
+    assert g["errors"] == [{"query": "q1", "error": "search timed out"}]
+    op = next(o for o in store.ops(run_id, x) if o.get("op") == "ground")
+    assert op["errors"] == g["errors"]
 
 
 def test_accepting_a_proposal_adds_a_grounding_reference(runs, run_id):

@@ -36,6 +36,8 @@ Requires Python 3.11+ and [`uv`](https://docs.astral.sh/uv/).
 uv sync                      # install dependencies
 
 cp .env.example .env         # then set DEEPSEEK_API_KEY=sk-...  (auto-loaded)
+                             # optional: BRAVE_API_KEY=... — live web search (news
+                             # + web via Brave); without it, search is Wikipedia-only
 
 python -m cultural_signal_graph         # batch run: writes the six files into out/
 python -m cultural_signal_graph.server  # UI: local web app, opens in the browser

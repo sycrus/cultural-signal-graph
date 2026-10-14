@@ -40,6 +40,7 @@ def to_markdown(snap: dict) -> str:
         lines.append(f"{len(g['queries'])} queries, {g['examined']} results examined, "
                      f"{len(g['proposals'])} proposal(s) — accepted one by one by the strategist.")
         lines += [f"- query: {q}" for q in g["queries"]]
+        lines += [f"- failed: {e['query']} ({e['error']})" for e in g.get("errors", [])]
     for order in sorted({p["order"] for p in snap["projections"]}):
         lines += ["", f"## Order {order}", ""]
         for p in (q for q in snap["projections"] if q["order"] == order):
