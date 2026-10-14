@@ -102,3 +102,55 @@ def test_run_captures_token_usage(spans):
     forecast = run(SEED_CORPUS, category="tech")
     assert len(forecast.usage) == 3  # extract + align + draft
     assert sum(u.total_tokens for u in forecast.usage) == 450
+
+
+class _FakeMessages:
+    def __init__(self, text):
+        self.text = text
+        self.kwargs = None
+
+    def create(self, **kwargs):
+        from types import SimpleNamespace
+
+        self.kwargs = kwargs
+        return SimpleNamespace(
+            content=[SimpleNamespace(type="text", text=self.text)],
+            usage=SimpleNamespace(input_tokens=12, output_tokens=7),
+        )
+
+
+def test_model_call_span_records_full_input_and_output(monkeypatch):
+    """Issue #29: the model-call span carries the prompt that went in and the raw
+    text that came out, not just token counts."""
+    import json
+    from types import SimpleNamespace
+
+    from cultural_signal_graph import llm
+
+    fake = _FakeMessages(RECORDED_MODEL_OUTPUT)
+    monkeypatch.setattr(llm, "get_client", lambda: SimpleNamespace(messages=fake))
+    _exporter.clear()
+
+    ext.extract(SEED_CORPUS)
+
+    (model_call,) = [s for s in _exporter.get_finished_spans() if s.name == "model_call"]
+    recorded_input = json.loads(model_call.attributes["gen_ai.prompt"])
+    assert recorded_input["system"] == fake.kwargs["system"]
+    assert recorded_input["messages"] == fake.kwargs["messages"]
+    assert SEED_CORPUS[0].uri in recorded_input["messages"][0]["content"]
+    assert model_call.attributes["gen_ai.completion"] == RECORDED_MODEL_OUTPUT
+    assert model_call.attributes["gen_ai.usage.input_tokens"] == 12
+    assert model_call.attributes["gen_ai.request.model"] == ext.EXTRACTION_MODEL
+
+
+def test_call_model_passes_temperature_only_when_set(monkeypatch):
+    from types import SimpleNamespace
+
+    from cultural_signal_graph import llm
+
+    fake = _FakeMessages("[]")
+    monkeypatch.setattr(llm, "get_client", lambda: SimpleNamespace(messages=fake))
+    llm.call_model("m", "sys", "hi", max_tokens=10)
+    assert "temperature" not in fake.kwargs
+    llm.call_model("m", "sys", "hi", max_tokens=10, temperature=0.9)
+    assert fake.kwargs["temperature"] == 0.9

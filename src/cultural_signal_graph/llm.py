@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 
 import anthropic
+from opentelemetry import trace
 
 from .config import load_dotenv
-from .models import CSG_NS, EX_NS, GAMING_NS, TECH_NS
+from .models import CSG_NS, EX_NS, GAMING_NS, TECH_NS, Usage
+from .tracing import record_io
 
 # Make DEEPSEEK_API_KEY (from a `.env` file) available to get_client().
 load_dotenv()
@@ -23,6 +26,40 @@ def get_client() -> anthropic.Anthropic:
     if not key:
         raise RuntimeError("DEEPSEEK_API_KEY is not set; cannot call a model")
     return anthropic.Anthropic(base_url=DEEPSEEK_BASE_URL, auth_token=key)
+
+
+def call_model(
+    model: str,
+    system: str,
+    prompt: str,
+    max_tokens: int,
+    temperature: float | None = None,
+) -> tuple[str, Usage]:
+    """One single-turn model call. Returns (raw text, usage), and records the full input
+    and raw output on the current span so the trace shows what went in and came out."""
+    kwargs = {}
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    messages = [{"role": "user", "content": prompt}]
+    response = get_client().messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        thinking={"type": "disabled"},
+        system=system,
+        messages=messages,
+        **kwargs,
+    )
+    text = "".join(block.text for block in response.content if block.type == "text")
+    input_tokens = response.usage.input_tokens or 0
+    output_tokens = response.usage.output_tokens or 0
+    usage = Usage(
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=input_tokens + output_tokens,
+    )
+    record_io(trace.get_current_span(), json.dumps({"system": system, "messages": messages}), text)
+    return text, usage
 
 
 def expand_curie(curie: str) -> str:

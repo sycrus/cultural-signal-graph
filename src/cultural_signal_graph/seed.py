@@ -14,7 +14,7 @@ from pathlib import Path
 from rdflib import Graph, Literal, Namespace
 from rdflib.namespace import OWL, RDF, RDFS, XSD
 
-from .llm import extract_json, get_client
+from .llm import call_model, extract_json
 from .models import CSG_NS, SeedClass, SeedOntology, Usage
 
 logger = logging.getLogger(__name__)
@@ -52,23 +52,7 @@ def _build_prompt(category: str, market: str | None = None) -> str:
 
 def _call_seed_model(category: str, market: str | None = None) -> tuple[str, Usage]:
     """The seam. Returns (raw model text, usage); monkeypatched in tests."""
-    response = get_client().messages.create(
-        model=SEEDING_MODEL,
-        max_tokens=4000,
-        thinking={"type": "disabled"},
-        system=_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": _build_prompt(category, market)}],
-    )
-    text = "".join(block.text for block in response.content if block.type == "text")
-    input_tokens = response.usage.input_tokens or 0
-    output_tokens = response.usage.output_tokens or 0
-    usage = Usage(
-        model=SEEDING_MODEL,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        total_tokens=input_tokens + output_tokens,
-    )
-    return text, usage
+    return call_model(SEEDING_MODEL, _SYSTEM_PROMPT, _build_prompt(category, market), max_tokens=4000)
 
 
 def parse_seed_ontology(raw_json: str) -> list[SeedClass]:

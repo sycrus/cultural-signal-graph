@@ -1,6 +1,7 @@
 """OpenTelemetry tracing (ADR-0006).
 
-One span per agent stage and per model call, recording tokens + latency, exported via
+One span per agent stage and per model call, recording tokens + latency and the
+model's full input and raw output, exported via
 OTLP to a self-hosted Langfuse. `init_tracing(exporter)` installs the global provider —
 pass an `InMemorySpanExporter` in tests, or an OTLP exporter in production.
 """
@@ -68,6 +69,13 @@ def record_usage(span: trace.Span, usage: Usage) -> None:
     span.set_attribute("gen_ai.usage.output_tokens", usage.output_tokens)
     span.set_attribute("gen_ai.usage.total_tokens", usage.total_tokens)
     _usage_log.append(usage)
+
+
+def record_io(span: trace.Span, model_input: str, model_output: str) -> None:
+    """Record a model call's full input and raw output on its span (Langfuse shows the
+    GenAI prompt/completion attributes as the observation's input and output)."""
+    span.set_attribute("gen_ai.prompt", model_input)
+    span.set_attribute("gen_ai.completion", model_output)
 
 
 def reset_usage() -> None:

@@ -23,7 +23,7 @@ import urllib.parse
 import urllib.request
 
 from .extraction import EXTRACTION_MODEL
-from .llm import extract_json, get_client
+from .llm import call_model, extract_json
 from .models import CSG_NS, GAMING_NS, TECH_NS, Ask, SourceDoc, Usage
 from .tracing import get_tracer, model_span, record_usage
 
@@ -183,23 +183,7 @@ def _call_query_model(ask: Ask) -> tuple[str, Usage]:
         "Return a single JSON array of 2-3 short query strings only — no prose, "
         "no markdown fences."
     )
-    response = get_client().messages.create(
-        model=QUERY_MODEL,
-        max_tokens=1000,
-        thinking={"type": "disabled"},
-        system=system_prompt,
-        messages=[{"role": "user", "content": _build_prompt(ask)}],
-    )
-    text = "".join(block.text for block in response.content if block.type == "text")
-    input_tokens = response.usage.input_tokens or 0
-    output_tokens = response.usage.output_tokens or 0
-    usage = Usage(
-        model=QUERY_MODEL,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        total_tokens=input_tokens + output_tokens,
-    )
-    return text, usage
+    return call_model(QUERY_MODEL, system_prompt, _build_prompt(ask), max_tokens=1000)
 
 
 def _queries_with_source(ask: Ask, given: list[str] | None) -> tuple[list[str], str]:

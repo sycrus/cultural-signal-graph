@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 
-from .llm import extract_json, get_client
+from .llm import call_model, extract_json
 from .models import EquivalenceEdge, Extraction, Usage
 from .tracing import get_tracer, model_span, record_usage
 
@@ -51,23 +51,7 @@ def _build_prompt(extraction: Extraction) -> str:
 
 def _call_alignment_model(extraction: Extraction) -> tuple[str, Usage]:
     """The seam. Returns (raw model text, usage); monkeypatched in tests."""
-    response = get_client().messages.create(
-        model=ALIGNMENT_MODEL,
-        max_tokens=16000,
-        thinking={"type": "disabled"},
-        system=_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": _build_prompt(extraction)}],
-    )
-    text = "".join(block.text for block in response.content if block.type == "text")
-    input_tokens = response.usage.input_tokens or 0
-    output_tokens = response.usage.output_tokens or 0
-    usage = Usage(
-        model=ALIGNMENT_MODEL,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        total_tokens=input_tokens + output_tokens,
-    )
-    return text, usage
+    return call_model(ALIGNMENT_MODEL, _SYSTEM_PROMPT, _build_prompt(extraction), max_tokens=16000)
 
 
 def _require(obj: dict, key: str):
