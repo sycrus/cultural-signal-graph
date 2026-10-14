@@ -108,3 +108,73 @@ _Avoid_: test, benchmark
 **Golden set**:
 A held-out corpus of signals with known-expected outcomes, used to score evals and catch regressions when prompts or models change.
 _Avoid_: fixture, test data
+
+### Futures
+
+**Exploration**:
+One futures session on a forecast run: a goal, an initial state (selected anchors), a horizon, and a number of orders. A run can hold many.
+_Avoid_: scenario (a Matrix quadrant's world), session
+
+**Projection**:
+A speculative future event in an exploration. Carries no confidence and no probability — only qualitative lens tags and its provenance (anchors, parents, the generating model call).
+_Avoid_: prediction, future event (Event means something that actually happened), forecast
+
+**Order**:
+A projection's causal depth from the initial state (1st-, 2nd-, 3rd-order consequence). Not time: a 2nd-order consequence can land before a 1st-order one.
+_Avoid_: level, generation, step
+
+**Time window**:
+The span of years a projection is expected to occur in, estimated by the generator and editable. Separate from order; a child can't start before its parent.
+_Avoid_: date, timestamp, horizon (the exploration's overall limit)
+
+**Baseline**:
+The one projected, business-as-usual branch every exploration contains — the reference the alternatives are read against. Not a probability claim.
+_Avoid_: probable future, default scenario
+
+**Discontinuity**:
+An anchored projection that breaks from trend, tagged as such. The generator includes at least one per order.
+_Avoid_: wild card (that is human-added and unanchored), disruption
+
+**Branch**:
+One path through an exploration's projection DAG. Branches may converge on a shared projection.
+_Avoid_: thread, scenario
+
+**Fork**:
+A strategist-initiated sibling branch, regenerated downstream from a chosen projection, optionally with a "what if" hint. The original branch is kept.
+_Avoid_: variant, copy
+
+**Anchor**:
+A node an exploration or projection grows from. Evidence anchors are forecast nodes (signals, flagged signals, pending edges, claims); futures-scoped anchors are strategist references that never enter the forecast's evidence.
+_Avoid_: seed, input, source (a Source is where evidence came from)
+
+**Grounded assumption**:
+A strategist-added projection backed by a futures-scoped reference (e.g. a news item, a government forecast or plan).
+_Avoid_: hypothesis, manual node
+
+**Wild card**:
+A strategist-added projection with no reference. Allowed, tagged, greyed.
+_Avoid_: outlier, black swan
+
+**Promotion**:
+Moving a futures-scoped reference into the forecast. Always creates a new forecast run; the original run is untouched.
+_Avoid_: import, sync
+
+**Lens**:
+An organizing view over an exploration's projections — Wheel, Matrix, Cone, Horizons, PESTLE. A lens tags and arranges (the strategist can override any tag); it never creates projections directly, but may seed a constrained fork or write an annotation.
+_Avoid_: framework (the method a lens is based on), mode, view
+
+**Annotation**:
+A lens-written synthesis over projections — e.g. a Matrix scenario narrative per quadrant. Has provenance; is not a projection; goes stale when its projections change.
+_Avoid_: summary, note (a Note is a human overlay on the forecast graph)
+
+**Scroll**:
+The base view of an exploration: a horizontal branching timeline, present on the left, with a sliding visible window over orders.
+_Avoid_: timeline (generic), canvas
+
+**Operation log**:
+The append-only record of every action on an exploration, including the full input and output of each model call. The exploration's source of truth: state is its replay, undo/redo move a cursor over it.
+_Avoid_: history, event log, undo stack
+
+**Stale**:
+A projection whose anchor or ancestor was edited, deleted, or rejected after it was generated. Marked, never auto-regenerated.
+_Avoid_: invalid, outdated
