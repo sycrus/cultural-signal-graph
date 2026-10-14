@@ -124,3 +124,14 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 
 .gen-bar { display: flex; gap: 12px; align-items: center; }
 .gen-bar .spacer { flex: 1; }
+
+.exp-head .spacer { flex: 1; }
+.history { display: inline-flex; gap: 6px; align-items: center; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+.action-form { margin: 10px 0; padding: 10px; border-radius: 8px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
+.action-form.danger { background: #fef2f2; }
+.action-form textarea { width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; }
+.action-form label { margin: 0; }
+.action-form .row { display: flex; gap: 6px; align-items: center; }
+.action-form .row input { flex: 1; min-width: 0; }
+.action-form .row.right { justify-content: flex-end; }

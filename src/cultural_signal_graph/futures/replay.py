@@ -5,11 +5,14 @@ State is JSON-native (dicts), like the forecast pipeline's checkpointed state:
     exploration   goal, horizon, orders, start_year, run_id, ...
     anchors       anchor id -> the anchor as snapshotted at create time
     projections   projection id -> {id, statement, order, window, parents, anchors,
-                                    origin, baseline, discontinuity, op}
+                                    origin, baseline, discontinuity, op, ...}
     orders_generated   how many orders the generator has completed
+    changed       node id -> seq of the last op that edited or removed it
+    removed       projection id -> its statement, once deleted (for display)
 
 A projection's `parents` are projection ids; its `anchors` are anchor ids it grows
 from directly. Order is causal depth, `window` is [start_year, end_year] — separate.
+`op` is the seq of the op that generated it; staleness compares it against `changed`.
 """
 
 from __future__ import annotations
@@ -26,14 +29,48 @@ def replay(ops: list[dict]) -> dict:
 
 def derive(state: dict) -> dict[str, dict]:
     """Per-projection flags computed from the DAG, not stored in any op:
-    `timing_conflict` — it starts before something it grows from."""
+    `timing_conflict` — it starts before something it grows from;
+    `stale` — something it grows from (transitively) was edited or removed after
+    it was generated."""
     projections = state["projections"]
+    changed = state.get("changed", {})
+    latest: dict[str, int] = {}
+
+    def last_change(node_id: str, seen: frozenset = frozenset()) -> int:
+        """The latest change to this node or anything upstream of it."""
+        if node_id in latest:
+            return latest[node_id]
+        value = changed.get(node_id, -1)
+        p = projections.get(node_id)
+        if p is not None and node_id not in seen:
+            for src in p["parents"] + p["anchors"]:
+                value = max(value, last_change(src, seen | {node_id}))
+        latest[node_id] = value
+        return value
+
     out = {}
     for pid, p in projections.items():
         parents = [projections[q] for q in p["parents"] if q in projections]
+        upstream = max((last_change(s) for s in p["parents"] + p["anchors"]), default=-1)
         out[pid] = {
             "timing_conflict": any(p["window"][0] < q["window"][0] for q in parents),
+            "stale": upstream > p["op"],
         }
+    return out
+
+
+def descendants(state: dict, root: str) -> list[str]:
+    """Every projection downstream of `root`, nearest first."""
+    children: dict[str, list[str]] = {}
+    for p in state["projections"].values():
+        for src in p["parents"] + p["anchors"]:
+            children.setdefault(src, []).append(p["id"])
+    out, queue = [], [root]
+    while queue:
+        for c in children.get(queue.pop(0), []):
+            if c not in out:
+                out.append(c)
+                queue.append(c)
     return out
 
 
@@ -49,11 +86,17 @@ def _create(state: dict, op: dict) -> None:
     state["anchors"] = {a["id"]: copy.deepcopy(a) for a in op["anchors"]}
     state["projections"] = {}
     state["orders_generated"] = 0
+    state["changed"] = {}
+    state["removed"] = {}
+
+
+def _add(state: dict, projections: list[dict], seq: int) -> None:
+    for p in projections:
+        state["projections"][p["id"]] = {**copy.deepcopy(p), "op": seq}
 
 
 def _generate_order(state: dict, op: dict) -> None:
-    for p in op["projections"]:
-        state["projections"][p["id"]] = {**copy.deepcopy(p), "op": op["seq"]}
+    _add(state, op["projections"], op["seq"])
     state["orders_generated"] = max(state["orders_generated"], op["order"])
     state.pop("stopped_at", None)
 
@@ -62,8 +105,41 @@ def _stop(state: dict, op: dict) -> None:
     state["stopped_at"] = op["order"]
 
 
+def _edit(state: dict, op: dict) -> None:
+    p = state["projections"][op["id"]]
+    if "statement" in op:
+        p["statement"] = op["statement"]
+    if "window" in op:
+        p["window"] = list(op["window"])
+    p["edited_op"] = op["seq"]
+    if "statement" in op:
+        # what grew from it was generated from the old statement; a new window
+        # alone only surfaces as timing conflicts
+        state["changed"][op["id"]] = op["seq"]
+
+
+def _delete(state: dict, op: dict) -> None:
+    p = state["projections"].pop(op["id"])
+    state["removed"][op["id"]] = p["statement"]
+    state["changed"][op["id"]] = op["seq"]
+
+
+def _branch(state: dict, op: dict) -> None:
+    """regenerate / fork: drop the replaced projections, add the branch."""
+    for pid in op.get("removed", []):
+        p = state["projections"].pop(pid, None)
+        if p is not None:
+            state["removed"][pid] = p["statement"]
+    for payload in op["orders"]:
+        _add(state, payload["projections"], op["seq"])
+
+
 _HANDLERS = {
-    "stop": _stop,
     "create": _create,
     "generate_order": _generate_order,
+    "stop": _stop,
+    "edit": _edit,
+    "delete": _delete,
+    "regenerate": _branch,
+    "fork": _branch,
 }

@@ -16,9 +16,14 @@ from pathlib import Path
 
 from ..flags import detect_flags
 from ..models import extraction_from_dict
-from .generator import fixture_generator, live_generator
+from .generator import (
+    fixture_branch_generator,
+    fixture_generator,
+    live_branch_generator,
+    live_generator,
+)
 from .log import OperationLog
-from .replay import derive, replay
+from .replay import derive, descendants, replay
 
 _EXPLORATION_ID = re.compile(r"^x-\d{8}-\d{6}-[0-9a-f]{6}$")
 _RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
@@ -30,9 +35,12 @@ class ExplorationStore:
         runs_root: str | Path = "runs",
         generator=None,
         mode: str = "fixture",
+        branch_generator=None,
     ):
         self.root = Path(runs_root)
-        self._generate = generator or (live_generator if mode == "live" else fixture_generator)
+        live = mode == "live"
+        self._generate = generator or (live_generator if live else fixture_generator)
+        self._branch = branch_generator or (live_branch_generator if live else fixture_branch_generator)
         self.mode = mode
         self._lock = threading.Lock()
         self._running: dict[str, threading.Event] = {}  # exploration -> stop flag
@@ -158,6 +166,94 @@ class ExplorationStore:
             with self._lock:
                 self._running.pop(exp_id, None)
 
+    # --- edits & history (each one an op; undo/redo move the cursor) -----------
+
+    def edit(
+        self,
+        run_id: str,
+        exp_id: str,
+        pid: str,
+        statement: str | None = None,
+        window: list[int] | None = None,
+        author: str = "strategist",
+    ) -> dict:
+        """Change a projection's statement and/or time window. A new statement makes
+        its descendants stale; a new window only shows up as timing conflicts."""
+        log, state = self._mutable(run_id, exp_id)
+        p = self._projection(state, pid)
+        op: dict = {"op": "edit", "id": pid, "before": {"statement": p["statement"], "window": p["window"]}}
+        if statement is not None:
+            if not statement.strip():
+                raise ValueError("a projection needs a statement")
+            op["statement"] = statement.strip()
+        if window is not None:
+            if len(window) != 2 or int(window[0]) > int(window[1]):
+                raise ValueError("window must be [start_year, end_year] with start <= end")
+            op["window"] = [int(window[0]), int(window[1])]
+        if "statement" not in op and "window" not in op:
+            raise ValueError("nothing to change")
+        log.append(op, author=author)
+        return self.snapshot(run_id, exp_id)
+
+    def delete(self, run_id: str, exp_id: str, pid: str, author: str = "strategist") -> dict:
+        """Remove a projection; what grew from it is marked stale, never removed."""
+        log, state = self._mutable(run_id, exp_id)
+        p = self._projection(state, pid)
+        log.append({"op": "delete", "id": pid, "before": p}, author=author)
+        return self.snapshot(run_id, exp_id)
+
+    def regenerate(self, run_id: str, exp_id: str, pid: str, author: str = "strategist") -> dict:
+        """Replace the stale projections downstream of `pid` with a fresh branch grown
+        from it, as deep as the ones it replaces. One op, so one undo."""
+        log, state = self._mutable(run_id, exp_id)
+        root = self._projection(state, pid)
+        flags = derive(state)
+        removed = [d for d in descendants(state, pid) if flags[d]["stale"]]
+        if not removed:
+            raise ValueError("nothing downstream of this projection is stale")
+        depth = max(state["projections"][d]["order"] for d in removed) - root["order"]
+        orders = self._grow(state, root, max(depth, 1), kind="regenerated", removed=removed)
+        log.append({"op": "regenerate", "root": pid, "removed": removed, "orders": orders}, author=author)
+        return self.snapshot(run_id, exp_id)
+
+    def _grow(self, state: dict, root: dict, depth: int, kind: str, removed=(), hint=None) -> list[dict]:
+        """Grow a branch from `root`, one branch-generator call per order."""
+        working = {**state, "projections": {k: v for k, v in state["projections"].items() if k not in set(removed)}}
+        frontier = [root["id"]]
+        payloads = []
+        for order in range(root["order"] + 1, root["order"] + depth + 1):
+            branch = {"kind": kind, "frontier": frontier, "baseline": root["baseline"], "hint": hint}
+            payload = self._branch(working, order, branch)
+            if not payload["projections"]:
+                break
+            payloads.append(payload)
+            working["projections"] = {**working["projections"], **{p["id"]: {**p, "op": -1} for p in payload["projections"]}}
+            frontier = [p["id"] for p in payload["projections"]]
+        return payloads
+
+    def undo(self, run_id: str, exp_id: str) -> dict:
+        log, _ = self._mutable(run_id, exp_id)
+        log.undo()
+        return self.snapshot(run_id, exp_id)
+
+    def redo(self, run_id: str, exp_id: str) -> dict:
+        """Redo replays the stored op — a generation's recorded output, no model call."""
+        log, _ = self._mutable(run_id, exp_id)
+        log.redo()
+        return self.snapshot(run_id, exp_id)
+
+    def _mutable(self, run_id: str, exp_id: str):
+        log = self._log(run_id, exp_id)
+        if self.is_generating(exp_id):
+            raise ValueError(f"exploration {exp_id} is generating; stop it first")
+        return log, replay(log.active())
+
+    @staticmethod
+    def _projection(state: dict, pid: str) -> dict:
+        if pid not in state["projections"]:
+            raise KeyError(f"unknown projection: {pid}")
+        return state["projections"][pid]
+
     def stop(self, run_id: str, exp_id: str) -> dict:
         """Ask a running generation to halt after its current order."""
         self._log(run_id, exp_id)
@@ -211,6 +307,7 @@ class ExplorationStore:
             "can_continue": self._can_continue(state),
             "generating": self.is_generating(exp_id),
             "stopped_at": state.get("stopped_at"),
+            "removed": state["removed"],
             "cursor": log.cursor(),
             "can_undo": log.can_undo(),
             "can_redo": log.can_redo(),

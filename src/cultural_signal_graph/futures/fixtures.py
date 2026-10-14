@@ -88,3 +88,12 @@ _ORDERS = [
 
 # One recorded raw model output per order (index 0 = order 1).
 RECORDED_ORDER_OUTPUTS: list[str] = [json.dumps({"projections": ps}, indent=2) for ps in _ORDERS]
+
+# Fixture mode's stand-in consequences for a regenerated or forked branch (no model).
+FIXTURE_BRANCH_LINES = [
+    "Buyers and regulators adjust to the new direction within two years",
+    "A new set of players fills the gap the change leaves behind",
+    "Everyday habits settle around the new arrangement",
+    "The shift spreads to adjacent categories and markets",
+    "What was contested becomes the unremarkable norm",
+]

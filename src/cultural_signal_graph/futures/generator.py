@@ -21,7 +21,7 @@ import logging
 from ..config import futures_cap, futures_model
 from ..llm import call_model, extract_json
 from ..tracing import get_tracer, model_span, record_usage
-from .fixtures import RECORDED_ORDER_OUTPUTS
+from .fixtures import FIXTURE_BRANCH_LINES, RECORDED_ORDER_OUTPUTS
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +86,18 @@ def caps() -> tuple[int, int]:
     return futures_cap("max_per_order", 6), futures_cap("max_children", 3)
 
 
-def finalize_order(projections: list[dict], state: dict, order: int) -> list[dict]:
+def finalize_order(projections: list[dict], state: dict, order: int, branch: dict | None = None) -> list[dict]:
     """Enforce the invariants a model can't be trusted with: windows inside the
-    horizon, the caps, and exactly one baseline continuing the previous one."""
+    horizon, the caps, and exactly one baseline continuing the previous one.
+
+    For a `branch` (regenerate / fork), every projection must grow from the branch
+    frontier, and the baseline continues only if the branch carries it."""
     e = state["exploration"]
     first, last = e["start_year"], e["start_year"] + e["horizon"]
     out = []
+    if branch is not None:
+        frontier = set(branch["frontier"])
+        projections = [p for p in projections if set(p["parents"]) & frontier]
     for p in projections:
         start, end = p["window"]
         if start > last:
@@ -112,15 +118,19 @@ def finalize_order(projections: list[dict], state: dict, order: int) -> list[dic
         kept.append(p)
 
     # exactly one baseline: order 1 opens it; later orders continue the previous one
-    prev = {q["id"] for q in state["projections"].values() if q["baseline"] and q["order"] == order - 1}
-    eligible = [p for p in kept if order == 1 or set(p["parents"]) & prev]
+    if branch is not None:
+        prev = {f for f in branch["frontier"] if state["projections"][f]["baseline"]} if branch["baseline"] else set()
+        eligible = [p for p in kept if set(p["parents"]) & prev]
+    else:
+        prev = {q["id"] for q in state["projections"].values() if q["baseline"] and q["order"] == order - 1}
+        eligible = [p for p in kept if order == 1 or set(p["parents"]) & prev]
     chosen = next((p for p in eligible if p["baseline"]), eligible[0] if eligible else None)
     for p in kept:
         p["baseline"] = p is chosen
     return kept
 
 
-def build_prompt(state: dict, order: int) -> str:
+def build_prompt(state: dict, order: int, branch: dict | None = None) -> str:
     e = state["exploration"]
     first, last = e["start_year"], e["start_year"] + e["horizon"]
     max_per_order, max_children = caps()
@@ -141,19 +151,37 @@ def build_prompt(state: dict, order: int) -> str:
             lines.append(
                 f"- {p['id']} (order {p['order']}, {p['window'][0]}-{p['window'][1]}){marks}: {p['statement']}"
             )
-    source = "anchor ids" if order == 1 else f"ids of order-{order - 1} projections (anchor ids may be added)"
-    baseline = "of the trend" if order == 1 else "continuing the current baseline projection"
+    if branch is None:
+        source = "anchor ids" if order == 1 else f"ids of order-{order - 1} projections (anchor ids may be added)"
+        baseline = "of the trend" if order == 1 else "continuing the current baseline projection"
+        rules = [
+            f"Write the order-{order} consequences. Decide how many: at most {max_per_order} in total and "
+            f"at most {max_children} growing from any one source.",
+            f"- `from` lists the {source} each projection grows from. Several ids = convergence: use it when "
+            "different paths arrive at the same outcome instead of writing near-duplicates.",
+            f"- Exactly one projection is the baseline (`baseline: true`): the business-as-usual extrapolation {baseline}.",
+            "- At least one projection is a discontinuity (`discontinuity: true`): a break from trend, still "
+            "grounded in the evidence above.",
+        ]
+    else:
+        frontier = ", ".join(branch["frontier"])
+        rules = [
+            f"Grow a {branch['kind']} branch: write the order-{order} consequences of ONLY these projections: "
+            f"{frontier}. At most {max_children} from each, {max_per_order} in total.",
+            "- `from` must include at least one of those ids; add any other existing id where the branch "
+            "converges with it.",
+            "- Exactly one projection is the baseline (`baseline: true`), continuing the baseline projection above."
+            if branch["baseline"]
+            else "- None of these is the baseline (`baseline: false`).",
+            "- Mark a break from trend as a discontinuity (`discontinuity: true`).",
+        ]
+        if branch.get("hint"):
+            rules.insert(1, f"- The strategist asks: what if {branch['hint']}? Explore that possibility.")
     lines += [
         "",
-        f"Write the order-{order} consequences. Decide how many: at most {max_per_order} in total and "
-        f"at most {max_children} growing from any one source.",
-        f"- `from` lists the {source} each projection grows from. Several ids = convergence: use it when "
-        "different paths arrive at the same outcome instead of writing near-duplicates.",
+        *rules,
         "- `window` is [start_year, end_year] within the horizon: when it would happen. Order is causal "
         "depth, not time: set the years on their own merits, but never before what it grows from.",
-        f"- Exactly one projection is the baseline (`baseline: true`): the business-as-usual extrapolation {baseline}.",
-        "- At least one projection is a discontinuity (`discontinuity: true`): a break from trend, still "
-        "grounded in the evidence above.",
         "",
         'Return JSON: {"projections": [{"id", "statement", "from", "window", "baseline", "discontinuity"}]} '
         f'with short ids like "o{order}-<slug>" and one-sentence statements.',
@@ -168,7 +196,13 @@ def _call_generation_model(prompt: str, call_type: str = "generate"):
     return text, usage, model, temperature
 
 
-def run_generation(prompt: str, parse, call_type: str = "generate", span_name: str = "futures_generate"):
+def run_generation(
+    prompt: str,
+    parse,
+    call_type: str = "generate",
+    span_name: str = "futures_generate",
+    require_discontinuity: bool = True,
+):
     """One generation call, retried once on a parse failure or a missing
     discontinuity. `parse(text)` returns finalized projections. Returns the op
     payload fields: model, temperature, full input, raw output, warnings, projections."""
@@ -188,7 +222,7 @@ def run_generation(prompt: str, parse, call_type: str = "generate", span_name: s
                 if attempt == 1:
                     raise ValueError(f"generation failed: {exc}") from exc
                 continue
-            if not projections or any(p["discontinuity"] for p in projections):
+            if not require_discontinuity or not projections or any(p["discontinuity"] for p in projections):
                 break
             if attempt == 1:
                 warnings.append("no discontinuity in this generation")
@@ -228,3 +262,56 @@ def fixture_generator(state: dict, order: int) -> dict:
         "output": raw,
         "projections": finalize_order(parse_order(raw, order, state), state, order),
     }
+
+
+def live_branch_generator(state: dict, order: int, branch: dict) -> dict:
+    """One model call for one order of a branch grown from `branch["frontier"]`.
+    `branch` = {kind: "regenerated"|"fork", frontier: [ids], baseline: bool, hint}."""
+    call_type = "fork" if branch["kind"] == "fork" else "generate"
+
+    def parse(text):
+        ps = finalize_order(parse_order(text, order, state), state, order, branch)
+        for p in ps:
+            p["origin"] = "forked" if branch["kind"] == "fork" else "generated"
+            if branch.get("hint"):
+                p["hint"] = branch["hint"]
+        return ps
+
+    payload = run_generation(
+        build_prompt(state, order, branch),
+        parse,
+        call_type=call_type,
+        span_name=f"futures_{branch['kind']}_order",
+        require_discontinuity=False,
+    )
+    return {"order": order, **payload}
+
+
+def fixture_branch_generator(state: dict, order: int, branch: dict) -> dict:
+    """Offline stand-in for a branch: one deterministic consequence per frontier
+    node, so fork and regenerate are explorable without a model."""
+    e = state["exploration"]
+    last = e["start_year"] + e["horizon"]
+    items = []
+    for i, fid in enumerate(branch["frontier"]):
+        parent = state["projections"][fid]
+        start = min(parent["window"][1], last)
+        line = FIXTURE_BRANCH_LINES[(order + i) % len(FIXTURE_BRANCH_LINES)]
+        statement = f"If {branch['hint']}: {line[0].lower()}{line[1:]}" if branch.get("hint") else line
+        items.append(
+            {
+                "id": f"o{order}-{branch['kind']}-{fid}",
+                "statement": statement,
+                "from": [fid],
+                "window": [start, min(start + 2, last)],
+                "baseline": bool(branch["baseline"] and parent["baseline"]),
+                "discontinuity": i == 0,
+            }
+        )
+    raw = json.dumps({"projections": items}, indent=2)
+    projections = finalize_order(parse_order(raw, order, state), state, order, branch)
+    for p in projections:
+        p["origin"] = "forked" if branch["kind"] == "fork" else "generated"
+        if branch.get("hint"):
+            p["hint"] = branch["hint"]
+    return {"order": order, "model": "fixture", "input": {"fixture": True, "branch": branch}, "output": raw, "projections": projections}

@@ -171,9 +171,9 @@ def test_timing_conflict_is_derived():
 
     state = {
         "projections": {
-            "a": {"window": [2030, 2031], "parents": []},
-            "b": {"window": [2028, 2029], "parents": ["a"]},  # before its parent
-            "c": {"window": [2031, 2032], "parents": ["a"]},
+            "a": {"window": [2030, 2031], "parents": [], "anchors": ["s"], "op": 1},
+            "b": {"window": [2028, 2029], "parents": ["a"], "anchors": [], "op": 1},  # before its parent
+            "c": {"window": [2031, 2032], "parents": ["a"], "anchors": [], "op": 1},
         }
     }
     flags = derive(state)

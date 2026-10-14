@@ -7,6 +7,7 @@ import htm from "htm";
 import * as S from "./store.js";
 import { Scroll } from "./scroll.js";
 import { DetailPanel } from "./panel.js";
+import { HistoryBar, ProjectionActions } from "./actions.js";
 
 const html = htm.bind(h);
 
@@ -152,6 +153,8 @@ function ExplorationView() {
     <div class="exp-head">
       <h1>${e.goal}</h1>
       <span class="hint">${e.start_year} → ${e.start_year + e.horizon} · ${e.orders} orders · ${s.anchors.length} anchors · ${s.projections.length} projections</span>
+      <span class="spacer"></span>
+      <${HistoryBar} />
     </div>
     <${ErrorLine} />
     ${S.generating.value
@@ -172,7 +175,10 @@ function ExplorationView() {
     <div class="exp-body">
       <div class="exp-main"><${Scroll} snap=${s} selectedId=${S.selectedId.value} onSelect=${select} /></div>
       ${S.selectedId.value
-        ? html`<${DetailPanel} id=${S.selectedId.value} onSelect=${select} onClose=${() => (S.selectedId.value = null)} />`
+        ? html`<${DetailPanel} id=${S.selectedId.value} onSelect=${select} onClose=${() => (S.selectedId.value = null)}
+            actions=${S.projectionsById.value[S.selectedId.value]
+              ? html`<${ProjectionActions} p=${S.projectionsById.value[S.selectedId.value]} />`
+              : null} />`
         : null}
     </div>
   </div>`;

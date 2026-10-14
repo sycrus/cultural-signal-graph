@@ -79,6 +79,16 @@ class ExplorationIn(BaseModel):
     author: str = "strategist"
 
 
+class ProjectionEditIn(BaseModel):
+    statement: str | None = None
+    window: list[int] | None = None
+    author: str = "strategist"
+
+
+class AuthorIn(BaseModel):
+    author: str = "strategist"
+
+
 def create_app(
     store: RunStore | None = None,
     futures: ExplorationStore | None = None,
@@ -223,6 +233,26 @@ def create_app(
                 yield _sse("error", {"detail": str(exc)})
 
         return StreamingResponse(events(), media_type="text/event-stream")
+
+    @app.patch("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}")
+    def edit_projection(run_id: str, exp_id: str, pid: str, body: ProjectionEditIn) -> dict:
+        return futures.edit(run_id, exp_id, pid, statement=body.statement, window=body.window, author=body.author)
+
+    @app.delete("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}")
+    def delete_projection(run_id: str, exp_id: str, pid: str, author: str = "strategist") -> dict:
+        return futures.delete(run_id, exp_id, pid, author=author)
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}/regenerate")
+    def regenerate_downstream(run_id: str, exp_id: str, pid: str, body: AuthorIn | None = None) -> dict:
+        return futures.regenerate(run_id, exp_id, pid, author=(body.author if body else "strategist"))
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/undo")
+    def undo_exploration(run_id: str, exp_id: str) -> dict:
+        return futures.undo(run_id, exp_id)
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/redo")
+    def redo_exploration(run_id: str, exp_id: str) -> dict:
+        return futures.redo(run_id, exp_id)
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/stop")
     def stop_generation(run_id: str, exp_id: str) -> dict:

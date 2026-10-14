@@ -160,3 +160,25 @@ export async function stopGeneration() {
 export async function fetchOp(seq) {
   return api(`${base()}/explorations/${snap.value.exploration.id}/ops/${seq}`);
 }
+
+/* --- edits & history: every action is an op; undo/redo move the log cursor --- */
+
+export const author = signal(localStorage.getItem("csg-author") || "strategist");
+
+async function mutate(path, opts = {}) {
+  const expId = snap.value.exploration.id;
+  await guarded(async () => {
+    snap.value = await api(`${base()}/explorations/${expId}${path}`, opts);
+  });
+}
+
+export const editProjection = (pid, changes) =>
+  mutate(`/projections/${pid}`, { method: "PATCH", body: { ...changes, author: author.value } });
+export const deleteProjection = (pid) => {
+  if (selectedId.value === pid) selectedId.value = null;
+  return mutate(`/projections/${pid}?author=${encodeURIComponent(author.value)}`, { method: "DELETE" });
+};
+export const regenerateDownstream = (pid) =>
+  mutate(`/projections/${pid}/regenerate`, { method: "POST", body: { author: author.value } });
+export const undo = () => mutate("/undo", { method: "POST" });
+export const redo = () => mutate("/redo", { method: "POST" });
