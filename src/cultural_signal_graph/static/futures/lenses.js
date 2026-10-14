@@ -10,6 +10,7 @@ import * as S from "./store.js";
 import { Scroll } from "./scroll.js";
 import { Wheel } from "./wheel.js";
 import { Cone, CONE_CLASSES } from "./cone.js";
+import { Matrix, MATRIX_VALUES } from "./matrix.js";
 
 const html = htm.bind(h);
 
@@ -24,6 +25,14 @@ export const LENSES = [
     tags: true,
     values: CONE_CLASSES,
     extras: [{ key: "preferable", label: "Preferable (serves the goal)" }],
+  },
+  {
+    key: "matrix",
+    label: "Matrix",
+    hint: "2×2 scenario matrix: two critical uncertainties, four worlds",
+    view: Matrix,
+    tags: true,
+    values: MATRIX_VALUES,
   },
 ];
 
@@ -43,7 +52,8 @@ export function LensTabs() {
 
 export function LensView({ snap, selectedId, onSelect }) {
   const lens = lensSpec(S.lens.value) || LENSES[0];
-  const untagged = lens.tags ? snap.lenses?.[lens.key]?.untagged || 0 : 0;
+  const status = snap.lenses?.[lens.key];
+  const untagged = lens.tags && status?.ready ? status.untagged || 0 : 0;
   useEffect(() => {
     if (untagged && !S.busy.value && !S.generating.value) S.classifyLens(lens.key);
   }, [lens.key, untagged, S.generating.value]);

@@ -26,6 +26,7 @@ from .generator import (
     live_generator,
 )
 from . import lenses as lens_registry
+from . import matrix
 from .export import to_json, to_markdown
 from .rdf import exploration_graph, run_dataset
 from .log import OperationLog
@@ -379,6 +380,79 @@ class ExplorationStore:
         log.append({"op": "retag", "lens": lens_key, "source": "human", "tags": {pid: clean}, "before": before}, author=author)
         return self.snapshot(run_id, exp_id)
 
+    # --- the Matrix: axes first, then seeded worlds and narratives ------------------
+
+    def propose_axes(self, run_id: str, exp_id: str, author: str = "strategist") -> dict:
+        log, state = self._mutable(run_id, exp_id)
+        payload = matrix.propose_axes(state, live=self.mode == "live")
+        log.append({"op": "propose_axes", **payload}, author=author)
+        return self.snapshot(run_id, exp_id)
+
+    def set_axes(self, run_id: str, exp_id: str, axes: list[dict], author: str = "strategist") -> dict:
+        log, state = self._mutable(run_id, exp_id)
+        if len(axes) != 2:
+            raise ValueError("a matrix needs exactly two axes")
+        clean = [matrix._clean_axis(a, state["anchors"]) for a in axes]
+        log.append({"op": "set_axes", "axes": clean, "before": state["axes"]}, author=author)
+        return self.snapshot(run_id, exp_id)
+
+    def seed_quadrant(self, run_id: str, exp_id: str, quadrant: str, author: str = "strategist") -> dict:
+        """Generate a branch from the present for one quadrant's world, down to the
+        depth limit, conditioned on that quadrant's axis values."""
+        log, state = self._mutable(run_id, exp_id)
+        axes = self._axes(state, quadrant)
+        constraint = {a["name"]: a[pole] for a, pole in zip(axes, matrix.POLES[quadrant])}
+        working = {**state}
+        frontier = list(state["anchors"])
+        payloads = []
+        for order in range(1, state["exploration"]["orders"] + 1):
+            branch = {"kind": "seeded", "frontier": frontier, "baseline": False, "world": matrix.world(axes, quadrant)}
+            payload = self._branch(working, order, branch)
+            if not payload["projections"]:
+                break
+            payloads.append(payload)
+            working["projections"] = {**working["projections"], **{p["id"]: {**p, "op": -1} for p in payload["projections"]}}
+            frontier = [p["id"] for p in payload["projections"]]
+        if not payloads:
+            raise ValueError("the seeded branch produced nothing")
+        log.append({"op": "seed_fork", "quadrant": quadrant, "constraint": constraint, "orders": payloads}, author=author)
+        return self.snapshot(run_id, exp_id)
+
+    def write_narrative(self, run_id: str, exp_id: str, quadrant: str, author: str = "strategist") -> dict:
+        log, state = self._mutable(run_id, exp_id)
+        axes = self._axes(state, quadrant)
+        members = self._members(state, quadrant)
+        payload = matrix.narrative(state, axes, quadrant, members, live=self.mode == "live")
+        log.append(
+            {"op": "annotate", "lens": "matrix", "key": quadrant, "based_on": [p["id"] for p in members], **payload},
+            author=author,
+        )
+        return self.snapshot(run_id, exp_id)
+
+    @staticmethod
+    def _axes(state: dict, quadrant: str) -> list[dict]:
+        if quadrant not in matrix.QUADRANTS:
+            raise KeyError(f"unknown quadrant: {quadrant}")
+        if not state["axes"]:
+            raise ValueError("pick two axes for the matrix first")
+        return state["axes"]
+
+    @staticmethod
+    def _members(state: dict, quadrant: str) -> list[dict]:
+        tags = state["tags"].get("matrix", {})
+        return [p for p in state["projections"].values() if tags.get(p["id"], {}).get("value") == quadrant]
+
+    def _annotations(self, state: dict) -> list[dict]:
+        """Annotations, each stale once its quadrant's projections changed after it
+        was written (membership, statements, or removals)."""
+        out = []
+        for a in state["annotations"].values():
+            members = {p["id"] for p in self._members(state, a["key"])}
+            changed = state["changed"]
+            stale = members != set(a["based_on"]) or any(changed.get(pid, -1) > a["op"] for pid in a["based_on"])
+            out.append({**a, "stale": stale})
+        return out
+
     def _grow(self, state: dict, root: dict, depth: int, kind: str, removed=(), hint=None) -> list[dict]:
         """Grow a branch from `root`, one branch-generator call per order."""
         working = {**state, "projections": {k: v for k, v in state["projections"].items() if k not in set(removed)}}
@@ -474,9 +548,15 @@ class ExplorationStore:
             "generating": self.is_generating(exp_id),
             "stopped_at": state.get("stopped_at"),
             "removed": state["removed"],
+            "axes": state["axes"],
+            "axis_candidates": state["axis_candidates"],
+            "annotations": self._annotations(state),
             "lenses": {
-                key: {"untagged": sum(1 for p in state["projections"] if p not in state["tags"].get(key, {}))}
-                for key in lens_registry.LENSES
+                key: {
+                    "untagged": sum(1 for p in state["projections"] if p not in state["tags"].get(key, {})),
+                    "ready": spec.ready(state) is None,
+                }
+                for key, spec in lens_registry.LENSES.items()
             },
             "cursor": log.cursor(),
             "can_undo": log.can_undo(),

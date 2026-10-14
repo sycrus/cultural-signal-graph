@@ -97,7 +97,7 @@ def finalize_order(projections: list[dict], state: dict, order: int, branch: dic
     out = []
     if branch is not None:
         frontier = set(branch["frontier"])
-        projections = [p for p in projections if set(p["parents"]) & frontier]
+        projections = [p for p in projections if set(p["parents"] + p["anchors"]) & frontier]
     for p in projections:
         start, end = p["window"]
         if start > last:
@@ -119,7 +119,7 @@ def finalize_order(projections: list[dict], state: dict, order: int, branch: dic
 
     # exactly one baseline: order 1 opens it; later orders continue the previous one
     if branch is not None:
-        prev = {f for f in branch["frontier"] if state["projections"][f]["baseline"]} if branch["baseline"] else set()
+        prev = {f for f in branch["frontier"] if state["projections"].get(f, {}).get("baseline")} if branch["baseline"] else set()
         eligible = [p for p in kept if set(p["parents"]) & prev]
     else:
         prev = {q["id"] for q in state["projections"].values() if q["baseline"] and q["order"] == order - 1}
@@ -166,7 +166,7 @@ def build_prompt(state: dict, order: int, branch: dict | None = None) -> str:
     else:
         frontier = ", ".join(branch["frontier"])
         rules = [
-            f"Grow a {branch['kind']} branch: write the order-{order} consequences of ONLY these projections: "
+            f"Grow a {branch['kind']} branch: write the order-{order} consequences of ONLY these: "
             f"{frontier}. At most {max_children} from each, {max_per_order} in total.",
             "- `from` must include at least one of those ids; add any other existing id where the branch "
             "converges with it.",
@@ -180,6 +180,12 @@ def build_prompt(state: dict, order: int, branch: dict | None = None) -> str:
                 1,
                 f"- The strategist asks: what if {branch['hint']}? Treat it as the premise of this whole "
                 "branch: every projection plays out in a world where it happened.",
+            )
+        if branch.get("world"):
+            rules.insert(
+                1,
+                f"- This branch explores one scenario world: {branch['world']}. Every projection must be "
+                "consistent with that world, even where today's trends point elsewhere.",
             )
     lines += [
         "",
@@ -271,15 +277,10 @@ def fixture_generator(state: dict, order: int) -> dict:
 def live_branch_generator(state: dict, order: int, branch: dict) -> dict:
     """One model call for one order of a branch grown from `branch["frontier"]`.
     `branch` = {kind: "regenerated"|"fork", frontier: [ids], baseline: bool, hint}."""
-    call_type = "fork" if branch["kind"] == "fork" else "generate"
+    call_type = "generate" if branch["kind"] == "regenerated" else "fork"
 
     def parse(text):
-        ps = finalize_order(parse_order(text, order, state), state, order, branch)
-        for p in ps:
-            p["origin"] = "forked" if branch["kind"] == "fork" else "generated"
-            if branch.get("hint"):
-                p["hint"] = branch["hint"]
-        return ps
+        return _mark(finalize_order(parse_order(text, order, state), state, order, branch), branch)
 
     payload = run_generation(
         build_prompt(state, order, branch),
@@ -298,10 +299,11 @@ def fixture_branch_generator(state: dict, order: int, branch: dict) -> dict:
     last = e["start_year"] + e["horizon"]
     items = []
     for i, fid in enumerate(branch["frontier"]):
-        parent = state["projections"][fid]
+        parent = state["projections"].get(fid, {"window": [e["start_year"], e["start_year"]], "baseline": False})
         start = min(parent["window"][1], last)
         line = FIXTURE_BRANCH_LINES[(order + i) % len(FIXTURE_BRANCH_LINES)]
-        statement = f"If {branch['hint']}: {line[0].lower()}{line[1:]}" if branch.get("hint") else line
+        premise = branch.get("hint") or branch.get("world")
+        statement = f"If {premise}: {line[0].lower()}{line[1:]}" if premise else line
         items.append(
             {
                 "id": f"o{order}-{branch['kind']}-{fid}",
@@ -313,12 +315,22 @@ def fixture_branch_generator(state: dict, order: int, branch: dict) -> dict:
             }
         )
     raw = json.dumps({"projections": items}, indent=2)
-    projections = finalize_order(parse_order(raw, order, state), state, order, branch)
+    projections = _mark(finalize_order(parse_order(raw, order, state), state, order, branch), branch)
+    return {"order": order, "model": "fixture", "input": {"fixture": True, "branch": branch}, "output": raw, "projections": projections}
+
+
+_ORIGIN = {"fork": "forked", "seeded": "seeded", "regenerated": "generated"}
+
+
+def _mark(projections: list[dict], branch: dict) -> list[dict]:
+    """Stamp a branch's projections with their origin and the premise they grew under."""
     for p in projections:
-        p["origin"] = "forked" if branch["kind"] == "fork" else "generated"
+        p["origin"] = _ORIGIN[branch["kind"]]
         if branch.get("hint"):
             p["hint"] = branch["hint"]
-    return {"order": order, "model": "fixture", "input": {"fixture": True, "branch": branch}, "output": raw, "projections": projections}
+        if branch.get("world"):
+            p["hint"] = branch["world"]
+    return projections
 
 
 SUMMARY_SYSTEM = (

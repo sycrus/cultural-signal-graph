@@ -18,7 +18,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .futures.store import ExplorationStore
 from .pipeline import forecast_run_from_state
@@ -103,6 +103,24 @@ class HumanProjectionIn(BaseModel):
     parent_id: str | None = None
     reference: NewReferenceIn | None = None
     reference_id: str | None = None
+    author: str = "strategist"
+
+
+class AxisIn(BaseModel):
+    name: str
+    low: str
+    high: str
+    from_: list[str] = Field(default=[], alias="from")
+    why: str = ""
+
+    def model_dump(self, **kw):
+        d = super().model_dump(**kw)
+        d["from"] = d.pop("from_")
+        return d
+
+
+class AxesIn(BaseModel):
+    axes: list[AxisIn]
     author: str = "strategist"
 
 
@@ -342,6 +360,22 @@ def create_app(
             media_type="application/trig; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{run_id}-futures.trig"'},
         )
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/matrix/axes/propose")
+    def propose_axes(run_id: str, exp_id: str) -> dict:
+        return futures.propose_axes(run_id, exp_id)
+
+    @app.put("/api/runs/{run_id}/explorations/{exp_id}/lenses/matrix/axes")
+    def set_axes(run_id: str, exp_id: str, body: AxesIn) -> dict:
+        return futures.set_axes(run_id, exp_id, [a.model_dump() for a in body.axes], author=body.author)
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/matrix/quadrants/{quadrant}/seed")
+    def seed_quadrant(run_id: str, exp_id: str, quadrant: str) -> dict:
+        return futures.seed_quadrant(run_id, exp_id, quadrant)
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/matrix/quadrants/{quadrant}/narrative")
+    def write_narrative(run_id: str, exp_id: str, quadrant: str) -> dict:
+        return futures.write_narrative(run_id, exp_id, quadrant)
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/undo")
     def undo_exploration(run_id: str, exp_id: str) -> dict:

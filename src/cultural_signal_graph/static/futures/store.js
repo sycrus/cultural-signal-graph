@@ -227,3 +227,9 @@ export async function importExploration(text) {
     await openExploration(created.exploration.id);
   });
 }
+
+/* --- the Matrix --- */
+export const proposeAxes = () => mutate("/lenses/matrix/axes/propose", { method: "POST" });
+export const setAxes = (axes) => mutate("/lenses/matrix/axes", { method: "PUT", body: { axes, author: author.value } });
+export const seedQuadrant = (q) => mutate(`/lenses/matrix/quadrants/${q}/seed`, { method: "POST" });
+export const writeNarrative = (q) => mutate(`/lenses/matrix/quadrants/${q}/narrative`, { method: "POST" });

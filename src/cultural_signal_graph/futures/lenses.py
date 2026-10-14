@@ -28,6 +28,8 @@ class LensSpec:
     fixture: Callable[[dict], dict] = lambda p: {}
     extras: dict[str, str] = field(default_factory=dict)  # extra field -> its description
     clean_extras: Callable[[dict], dict] = lambda t: {}
+    context: Callable[[dict], str] = lambda state: ""  # state-dependent instructions
+    ready: Callable[[dict], str | None] = lambda state: None  # why it can't classify yet
 
 
 def _cone_fixed(p: dict) -> dict | None:
@@ -59,7 +61,31 @@ CONE = LensSpec(
     clean_extras=lambda t: {"preferable": bool(t.get("preferable", False))},
 )
 
-LENSES: dict[str, LensSpec] = {CONE.key: CONE}
+def _matrix_context(state: dict) -> str:
+    a, b = state["axes"]
+    return (
+        f"Axis A: {a['name']} (low = {a['low']}, high = {a['high']}). "
+        f"Axis B: {b['name']} (low = {b['low']}, high = {b['high']}). "
+        "Place each projection in the quadrant of the world it belongs to: q1 = A high & B high, "
+        "q2 = A low & B high, q3 = A low & B low, q4 = A high & B low; 'none' if it says nothing "
+        "about either axis."
+    )
+
+
+def _matrix_fixture(p: dict) -> dict:
+    return {"value": ("q1", "q2", "q3", "q4")[sum(map(ord, p["id"])) % 4]}
+
+
+MATRIX = LensSpec(
+    key="matrix",
+    values=("q1", "q2", "q3", "q4", "none"),
+    instructions="Organize the projections with a 2x2 scenario matrix (intuitive logics).",
+    fixture=_matrix_fixture,
+    context=_matrix_context,
+    ready=lambda state: None if state.get("axes") else "pick two axes for the matrix first",
+)
+
+LENSES: dict[str, LensSpec] = {CONE.key: CONE, MATRIX.key: MATRIX}
 
 CLASSIFY_SYSTEM = (
     "You organize speculative projections with a futures-thinking framework. You give "
@@ -85,6 +111,7 @@ def build_prompt(spec: LensSpec, state: dict, projections: list[dict]) -> str:
         f"Exploration goal: {state['exploration']['goal']}",
         "",
         spec.instructions,
+        spec.context(state),
         f"Allowed values: {', '.join(spec.values)}.",
         "",
         "Projections (id, years, statement):",
@@ -98,6 +125,9 @@ def build_prompt(spec: LensSpec, state: dict, projections: list[dict]) -> str:
 
 def classify(spec: LensSpec, state: dict, projections: list[dict], live: bool) -> dict:
     """Tag `projections` for one lens. Returns the op payload: tags (+ model I/O)."""
+    why_not = spec.ready(state)
+    if why_not:
+        raise ValueError(why_not)
     tags: dict[str, dict] = {}
     to_ask = []
     for p in projections:

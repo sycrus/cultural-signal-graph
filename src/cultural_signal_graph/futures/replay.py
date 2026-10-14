@@ -108,6 +108,9 @@ def _create(state: dict, op: dict) -> None:
     state["changed"] = {}
     state["removed"] = {}
     state["tags"] = {}  # lens -> projection id -> {value, ..., source, op}
+    state["axes"] = None  # the Matrix's two chosen axes
+    state["axis_candidates"] = []
+    state["annotations"] = {}  # "lens:key" -> {lens, key, text, based_on, op}
 
 
 def _add(state: dict, projections: list[dict], seq: int) -> None:
@@ -179,8 +182,42 @@ def _retag(state: dict, op: dict) -> None:
         tags[pid] = new
 
 
+def _propose_axes(state: dict, op: dict) -> None:
+    state["axis_candidates"] = copy.deepcopy(op["candidates"])
+
+
+def _set_axes(state: dict, op: dict) -> None:
+    """New axes are a new matrix: placements and narratives start over."""
+    state["axes"] = copy.deepcopy(op["axes"])
+    state["tags"]["matrix"] = {}
+    state["annotations"] = {k: v for k, v in state["annotations"].items() if v["lens"] != "matrix"}
+
+
+def _seed_fork(state: dict, op: dict) -> None:
+    """A branch generated for one quadrant's world: placed in that quadrant."""
+    _branch(state, op)
+    tags = state["tags"].setdefault("matrix", {})
+    for payload in op["orders"]:
+        for p in payload["projections"]:
+            tags[p["id"]] = {"value": op["quadrant"], "source": "seeded", "op": op["seq"]}
+
+
+def _annotate(state: dict, op: dict) -> None:
+    state["annotations"][f"{op['lens']}:{op['key']}"] = {
+        "lens": op["lens"],
+        "key": op["key"],
+        "text": op["text"],
+        "based_on": list(op["based_on"]),
+        "op": op["seq"],
+    }
+
+
 _HANDLERS = {
     "create": _create,
+    "propose_axes": _propose_axes,
+    "set_axes": _set_axes,
+    "seed_fork": _seed_fork,
+    "annotate": _annotate,
     "retag": _retag,
     "add_reference": _add_reference,
     "add_assumption": _add_human_projection,
