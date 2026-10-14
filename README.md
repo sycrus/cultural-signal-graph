@@ -77,6 +77,38 @@ Without `DEEPSEEK_API_KEY`, the app runs in **fixture mode** (badge in the heade
 the recorded demo outputs on the pinned seed corpus, no model calls — the whole
 loop is explorable offline.
 
+## Futures mode
+
+Speculative explorations grown from a run's evidence — a second mode, reached
+from the Forecast / Futures switch at the top of any run page. Futures output
+never enters the forecast's evidence or brief; crossing back is deliberate
+(promotion).
+
+- **Explorations** — a goal plus chosen anchors generates projections order by
+  order (orders are causal depth, not time), live-filled as each order lands;
+  Stop and continue are safe because the operation log checkpoints everything.
+- **The Scroll** — the default lens: anchors in a Present column, projections
+  on a time axis. Other lenses re-view the same projections: Wheel,
+  Cone (plausibility wedges), Matrix (2×2 axes with seeded worlds and
+  narratives), Three Horizons, PESTLE (multi-label swimlanes). Lenses tag;
+  the strategist can override any tag.
+- **Your own additions** — grounded assumptions (backed by a reference), wild
+  cards (no evidence, tagged, greyed), and standalone references. All
+  futures-scoped: never forecast evidence.
+- **Fork / edit / undo** — every action is an undoable op; an edit marks what
+  grew from it stale; regenerate-downstream replaces the stale branch.
+- **Ground this** — the one agent: a bounded search for evidence *for and
+  against* a projection (model-written queries → search → each result judged
+  support / contradict, one refinement round at most). Proposals are never
+  auto-added: the strategist accepts them one by one as references that record
+  which projection they ground and their stance.
+- **Promotion** — a futures-scoped reference becomes forecast evidence only by
+  creating a new run (sources lock once a run starts); the original run and its
+  explorations are untouched.
+- **Export** — `exploration.md` (a readable walk by order), `exploration.json`,
+  the operation log (`log.jsonl`, re-importable), and the exploration's named
+  graph (`exploration.trig`).
+
 ## Outputs
 
 A batch run writes six files into `out/`:
@@ -118,7 +150,10 @@ src/cultural_signal_graph/
   tracing.py     OpenTelemetry spans           checkpoint.py  file-backed checkpoints
   llm.py         DeepSeek client + JSON/CURIE helpers
   server.py      local web app (FastAPI)       runstore.py  runs/ dir state machine
+  futures/       speculative mode: per-order generator, lenses, Ground this (the
+                 one agent), promotion, op-log replay, exports, RDF named graphs
   static/        the stepper UI (app.js/app.css, vendored cytoscape.min.js)
+                 + the futures app (static/futures/, Preact + htm + signals, no build step)
   ontology/      upper.ttl, tech.ttl, gaming.ttl, shapes.ttl (SHACL)
 ```
 
@@ -128,7 +163,7 @@ src/cultural_signal_graph/
 uv run pytest
 ```
 
-85 tests, all fixture-based — no network or API key required. The eval harness
+187 tests, all fixture-based — no network or API key required. The eval harness
 (`python -m cultural_signal_graph.eval_main`) runs the golden set and enforces the regression
 gate.
 
@@ -136,6 +171,8 @@ gate.
 
 - **[PRD.md](PRD.md)** — the v1/v2 product spec.
 - **[PRD-ui.md](PRD-ui.md)** — the UI (v3) spec: local web app, sign-off loop, layouts.
+- **[PRD-futures.md](PRD-futures.md)** — the futures (v4) spec: speculative explorations,
+  lenses, Ground this, promotion.
 - **[CONTEXT.md](CONTEXT.md)** — the domain glossary (Entity, Signal, Source, Provenance, …).
 - **[docs/adr/](docs/adr/)** — architecture decision records (LangGraph, RDFLib+files,
   category-as-input, source discovery, ontology retrieval, OTel+Langfuse).
