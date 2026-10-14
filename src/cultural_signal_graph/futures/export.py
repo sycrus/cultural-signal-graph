@@ -31,7 +31,15 @@ def to_markdown(snap: dict) -> str:
     for a in snap["anchors"]:
         tags = [a["kind"]] + ([a["flag"]] if a.get("flag") else []) + (["pending sign-off"] if a.get("pending") else [])
         src = f" ({a['source_uri']})" if a.get("source_uri") else ""
-        lines.append(f"- **{a['text']}** _[{', '.join(tags)}]_{src}")
+        line = f"- **{a['text']}** _[{', '.join(tags)}]_{src}"
+        if a.get("grounds"):
+            line += f" — {'supports' if a['stance'] == 'support' else 'contradicts'}: {name(a['grounds'])}"
+        lines.append(line)
+    for pid, g in (snap.get("grounding") or {}).items():
+        lines += ["", f"## Grounding search: {name(pid)}", ""]
+        lines.append(f"{len(g['queries'])} queries, {g['examined']} results examined, "
+                     f"{len(g['proposals'])} proposal(s) — accepted one by one by the strategist.")
+        lines += [f"- query: {q}" for q in g["queries"]]
     for order in sorted({p["order"] for p in snap["projections"]}):
         lines += ["", f"## Order {order}", ""]
         for p in (q for q in snap["projections"] if q["order"] == order):

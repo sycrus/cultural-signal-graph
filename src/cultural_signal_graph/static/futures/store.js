@@ -187,8 +187,21 @@ export const forkProjection = (pid, hint) =>
 
 export const adding = signal(null); // {kind, parent_id} while the Add drawer is open
 
-export const addReference = (url, excerpt) =>
-  mutate("/references", { method: "POST", body: { url, excerpt, author: author.value } });
+export const addReference = (url, excerpt, extra = {}) =>
+  mutate("/references", { method: "POST", body: { url, excerpt, author: author.value, ...extra } });
+
+/* --- Ground this: the one agent; its proposals need the strategist's accept --- */
+
+export const groundingPid = signal(null); // the projection a Ground this search is running for
+
+export async function groundProjection(pid) {
+  groundingPid.value = pid;
+  try {
+    await mutate(`/projections/${pid}/ground`, { method: "POST", body: { author: author.value } });
+  } finally {
+    groundingPid.value = null;
+  }
+}
 export const addProjection = (body) =>
   mutate("/projections", { method: "POST", body: { ...body, author: author.value } });
 

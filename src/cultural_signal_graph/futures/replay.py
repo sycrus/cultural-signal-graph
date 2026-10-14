@@ -111,6 +111,7 @@ def _create(state: dict, op: dict) -> None:
     state["axes"] = None  # the Matrix's two chosen axes
     state["axis_candidates"] = []
     state["annotations"] = {}  # "lens:key" -> {lens, key, text, based_on, op}
+    state["grounding"] = {}  # projection id -> the latest Ground-this search (proposals + trail)
     for lens, tags in op.get("anchor_tags", {}).items():
         state["tags"][lens] = {
             aid: {**copy.deepcopy(t), "source": "model", "op": 0} for aid, t in tags.items() if aid in state["anchors"]
@@ -226,8 +227,18 @@ def _promote(state: dict, op: dict) -> None:
     _branch(state, op)
 
 
+def _ground(state: dict, op: dict) -> None:
+    state["grounding"][op["target"]] = {
+        "proposals": copy.deepcopy(op["proposals"]),
+        "queries": list(op.get("queries", [])),
+        "examined": len(op.get("results", [])),
+        "op": op["seq"],
+    }
+
+
 _HANDLERS = {
     "create": _create,
+    "ground": _ground,
     "propose_axes": _propose_axes,
     "set_axes": _set_axes,
     "seed_fork": _seed_fork,

@@ -8,9 +8,19 @@ import htm from "htm";
 import * as S from "./store.js";
 import { TagEditor } from "./lenses.js";
 import { PromoteAction } from "./promote.js";
+import { GroundSection, STANCE_MARK } from "./ground.js";
 
 const html = htm.bind(h);
 const opCache = {};
+
+function GroundsLine({ a, onSelect }) {
+  /* Accepted from a Ground this search: which projection it grounds, and its stance. */
+  const t = S.projectionsById.value[a.grounds];
+  return html`<div class="human-root ${a.stance === "support" ? "assumption" : ""}">
+    <span class=${`stance ${a.stance}`}>${STANCE_MARK[a.stance]} ${a.stance}</span> ${a.stance === "support" ? "Supports" : "Contradicts"}
+    ${" "}<a href="#" onClick=${(ev) => { ev.preventDefault(); onSelect(a.grounds); }}>${t ? t.statement : a.grounds}</a>
+  </div>`;
+}
 
 function Ref({ id, onSelect }) {
   const a = S.anchorsById.value[id];
@@ -54,6 +64,7 @@ export function DetailPanel({ id, onSelect, onClose, actions = null }) {
       ${a.entity ? html`<div class="hint">about ${a.entity}${a.confidence != null ? ` · confidence ${a.confidence}` : ""}</div>` : null}
       ${a.source_uri ? html`<div><a href=${a.source_uri} target="_blank" rel="noopener">source ↗</a></div>` : null}
       ${a.excerpt ? html`<blockquote>${a.excerpt}</blockquote>` : null}
+      ${a.grounds ? html`<${GroundsLine} a=${a} onSelect=${onSelect} />` : null}
       <${PromoteAction} a=${a} />
       <${TagEditor} p=${a} anchorsOnly=${true} />
       ${children.length ? html`<h4>Grows into</h4><ul class="refs">${children.map((c) => html`<${Ref} key=${c.id} id=${c.id} onSelect=${onSelect} />`)}</ul>` : null}
@@ -80,6 +91,7 @@ export function DetailPanel({ id, onSelect, onClose, actions = null }) {
           : `Grows from a ${p.human_root === "wildcard" ? "wild card" : "grounded assumption"}: it traces back to a human assumption, not only to evidence.`}</div>`
       : null}
     ${actions}
+    <${GroundSection} p=${p} />
     <h4>Lens tags</h4>
     <${TagEditor} p=${p} />
     <h4>Grows from</h4>

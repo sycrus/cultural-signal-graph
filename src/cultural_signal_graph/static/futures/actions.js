@@ -5,6 +5,7 @@ import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
+import { GroundButton } from "./ground.js";
 
 const html = htm.bind(h);
 
@@ -76,6 +77,7 @@ export function ProjectionActions({ p, extra = null }) {
     <button onClick=${() => setMode("edit")} disabled=${busy}>✎ Edit</button>
     <button onClick=${() => setMode("fork")} disabled=${busy || p.order >= S.snap.value.exploration.orders}
       title=${p.order >= S.snap.value.exploration.orders ? "At the depth limit" : "Explore an alternative from here"}>⑂ Fork</button>
+    <${GroundButton} p=${p} />
     ${extra}
     <button onClick=${() => { S.adding.value = { kind: "assumption", parent_id: p.id }; }} disabled=${busy}
       title="Add your own assumption or wild card growing from this one">+ After this</button>

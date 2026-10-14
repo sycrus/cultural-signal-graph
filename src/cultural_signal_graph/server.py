@@ -90,6 +90,8 @@ class ReferenceIn(BaseModel):
     url: str
     excerpt: str
     author: str = "strategist"
+    stance: str | None = None
+    grounds: str | None = None
 
 
 class NewReferenceIn(BaseModel):
@@ -320,7 +322,13 @@ def create_app(
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/references")
     def add_reference(run_id: str, exp_id: str, body: ReferenceIn) -> dict:
-        return futures.add_reference(run_id, exp_id, url=body.url, excerpt=body.excerpt, author=body.author)
+        return futures.add_reference(
+            run_id, exp_id, url=body.url, excerpt=body.excerpt, author=body.author, stance=body.stance, grounds=body.grounds
+        )
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}/ground")
+    def ground_projection(run_id: str, exp_id: str, pid: str, body: AuthorIn | None = None) -> dict:
+        return futures.ground(run_id, exp_id, pid, author=(body.author if body else "strategist"))
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/projections")
     def add_projection(run_id: str, exp_id: str, body: HumanProjectionIn) -> dict:

@@ -27,6 +27,7 @@ from .generator import (
     live_generator,
 )
 from . import lenses as lens_registry
+from . import ground as grounding
 from . import matrix
 from .export import to_json, to_markdown
 from .rdf import exploration_graph, run_dataset
@@ -314,11 +315,35 @@ class ExplorationStore:
 
     # --- the strategist's own additions --------------------------------------
 
-    def add_reference(self, run_id: str, exp_id: str, url: str, excerpt: str, author: str = "strategist") -> dict:
-        """A futures-scoped anchor in the Present column: never forecast evidence."""
+    def add_reference(
+        self,
+        run_id: str,
+        exp_id: str,
+        url: str,
+        excerpt: str,
+        author: str = "strategist",
+        stance: str | None = None,
+        grounds: str | None = None,
+    ) -> dict:
+        """A futures-scoped anchor in the Present column: never forecast evidence.
+        From Ground this, it records which projection it grounds and its stance."""
         log, state = self._mutable(run_id, exp_id)
         ref, summary = self._reference(state, url, excerpt)
+        if grounds:
+            self._projection(state, grounds)
+            if stance not in ("support", "contradict"):
+                raise ValueError("stance must be 'support' or 'contradict'")
+            ref = {**ref, "grounds": grounds, "stance": stance}
         log.append({"op": "add_reference", "reference": ref, "summary": summary}, author=author)
+        return self.snapshot(run_id, exp_id)
+
+    def ground(self, run_id: str, exp_id: str, pid: str, author: str = "strategist") -> dict:
+        """Ground this: search for evidence for and against a projection (bounded
+        agent loop); proposals are kept with the whole trail, never auto-added."""
+        log, state = self._mutable(run_id, exp_id)
+        target = self._projection(state, pid)
+        payload = grounding.ground(state, target, live=self.mode == "live")
+        log.append({"op": "ground", "target": pid, **payload}, author=author)
         return self.snapshot(run_id, exp_id)
 
     def add_projection(
@@ -606,6 +631,7 @@ class ExplorationStore:
             "axes": state["axes"],
             "axis_candidates": state["axis_candidates"],
             "annotations": self._annotations(state),
+            "grounding": state["grounding"],
             "lenses": {
                 key: {
                     "untagged": sum(1 for p in lens_registry.taggable(spec, state) if p["id"] not in state["tags"].get(key, {})),
