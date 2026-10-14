@@ -50,6 +50,12 @@ function ExplorationList() {
         New exploration
       </button>
       <span class="hint">Goal, initial anchors, horizon, orders.</span>
+      <span class="spacer"></span>
+      <label class="import-label" title="Re-open an exported log.jsonl as a new exploration">
+        Import log…
+        <input type="file" accept=".jsonl,application/x-ndjson" hidden
+          onChange=${async (ev) => { const f = ev.target.files[0]; if (f) await S.importExploration(await f.text()); }} />
+      </label>
     </div>
     <${ErrorLine} />
     <h2>Explorations</h2>
@@ -161,6 +167,12 @@ function ExplorationView() {
       <button onClick=${() => { S.selectedId.value = null; S.adding.value = { kind: "assumption" }; }}
         disabled=${S.generating.value}>+ Add</button>
       <${HistoryBar} />
+      <details class="export-menu">
+        <summary>Export</summary>
+        <div>${["exploration.md", "exploration.json", "log.jsonl", "exploration.trig"].map(
+          (n) => html`<a key=${n} href=${`/api/runs/${S.runId.value}/explorations/${e.id}/exports/${n}`} download>${n}</a>`,
+        )}</div>
+      </details>
     </div>
     <${ErrorLine} />
     ${S.generating.value

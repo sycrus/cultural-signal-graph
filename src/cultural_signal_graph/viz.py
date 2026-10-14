@@ -72,6 +72,7 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   <div><span class="dot" style="background:#ef4444"></span>signal (conflict/flag)</div>
   <div><span class="dot" style="background:#9ca3af"></span>source</div>
   <div style="margin-top:4px">dashed purple = gated cross-domain edge</div>
+  <div class="legend-futures" style="margin-top:4px; color:#7c3aed; display:none">&#9671; projection (futures layer, speculative)</div>
 </div>
 <details id="usage" style="position:absolute; bottom:12px; left:12px; background:#fff; border:1px solid #d1d5db; border-radius:8px; padding:8px 12px; font-size:12px;">
   <summary>Usage</summary>
@@ -129,6 +130,10 @@ function bindNoteForm(targetId, targetKind) {
   };
 }
 
+if (data.nodes.some((n) => n.data.kind === 'projection')) {
+  document.querySelector('.legend-futures').style.display = 'block';
+}
+
 const cy = cytoscape({
   container: document.getElementById('cy'),
   elements: data,
@@ -145,6 +150,9 @@ const cy = cytoscape({
     { selector: 'edge[kind = "about"]', style: { 'line-color': '#60a5fa', 'target-arrow-color': '#60a5fa', 'width': 2 } },
     { selector: 'edge[kind = "equivalence"]', style: { 'line-color': '#a855f7', 'target-arrow-color': '#a855f7', 'width': 2.5 } },
     { selector: 'edge[kind = "equivalence"][status != "real"]', style: { 'line-style': 'dashed', 'line-color': '#c084fc', 'target-arrow-color': '#c084fc' } },
+    { selector: 'node[kind = "projection"]', style: { 'background-color': '#ede9fe', 'border-width': 2, 'border-color': '#7c3aed', 'shape': 'diamond', 'color': '#5b21b6' } },
+    { selector: 'node[kind = "reference"]', style: { 'background-color': '#ffffff', 'border-width': 2, 'border-style': 'dashed', 'border-color': '#0f766e', 'shape': 'round-rectangle' } },
+    { selector: 'edge[kind = "growsFrom"]', style: { 'line-color': '#c4b5fd', 'target-arrow-color': '#c4b5fd', 'line-style': 'dotted', 'width': 1.5 } },
     { selector: '.dimmed', style: { 'opacity': 0.12 } },
   ],
   layout: { name: 'cose', animate: false, fit: true, padding: 30, nodeRepulsion: 6000, idealEdgeLength: 90 },

@@ -22,6 +22,7 @@ const state = {
   error: null,
   signoffDraft: {}, // edge id -> true(approve) | false(reject), before confirming
   metrics: null, // the /metrics report for the open run
+  futuresLayer: false, // Graph tab: show exploration projections (hidden by default)
 };
 
 async function api(path, opts = {}) {
@@ -469,7 +470,10 @@ function renderGraph() {
   }
   return `
   ${tabsHtml("graph")}
-  <iframe class="graph-frame" src="/runs/${state.runId}/graph.html"
+  <label class="futures-toggle" title="Projections from this run's explorations, beside the evidence they grow from. Never part of the brief.">
+    <input type="checkbox" id="toggle-futures" ${state.futuresLayer ? "checked" : ""}> Show futures layer
+  </label>
+  <iframe class="graph-frame" src="/runs/${state.runId}/graph.html${state.futuresLayer ? "?futures_layer=true" : ""}"
     title="Graph explorer — search, layout, click-to-trace"></iframe>`;
 }
 
@@ -608,6 +612,10 @@ function bind() {
     btn.addEventListener("click", () => decide(btn.dataset.decide, btn.dataset.value === "true"));
   });
   on("btn-confirm-signoff", "click", confirmSignoff);
+  on("toggle-futures", "change", (e) => {
+    state.futuresLayer = e.target.checked;
+    render();
+  });
   on("btn-undo-signoff", "click", undoSignoff);
   document.querySelectorAll("[data-tab]").forEach((btn) => {
     btn.addEventListener("click", () => showStage(btn.dataset.tab));

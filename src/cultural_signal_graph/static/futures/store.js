@@ -219,3 +219,11 @@ export const setTag = (pid, lensKey, tag) =>
     method: "PUT",
     body: { value: tag.value, extras: tag.extras || {}, author: author.value },
   });
+
+export async function importExploration(text) {
+  await guarded(async () => {
+    const created = await api(`${base()}/explorations/import`, { method: "POST", body: { log: text, author: author.value } });
+    explorations.value = await api(`${base()}/explorations`);
+    await openExploration(created.exploration.id);
+  });
+}

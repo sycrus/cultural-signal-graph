@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..flags import detect_flags
+from rdflib.namespace import RDFS
+
 from ..models import extraction_from_dict
 from .generator import (
     summarize_reference,
@@ -24,6 +26,8 @@ from .generator import (
     live_generator,
 )
 from . import lenses as lens_registry
+from .export import to_json, to_markdown
+from .rdf import exploration_graph, run_dataset
 from .log import OperationLog
 from .replay import derive, descendants, replay
 
@@ -508,6 +512,74 @@ class ExplorationStore:
             return True
         last = [p for p in state["projections"].values() if p["order"] == done]
         return bool(last) and min(p["window"][0] for p in last) < e["start_year"] + e["horizon"]
+
+    # --- export / import ----------------------------------------------------------
+
+    EXPORTS = ("exploration.json", "exploration.md", "log.jsonl", "exploration.trig")
+
+    def export(self, run_id: str, exp_id: str, name: str) -> str:
+        if name not in self.EXPORTS:
+            raise KeyError(f"unknown export: {name}")
+        if name == "log.jsonl":
+            return "".join(json.dumps(o, ensure_ascii=False) + "\n" for o in self.ops(run_id, exp_id))
+        snap = self.snapshot(run_id, exp_id)
+        if name == "exploration.json":
+            return to_json(snap)
+        if name == "exploration.md":
+            return to_markdown(snap)
+        state = replay(self.ops(run_id, exp_id))
+        return run_dataset(None, [state]).serialize(format="trig")
+
+    def import_log(self, run_id: str, text: str, author: str = "strategist") -> dict:
+        """Re-open an exported log as a new exploration on this run: same ops, same
+        state, a fresh id."""
+        self._run(run_id)
+        try:
+            ops = [json.loads(line) for line in text.splitlines() if line.strip()]
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"not an exploration log: {exc}") from exc
+        if not ops or ops[0].get("op") != "create":
+            raise ValueError("not an exploration log: it must start with a create op")
+        replay(ops)  # refuse a log that does not replay
+        exp_id = "x-" + time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
+        ops[0] = {
+            **ops[0],
+            "exploration": {**ops[0]["exploration"], "id": exp_id, "run_id": run_id, "imported_from": ops[0]["exploration"]["id"]},
+        }
+        log = OperationLog(self._dir(run_id, exp_id))
+        log.dir.mkdir(parents=True, exist_ok=True)
+        (log.dir / "log.jsonl").write_text("".join(json.dumps(o, ensure_ascii=False) + "\n" for o in ops), encoding="utf-8")
+        return self.snapshot(run_id, exp_id)
+
+    def futures_trig(self, run_id: str, evidence=None) -> str:
+        """The run's RDF with every exploration as a named graph beside the evidence."""
+        states = [replay(self._log(run_id, e["id"]).active()) for e in self.list(run_id)]
+        return run_dataset(evidence, states).serialize(format="trig")
+
+    def graph_layer(self, run_id: str) -> dict:
+        """Cytoscape elements for the forecast Graph tab's futures layer: every
+        exploration's projections and references, linked to the evidence they grow
+        from (signal nodes share their ids with the evidence graph)."""
+        from rdflib.namespace import RDF
+
+        from .rdf import CSGF
+
+        nodes, edges = [], []
+        for e in self.list(run_id):
+            state = replay(self._log(run_id, e["id"]).active())
+            g = exploration_graph(state)
+            for node in g.subjects(RDF.type, CSGF.Projection):
+                p = state["projections"][str(node).rsplit("#", 1)[-1]]
+                nodes.append({"data": {
+                    "id": str(node), "label": p["statement"][:40] + ("…" if len(p["statement"]) > 40 else ""),
+                    "statement": p["statement"], "kind": "projection", "exploration": e["goal"],
+                    "valid": f"{p['window'][0]} -> {p['window'][1]}", "origin": p["origin"],
+                }})
+            for node in g.subjects(RDF.type, CSGF.Reference):
+                nodes.append({"data": {"id": str(node), "label": str(g.value(node, RDFS.label))[:40], "kind": "reference"}})
+            for s, o in g.subject_objects(CSGF.growsFrom):
+                edges.append({"data": {"id": f"grows:{s}:{o}", "source": str(o), "target": str(s), "kind": "growsFrom"}})
+        return {"nodes": nodes, "edges": edges}
 
     def ops(self, run_id: str, exp_id: str) -> list[dict]:
         return self._log(run_id, exp_id).active()

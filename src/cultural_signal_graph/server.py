@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -103,6 +103,11 @@ class HumanProjectionIn(BaseModel):
     parent_id: str | None = None
     reference: NewReferenceIn | None = None
     reference_id: str | None = None
+    author: str = "strategist"
+
+
+class ImportIn(BaseModel):
+    log: str
     author: str = "strategist"
 
 
@@ -309,6 +314,35 @@ def create_app(
         tag = {"value": body.value, **body.extras}
         return futures.set_tag(run_id, exp_id, pid, lens, tag, author=body.author)
 
+    @app.get("/api/runs/{run_id}/explorations/{exp_id}/exports/{name}")
+    def export_exploration(run_id: str, exp_id: str, name: str) -> Response:
+        media = {"json": "application/json", "md": "text/markdown", "jsonl": "application/x-ndjson", "trig": "application/trig"}
+        body = futures.export(run_id, exp_id, name)
+        return Response(
+            body,
+            media_type=media[name.rsplit(".", 1)[-1]] + "; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{exp_id}-{name}"'},
+        )
+
+    @app.post("/api/runs/{run_id}/explorations/import", status_code=201)
+    def import_exploration(run_id: str, body: ImportIn) -> dict:
+        return futures.import_log(run_id, body.log, author=body.author)
+
+    @app.get("/api/runs/{run_id}/futures.trig")
+    def export_futures_trig(run_id: str) -> Response:
+        """The run's RDF: evidence as the default graph, each exploration named."""
+        graph_path = store.artifact_path(run_id, "graph.ttl")
+        evidence = None
+        if graph_path.is_file():
+            from rdflib import Graph
+
+            evidence = Graph().parse(graph_path, format="turtle")
+        return Response(
+            futures.futures_trig(run_id, evidence),
+            media_type="application/trig; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{run_id}-futures.trig"'},
+        )
+
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/undo")
     def undo_exploration(run_id: str, exp_id: str) -> dict:
         return futures.undo(run_id, exp_id)
@@ -322,7 +356,7 @@ def create_app(
         return futures.stop(run_id, exp_id)
 
     @app.get("/runs/{run_id}/graph.html", response_class=HTMLResponse)
-    def graph_html(run_id: str) -> HTMLResponse:
+    def graph_html(run_id: str, futures_layer: bool = False) -> HTMLResponse:
         """The graph explorer, served for embedding in the Graph tab. Rebuilt from
         the finalized state so it always matches the run's audit artifacts."""
         state_path = store.artifact_path(run_id, "state-final.json")
@@ -331,6 +365,13 @@ def create_app(
         elements = build_cyto_elements(
             forecast_run_from_state(json.loads(state_path.read_text(encoding="utf-8")))
         )
+        if futures_layer:  # the toggle: projections beside the evidence they grow from
+            layer = futures.graph_layer(run_id)
+            ids = {n["data"]["id"] for n in elements["nodes"]} | {n["data"]["id"] for n in layer["nodes"]}
+            elements = {
+                "nodes": elements["nodes"] + layer["nodes"],
+                "edges": elements["edges"] + [e for e in layer["edges"] if e["data"]["source"] in ids and e["data"]["target"] in ids],
+            }
         usage_path = store.artifact_path(run_id, "usage.json")
         usage = json.loads(usage_path.read_text(encoding="utf-8")) if usage_path.is_file() else None
         return HTMLResponse(

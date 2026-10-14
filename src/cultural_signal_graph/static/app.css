@@ -291,3 +291,6 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
 .score-chip.low { background: #fee2e2; color: #991b1b; }
 
 .futures-link { margin-left: 8px; padding: 3px 10px; border-radius: 6px; color: #7c3aed; background: #ede9fe; text-decoration: none; font-weight: 600; }
+
+.futures-toggle { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px 4px; font-weight: 400; color: #7c3aed; }
+.futures-toggle input { width: auto; margin: 0; }
