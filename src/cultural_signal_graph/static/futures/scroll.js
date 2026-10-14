@@ -10,6 +10,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/ho
 import htm from "htm";
 import { TAG_HINTS, nodeTitle } from "./hints.js";
 import { layoutLanes, lineage } from "./layout.js";
+import * as S from "./store.js";
 
 const html = htm.bind(h);
 const d3 = window.d3;
@@ -46,7 +47,8 @@ export function Scroll({ snap, selectedId, onSelect, laneKey = null, laneLabel =
   const [drag, setDrag] = useState(null); // {id, dy} while moving a card between swimlanes
   useEffect(() => setRange([first, last]), [e.id]);
 
-  const trackW = Math.max(width - PRESENT_W - CARD_W - 24, 200);
+  const trackW = Math.max(width - PRESENT_W - CARD_W - 24, 200) * S.spread.value;
+  const stageW = Math.floor(PRESENT_W + 12 + trackW + CARD_W + 12);
   const { lane, count, bands } = useMemo(
     () => layoutLanes(snap, { pxPerYear: trackW / Math.max(e.horizon, 1), cardW: CARD_W, laneKey }),
     [snap, trackW, laneKey],
@@ -108,7 +110,8 @@ export function Scroll({ snap, selectedId, onSelect, laneKey = null, laneLabel =
         ? html`<button class="ghost" onClick=${() => setRange([first, last])}>Unroll all</button>`
         : null}
     </div>
-    <div class="scroll-stage" style=${{ height: `${height}px` }}>
+    <div class="scroll-viewport">
+    <div class="scroll-stage" style=${{ height: `${height}px`, width: `${stageW}px` }}>
       <div class="present-col" style=${{ width: `${PRESENT_W}px` }}>
         <div class="axis-label">Present</div>
       </div>
@@ -121,7 +124,7 @@ export function Scroll({ snap, selectedId, onSelect, laneKey = null, laneLabel =
       ${years.map(
         (yr) => html`<div key=${yr} class="tick" style=${{ left: `${x(yr)}px` }}><span>${yr}</span></div>`,
       )}
-      <svg class="edges" width=${width} height=${height}>
+      <svg class="edges" width=${stageW} height=${height}>
         ${edges.map(
           (ed) => html`<path key=${ed.key} d=${ed.d} class=${`edge ${ed.baseline ? "baseline" : ""} ${ed.lit ? "lit" : ""} ${path.size && !ed.lit ? "faded" : ""}`} />`,
         )}
@@ -135,7 +138,7 @@ export function Scroll({ snap, selectedId, onSelect, laneKey = null, laneLabel =
       )}
       ${snap.projections.map((p) => {
         const shown = visible.has(p.id);
-        const left = shown ? x(p.window[0]) : p.window[1] < range[0] ? PRESENT_W : width;
+        const left = shown ? x(p.window[0]) : p.window[1] < range[0] ? PRESENT_W : stageW - CARD_W;
         const barW = Math.max(((p.window[1] + 1 - p.window[0]) / span) * trackW, 6);
         const top = y(lane[p.id]) + (drag?.id === p.id ? drag.dy : 0);
         const laneDrag = bands && onLaneDrop
@@ -178,6 +181,7 @@ export function Scroll({ snap, selectedId, onSelect, laneKey = null, laneLabel =
       })}
       ${rolledLeft ? html`<div class="rolled-count left" style=${{ left: `${PRESENT_W + 2}px` }}>◀ ${rolledLeft}</div>` : null}
       ${rolledRight ? html`<div class="rolled-count right">${rolledRight} ▶</div>` : null}
+    </div>
     </div>
     <${Minimap} snap=${snap} lane=${lane} count=${count} range=${range} setRange=${setRange} width=${width} />
   </div>`;

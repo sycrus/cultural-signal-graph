@@ -9,6 +9,7 @@ import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import { lineage } from "./layout.js";
 import { marksText } from "./hints.js";
+import * as S from "./store.js";
 
 const html = htm.bind(h);
 
@@ -42,7 +43,8 @@ export function Horizons({ snap, selectedId, onSelect, onRetag }) {
   const e = snap.exploration;
   const height = 440;
   const pad = { l: 60, r: 40, t: 30, b: 40 };
-  const W = width - pad.l - pad.r;
+  const W = (width - pad.l - pad.r) * S.spread.value;
+  const stageW = Math.ceil(width * S.spread.value);
   const H = height - pad.t - pad.b;
   const tOf = (year) => (year - e.start_year) / Math.max(e.horizon, 1);
   const X = (t) => pad.l + t * W;
@@ -102,7 +104,7 @@ export function Horizons({ snap, selectedId, onSelect, onRetag }) {
   const selected = items.find((it) => it.id === selectedId);
 
   return html`<div class="horizons" ref=${ref}>
-    <svg width=${width} height=${height}>
+    <svg width=${stageW} height=${height}>
       ${years.map((yr) => html`<g key=${yr}><line x1=${X(tOf(yr))} x2=${X(tOf(yr))} y1=${pad.t} y2=${pad.t + H} class="h-grid" />
         <text x=${X(tOf(yr))} y=${height - 14} text-anchor="middle" class="h-year">${yr}</text></g>`)}
       <text x=${pad.l - 10} y=${pad.t + 8} text-anchor="end" class="h-axis">prevalence</text>
@@ -119,8 +121,8 @@ export function Horizons({ snap, selectedId, onSelect, onRetag }) {
           <title>${marksText(it) ? marksText(it) + "\n" : ""}${it.text}${v ? ` — ${v}${it.tag.source === "human" ? " (set by you)" : ""}` : " — untagged"}${it.anchor ? " · evidence" : ""}</title>
         </g>`;
       })}
-      ${selected ? html`<text x=${Math.min(pos[selected.id][0] + 10, width - 10)} y=${pos[selected.id][1] - 10}
-        text-anchor=${pos[selected.id][0] > width * 0.7 ? "end" : "start"} class="h-selected-label">${selected.text.slice(0, 70)}${selected.text.length > 70 ? "…" : ""}</text>` : null}
+      ${selected ? html`<text x=${Math.min(pos[selected.id][0] + 10, stageW - 10)} y=${pos[selected.id][1] - 10}
+        text-anchor=${pos[selected.id][0] > stageW * 0.7 ? "end" : "start"} class="h-selected-label">${selected.text.slice(0, 70)}${selected.text.length > 70 ? "…" : ""}</text>` : null}
     </svg>
     <div class="h-legend hint">■ evidence (anchors, at the present) · ● projections at their time window · hollow on H2 = H2− (captured by H1), filled = H2+ (bridging to H3) · drag onto another curve to re-tag</div>
   </div>`;

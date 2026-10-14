@@ -62,12 +62,27 @@ export const lensSpec = (key) => LENSES.find((l) => l.key === key);
 /* Out-of-cone projections are greyed in every other view. */
 const outOfCone = (p) => p.tags?.cone?.value === "preposterous";
 
-export function LensTabs() {
-  return html`<div class="lens-tabs" role="tablist">
-    ${LENSES.map(
-      (l) => html`<button key=${l.key} role="tab" title=${l.hint}
-        class=${S.lens.value === l.key ? "on" : ""} onClick=${() => S.setLens(l.key)}>${l.label}</button>`,
+/* Lenses with time on x can stretch the axis past the container and pan. */
+const SPREADS = [1, 1.5, 2, 3];
+function SpreadPicker() {
+  return html`<span class="spread-pick" title="Stretch the time axis — pan left and right when spread past Fit">
+    ${SPREADS.map(
+      (sv) => html`<button key=${sv} class=${S.spread.value === sv ? "on" : ""}
+        onClick=${() => (S.spread.value = sv)}>${sv === 1 ? "Fit" : `${sv}×`}</button>`,
     )}
+  </span>`;
+}
+
+export function LensTabs() {
+  const timeLens = ["scroll", "cone", "horizons"].includes(S.lens.value);
+  return html`<div class="lens-bar">
+    <div class="lens-tabs" role="tablist">
+      ${LENSES.map(
+        (l) => html`<button key=${l.key} role="tab" title=${l.hint}
+          class=${S.lens.value === l.key ? "on" : ""} onClick=${() => S.setLens(l.key)}>${l.label}</button>`,
+      )}
+    </div>
+    ${timeLens ? html`<span class="spacer"></span><${SpreadPicker} />` : null}
   </div>`;
 }
 

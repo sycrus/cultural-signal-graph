@@ -58,7 +58,11 @@
 .scroll-tools .spacer { flex: 1; }
 .chip { padding: 2px 9px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
 .chip.on { background: var(--futures-soft); border-color: var(--futures); color: var(--futures); }
+.scroll-viewport { overflow-x: auto; overflow-y: hidden; }
 .scroll-stage { position: relative; overflow: hidden; }
+.scroll-viewport::-webkit-scrollbar, .cone::-webkit-scrollbar, .horizons::-webkit-scrollbar { height: 8px; }
+.scroll-viewport::-webkit-scrollbar-thumb, .cone::-webkit-scrollbar-thumb, .horizons::-webkit-scrollbar-thumb { background: #ddd6fe; border-radius: 4px; }
+.scroll-viewport::-webkit-scrollbar-track, .cone::-webkit-scrollbar-track, .horizons::-webkit-scrollbar-track { background: transparent; }
 .present-col { position: absolute; top: 0; bottom: 0; left: 0; border-right: 1px dashed var(--border); }
 .axis-label { position: absolute; top: 6px; left: 0; font-size: 11px; font-weight: 600; color: var(--evidence); text-transform: uppercase; letter-spacing: .06em; }
 .tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid #f0f1f4; transition: left .35s ease; }
@@ -163,9 +167,14 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 .anchor-card.rejected { text-decoration: line-through; opacity: .6; }
 
 /* --- lenses --------------------------------------------------------------------- */
-.lens-tabs { display: inline-flex; gap: 2px; padding: 3px; margin-bottom: 8px; border-radius: 9px; background: var(--card); border: 1px solid var(--border); }
+.lens-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.lens-bar .spacer { flex: 1; }
+.lens-tabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--card); border: 1px solid var(--border); }
 .lens-tabs button { border: 0; background: none; padding: 5px 14px; border-radius: 7px; font: inherit; color: var(--muted); cursor: pointer; }
 .lens-tabs button.on { background: var(--futures); color: #fff; font-weight: 600; }
+.spread-pick { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--card); border: 1px solid var(--border); }
+.spread-pick button { border: 0; background: none; padding: 4px 10px; border-radius: 7px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
+.spread-pick button.on { background: var(--futures); color: #fff; font-weight: 600; }
 .wheel { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 10px; display: flex; justify-content: center; padding: 8px; }
 .wheel-tools { position: absolute; top: 10px; left: 12px; }
 .wheel svg { overflow: visible; }
@@ -191,7 +200,7 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 .wheel .faded { opacity: .22; }
 
 /* --- Cone ----------------------------------------------------------------------- */
-.cone { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.cone { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; overflow-y: hidden; }
 .cone svg { display: block; }
 .cone-wedge { stroke: none; }
 .cone-wedge.preposterous { fill: #fafafa; }
@@ -263,7 +272,7 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 .m-chips { max-height: 210px; overflow: auto; }
 
 /* --- Three Horizons ------------------------------------------------------------- */
-.horizons { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 6px 8px 10px; }
+.horizons { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 6px 8px 10px; overflow-x: auto; overflow-y: hidden; }
 .h-grid { stroke: #f1f2f5; }
 .h-year, .h-axis { font-size: 10.5px; fill: var(--muted); }
 .h-curve { fill: none; stroke-width: 3; opacity: .55; }

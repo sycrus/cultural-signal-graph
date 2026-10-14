@@ -9,6 +9,7 @@ import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import { lineage } from "./layout.js";
 import { marksText } from "./hints.js";
+import * as S from "./store.js";
 
 const html = htm.bind(h);
 
@@ -51,7 +52,8 @@ export function Cone({ snap, selectedId, onSelect, onRetag }) {
   const e = snap.exploration;
   const first = e.start_year;
   const last = e.start_year + e.horizon;
-  const trackW = width - LEFT - NODE_W - 30;
+  const trackW = (width - LEFT - NODE_W - 30) * S.spread.value;
+  const stageW = Math.ceil(width * S.spread.value);
   const x = (year) => LEFT + ((year - first) / Math.max(last - first, 1)) * trackW;
   const { lanes, place } = packBands(snap, x);
 
@@ -89,7 +91,7 @@ export function Cone({ snap, selectedId, onSelect, onRetag }) {
   const wedge = (cls) => {
     const r = ext[cls][1] * LANE;
     const x0 = LEFT - 40;
-    const x1 = width - 10;
+    const x1 = stageW - 10;
     return `M${x0},${cy - r * 0.25} L${x1},${cy - r} L${x1},${cy + r} L${x0},${cy + r * 0.25} Z`;
   };
 
@@ -115,11 +117,11 @@ export function Cone({ snap, selectedId, onSelect, onRetag }) {
   };
 
   return html`<div class="cone" ref=${ref}>
-    <svg width=${width} height=${height}>
+    <svg width=${stageW} height=${height}>
       ${["preposterous", "possible", "plausible"].map((cls) => html`<path key=${cls} d=${wedge(cls)} class=${`cone-wedge ${cls}`} />`)}
-      <line x1=${LEFT - 40} y1=${cy} x2=${width - 10} y2=${cy} class="cone-axis" />
-      ${CONE_CLASSES.slice(1).map((cls) => html`<text key=${cls} x=${width - 16} y=${cy - ext[cls][1] * LANE + 14} text-anchor="end" class="cone-label">${cls}</text>`)}
-      <text x=${width - 16} y=${cy - 6} text-anchor="end" class="cone-label">projected</text>
+      <line x1=${LEFT - 40} y1=${cy} x2=${stageW - 10} y2=${cy} class="cone-axis" />
+      ${CONE_CLASSES.slice(1).map((cls) => html`<text key=${cls} x=${stageW - 16} y=${cy - ext[cls][1] * LANE + 14} text-anchor="end" class="cone-label">${cls}</text>`)}
+      <text x=${stageW - 16} y=${cy - 6} text-anchor="end" class="cone-label">projected</text>
       <text x=${LEFT - 44} y=${cy + 4} text-anchor="end" class="cone-label present">present</text>
       ${snap.projections.flatMap((p) =>
         p.parents.filter((q) => posOf[q]).map((q) => {
