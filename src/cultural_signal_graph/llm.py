@@ -39,7 +39,8 @@ def call_model(
     and raw output on the current span so the trace shows what went in and came out."""
     kwargs = {}
     if temperature is not None:
-        kwargs["temperature"] = temperature
+        # this SDK has no sampling params; DeepSeek's endpoint still reads temperature
+        kwargs["extra_body"] = {"temperature": temperature}
     messages = [{"role": "user", "content": prompt}]
     response = get_client().messages.create(
         model=model,

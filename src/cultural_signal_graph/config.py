@@ -24,3 +24,38 @@ def load_dotenv(path: str | Path | None = None) -> None:
         value = value.strip().strip("'\"")
         if key and key not in os.environ:
             os.environ[key] = value
+
+
+# --- futures mode model routing (PRD-futures.md, Model routing) --------------
+#
+# Every futures call type defaults to the cheap model. Override one call type with
+# `CSG_FUTURES_MODEL_<TYPE>` / `CSG_FUTURES_TEMP_<TYPE>` (e.g. CSG_FUTURES_MODEL_GENERATE=
+# deepseek-v4-pro) to compare tiers on the same exploration.
+
+CHEAP_MODEL = "deepseek-v4-flash"
+
+FUTURES_CALLS: dict[str, tuple[str, float]] = {
+    "generate": (CHEAP_MODEL, 0.9),  # an order of projections; siblings should diverge
+    "fork": (CHEAP_MODEL, 0.9),
+    "axes": (CHEAP_MODEL, 0.5),  # Matrix axis proposals
+    "narrative": (CHEAP_MODEL, 0.5),  # Matrix scenario narratives
+    "classify": (CHEAP_MODEL, 0.0),  # lens tags
+    "summarize": (CHEAP_MODEL, 0.0),  # a reference into one line
+    "suggest": (CHEAP_MODEL, 0.0),  # anchor suggestions for a goal
+    "ground": (CHEAP_MODEL, 0.3),  # Ground this
+}
+
+
+def futures_model(call_type: str) -> tuple[str, float]:
+    """The (model, temperature) for one futures call type, env-overridable."""
+    model, temperature = FUTURES_CALLS[call_type]
+    key = call_type.upper()
+    model = os.environ.get(f"CSG_FUTURES_MODEL_{key}") or model
+    temp = os.environ.get(f"CSG_FUTURES_TEMP_{key}")
+    return model, float(temp) if temp else temperature
+
+
+def futures_cap(name: str, default: int) -> int:
+    """A generation cap (`CSG_FUTURES_<NAME>`), tunable once the system runs."""
+    value = os.environ.get(f"CSG_FUTURES_{name.upper()}")
+    return int(value) if value else default

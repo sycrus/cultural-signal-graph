@@ -151,6 +151,6 @@ def test_call_model_passes_temperature_only_when_set(monkeypatch):
     fake = _FakeMessages("[]")
     monkeypatch.setattr(llm, "get_client", lambda: SimpleNamespace(messages=fake))
     llm.call_model("m", "sys", "hi", max_tokens=10)
-    assert "temperature" not in fake.kwargs
+    assert "extra_body" not in fake.kwargs
     llm.call_model("m", "sys", "hi", max_tokens=10, temperature=0.9)
-    assert fake.kwargs["temperature"] == 0.9
+    assert fake.kwargs["extra_body"] == {"temperature": 0.9}

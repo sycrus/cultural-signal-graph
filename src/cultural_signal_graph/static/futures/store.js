@@ -100,3 +100,10 @@ export async function createAndGenerate(body) {
     snap.value = await api(`${base()}/explorations/${created.exploration.id}/generate`, { method: "POST" });
   });
 }
+
+export async function continueGeneration() {
+  const expId = snap.value.exploration.id;
+  await guarded(async () => {
+    snap.value = await api(`${base()}/explorations/${expId}/generate`, { method: "POST" });
+  });
+}

@@ -175,6 +175,13 @@ function ExplorationView() {
       <span class="hint">${e.start_year} → ${e.start_year + e.horizon} · ${e.orders} orders · ${s.anchors.length} anchors</span>
     </div>
     <${ErrorLine} />
+    ${s.can_continue && !S.busy.value
+      ? html`<div class="card" style="display:flex; gap:12px; align-items:center">
+          <button class="primary" onClick=${S.continueGeneration}>
+            ${s.orders_generated ? `Continue from order ${s.orders_generated + 1} →` : "Generate →"}</button>
+          <span class="hint">${s.orders_generated} of ${e.orders} orders generated.</span>
+        </div>`
+      : null}
     ${S.busy.value && !s.projections.length ? html`<div class="card"><span class="spinner"></span> Generating…</div>` : null}
     <section class="present">
       <h2>Present</h2>

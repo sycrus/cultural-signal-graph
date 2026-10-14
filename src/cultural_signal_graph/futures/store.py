@@ -15,7 +15,7 @@ from pathlib import Path
 
 from ..flags import detect_flags
 from ..models import extraction_from_dict
-from .generator import fixture_generator
+from .generator import fixture_generator, live_generator
 from .log import OperationLog
 from .replay import replay
 
@@ -26,7 +26,7 @@ _RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 class ExplorationStore:
     def __init__(self, runs_root: str | Path = "runs", generator=None, mode: str = "fixture"):
         self.root = Path(runs_root)
-        self._generate = generator or fixture_generator
+        self._generate = generator or (live_generator if mode == "live" else fixture_generator)
         self.mode = mode
 
     # --- anchors -------------------------------------------------------------
@@ -124,6 +124,9 @@ class ExplorationStore:
             state = replay(log.active())
             if not payload["projections"]:
                 break  # nothing grew from the previous order; deeper orders can't either
+            e = state["exploration"]
+            if min(p["window"][0] for p in payload["projections"]) >= e["start_year"] + e["horizon"]:
+                break  # the time limit: no years left for a deeper order
         return self.snapshot(run_id, exp_id)
 
     # --- reads ---------------------------------------------------------------
@@ -158,11 +161,25 @@ class ExplorationStore:
             "anchors": list(state["anchors"].values()),
             "projections": projections,
             "orders_generated": state["orders_generated"],
+            "can_continue": self._can_continue(state),
             "cursor": log.cursor(),
             "can_undo": log.can_undo(),
             "can_redo": log.can_redo(),
             "mode": self.mode,
         }
+
+    @staticmethod
+    def _can_continue(state: dict) -> bool:
+        """More orders to generate: under the depth limit, and the last order both
+        grew something and left years before the time limit."""
+        e = state["exploration"]
+        done = state["orders_generated"]
+        if done >= e["orders"]:
+            return False
+        if done == 0:
+            return True
+        last = [p for p in state["projections"].values() if p["order"] == done]
+        return bool(last) and min(p["window"][0] for p in last) < e["start_year"] + e["horizon"]
 
     def ops(self, run_id: str, exp_id: str) -> list[dict]:
         return self._log(run_id, exp_id).active()
