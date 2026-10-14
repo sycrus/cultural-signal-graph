@@ -111,6 +111,10 @@ def _create(state: dict, op: dict) -> None:
     state["axes"] = None  # the Matrix's two chosen axes
     state["axis_candidates"] = []
     state["annotations"] = {}  # "lens:key" -> {lens, key, text, based_on, op}
+    for lens, tags in op.get("anchor_tags", {}).items():
+        state["tags"][lens] = {
+            aid: {**copy.deepcopy(t), "source": "model", "op": 0} for aid, t in tags.items() if aid in state["anchors"]
+        }
 
 
 def _add(state: dict, projections: list[dict], seq: int) -> None:
@@ -196,10 +200,12 @@ def _set_axes(state: dict, op: dict) -> None:
 def _seed_fork(state: dict, op: dict) -> None:
     """A branch generated for one quadrant's world: placed in that quadrant."""
     _branch(state, op)
-    tags = state["tags"].setdefault("matrix", {})
+    tags = state["tags"].setdefault(op.get("lens", "matrix"), {})
     for payload in op["orders"]:
         for p in payload["projections"]:
             tags[p["id"]] = {"value": op["quadrant"], "source": "seeded", "op": op["seq"]}
+            if op.get("lens") == "pestle":
+                tags[p["id"]]["secondary"] = []
 
 
 def _annotate(state: dict, op: dict) -> None:

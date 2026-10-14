@@ -277,3 +277,16 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 .h-node.faded { opacity: .25; }
 .h-selected-label { font-size: 12px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: #fff; stroke-width: 4px; }
 .h-legend { padding: 0 8px; }
+
+/* --- PESTLE ------------------------------------------------------------------------ */
+.pestle-coverage { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 10px; font-size: 12px; }
+.pc { display: inline-flex; gap: 5px; align-items: center; padding: 3px 9px; border-radius: 12px; background: var(--card); border: 1px solid var(--border); }
+.pc b { color: var(--futures); }
+.pc .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pc.gap { border-style: dashed; border-color: var(--warn); color: var(--muted); }
+.pc.gap button { padding: 0 4px; font-size: 11px; color: var(--warn); }
+.pestle-chip { font-size: 9.5px; padding: 0 5px; border-radius: 6px; background: #f1f5f9; color: #475569; font-weight: 700; }
+.pestle-chip.primary { font-size: 10.5px; font-weight: 600; background: var(--futures-soft); color: var(--futures); white-space: nowrap; }
+.label-row { display: flex; align-items: center; justify-content: space-between; }
+.anchor-row.suggested { background: #faf5ff; }
+.tag-multi { display: inline-flex; flex-wrap: wrap; gap: 6px; }

@@ -112,7 +112,46 @@ HORIZONS = LensSpec(
     include_anchors=True,
 )
 
-LENSES: dict[str, LensSpec] = {CONE.key: CONE, MATRIX.key: MATRIX, HORIZONS.key: HORIZONS}
+PESTLE_VALUES = ("political", "economic", "social", "technological", "legal", "environmental")
+_PESTLE_WORDS = {
+    "political": ("politic", "policy", "government", "geopolit", "election", "state "),
+    "economic": ("market", "sales", "price", "subsid", "insur", "margin", "business", "economy", "cost"),
+    "social": ("social", "habit", "norm", "etiquette", "citizen", "society", "status", "gamers", "consumer"),
+    "technological": ("ai ", "model", "device", "glasses", "headset", "platform", "interface", "sensor", "computing"),
+    "legal": ("regulat", "law", "ban", "consent", "legal", "mandat", "privacy"),
+    "environmental": ("environment", "energy", "climate", "battery", "waste", "carbon"),
+}
+
+
+def _pestle_fixture(p: dict) -> dict:
+    text = f" {p['statement'].lower()} "
+    hits = [k for k in PESTLE_VALUES if any(w in text for w in _PESTLE_WORDS[k])]
+    primary = hits[0] if hits else "technological"
+    return {"value": primary, "secondary": [h for h in hits if h != primary]}
+
+
+PESTLE = LensSpec(
+    key="pestle",
+    values=PESTLE_VALUES,
+    instructions=(
+        "Tag each item with PESTLE: its PRIMARY dimension (the dominant one) and any SECONDARY "
+        "dimensions it also touches — political, economic, social, technological, legal, "
+        "environmental. Most items touch more than one; pick the most logical primary."
+    ),
+    fixture=_pestle_fixture,
+    extras={"secondary": "list of other PESTLE dimensions it touches (may be empty)"},
+    clean_extras=lambda t: {
+        "secondary": [v for v in dict.fromkeys(t.get("secondary") or []) if v in PESTLE_VALUES and v != t.get("value")]
+    },
+    include_anchors=True,
+)
+
+LENSES: dict[str, LensSpec] = {
+    CONE.key: CONE,
+    MATRIX.key: MATRIX,
+    HORIZONS.key: HORIZONS,
+    PESTLE.key: PESTLE,
+}
 
 
 def taggable(spec: LensSpec, state: dict) -> list[dict]:

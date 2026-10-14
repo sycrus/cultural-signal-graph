@@ -2,13 +2,14 @@
    Explorations list → new exploration form → the exploration view. */
 
 import { h, render } from "preact";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
 import { LensTabs, LensView } from "./lenses.js";
 import { DetailPanel } from "./panel.js";
 import { HistoryBar, ProjectionActions } from "./actions.js";
 import { AddPanel } from "./add.js";
+import { Coverage } from "./pestle.js";
 
 const html = htm.bind(h);
 
@@ -82,11 +83,13 @@ function ExplorationList() {
   </div>`;
 }
 
-function AnchorRow({ a, checked, onToggle }) {
-  return html`<label class="anchor-row">
+function AnchorRow({ a, checked, onToggle, reason }) {
+  const p = S.anchorPestle.value[a.id];
+  return html`<label class=${`anchor-row ${reason ? "suggested" : ""}`}>
     <input type="checkbox" checked=${checked} onChange=${onToggle} />
     <span class=${`anchor-kind ${a.kind}`}>${KIND_LABEL[a.kind]}${a.flag ? ` · ${a.flag}` : ""}${a.pending ? " · pending sign-off" : ""}</span>
-    <span class="anchor-text">${a.text}</span>
+    <span class="anchor-text">${a.text}${reason ? html`<div class="hint">✦ ${reason}</div>` : null}</span>
+    ${p ? html`<span class="pestle-chip primary" title=${`PESTLE: ${p.value}${p.secondary?.length ? ` (also ${p.secondary.join(", ")})` : ""}`}>${p.value}</span>` : null}
     <span class="hint">${a.entity}</span>
   </label>`;
 }
@@ -98,6 +101,28 @@ function NewExploration() {
   const [picked, setPicked] = useState(new Set(d.anchor_ids || all.filter((a) => a.kind !== "flagged").map((a) => a.id)));
   const [horizon, setHorizon] = useState(d.horizon || 10);
   const [orders, setOrders] = useState(d.orders || 5);
+  const [reasons, setReasons] = useState({});
+  const [suggesting, setSuggesting] = useState(false);
+  useEffect(() => {
+    S.loadAnchorPestle();
+  }, []);
+  const suggest = async () => {
+    if (!goal.trim()) {
+      S.error.value = "Write the goal first: suggestions are for that goal.";
+      return;
+    }
+    setSuggesting(true);
+    try {
+      const out = await S.suggestAnchors(goal);
+      setPicked(new Set(out.anchor_ids));
+      setReasons(out.reasons || {});
+      S.error.value = null;
+    } catch (err) {
+      S.error.value = String(err.message || err);
+    }
+    setSuggesting(false);
+  };
+  const coverageItems = all.filter((a) => picked.has(a.id)).map((a) => ({ tags: { pestle: S.anchorPestle.value[a.id] } }));
   const toggle = (id) => {
     const next = new Set(picked);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -123,10 +148,14 @@ function NewExploration() {
       <input id="goal" value=${goal} onInput=${(e) => setGoal(e.target.value)}
         placeholder="the direction of AR/VR wearables" />
 
-      <label>Initial state — ${picked.size} anchor${picked.size === 1 ? "" : "s"}</label>
-      <div class="anchor-list">
-        ${all.map((a) => html`<${AnchorRow} key=${a.id} a=${a} checked=${picked.has(a.id)} onToggle=${() => toggle(a.id)} />`)}
+      <div class="label-row">
+        <label>Initial state — ${picked.size} anchor${picked.size === 1 ? "" : "s"}</label>
+        <button class="ghost" onClick=${suggest} disabled=${suggesting}>${suggesting ? "Suggesting…" : "✦ Suggest for this goal"}</button>
       </div>
+      <div class="anchor-list">
+        ${all.map((a) => html`<${AnchorRow} key=${a.id} a=${a} checked=${picked.has(a.id)} onToggle=${() => toggle(a.id)} reason=${reasons[a.id]} />`)}
+      </div>
+      <${Coverage} items=${coverageItems} label="anchors" />
       <div class="hint">Flagged signals are allowed: weak or contested evidence can still seed a possible future.</div>
 
       <div style="display:flex; gap:16px">

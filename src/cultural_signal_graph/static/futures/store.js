@@ -233,3 +233,17 @@ export const proposeAxes = () => mutate("/lenses/matrix/axes/propose", { method:
 export const setAxes = (axes) => mutate("/lenses/matrix/axes", { method: "PUT", body: { axes, author: author.value } });
 export const seedQuadrant = (q) => mutate(`/lenses/matrix/quadrants/${q}/seed`, { method: "POST" });
 export const writeNarrative = (q) => mutate(`/lenses/matrix/quadrants/${q}/narrative`, { method: "POST" });
+
+/* --- PESTLE --- */
+export const seedDimension = (dimension) => mutate(`/lenses/pestle/${dimension}/seed`, { method: "POST" });
+export const anchorPestle = signal({}); // anchor id -> {value, secondary}, for the picker
+export async function loadAnchorPestle() {
+  try {
+    anchorPestle.value = await api(`${base()}/futures/anchors/pestle`, { method: "POST" });
+  } catch (err) {
+    error.value = String(err.message || err);
+  }
+}
+export async function suggestAnchors(goal) {
+  return api(`${base()}/futures/suggest`, { method: "POST", body: { goal } });
+}

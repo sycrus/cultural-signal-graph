@@ -12,6 +12,7 @@ import { Wheel } from "./wheel.js";
 import { Cone, CONE_CLASSES } from "./cone.js";
 import { Matrix, MATRIX_VALUES } from "./matrix.js";
 import { Horizons, HORIZON_VALUES } from "./horizons.js";
+import { Pestle, PESTLE_VALUES } from "./pestle.js";
 
 const html = htm.bind(h);
 
@@ -43,6 +44,16 @@ export const LENSES = [
     tags: true,
     anchors: true,
     values: HORIZON_VALUES,
+  },
+  {
+    key: "pestle",
+    label: "PESTLE",
+    hint: "PESTLE swimlanes: each projection in its primary dimension, secondaries as chips",
+    view: Pestle,
+    tags: true,
+    anchors: true,
+    values: PESTLE_VALUES,
+    multi: "secondary",
   },
 ];
 
@@ -85,10 +96,17 @@ export function TagEditor({ p, anchorsOnly = false }) {
       return html`<div key=${l.key} class="tag-row">
         <span class="tag-lens">${l.label}</span>
         <select value=${tag?.value || ""} disabled=${S.busy.value}
-          onChange=${(e) => S.setTag(p.id, l.key, { value: e.target.value, extras: Object.fromEntries((l.extras || []).map((x) => [x.key, !!tag?.[x.key]])) })}>
+          onChange=${(e) => S.setTag(p.id, l.key, { value: e.target.value, extras: l.multi ? { [l.multi]: (tag?.[l.multi] || []).filter((v) => v !== e.target.value) } : Object.fromEntries((l.extras || []).map((x) => [x.key, !!tag?.[x.key]])) })}>
           ${!tag ? html`<option value="">untagged</option>` : null}
           ${l.values.map((v) => html`<option key=${v} value=${v}>${v}</option>`)}
         </select>
+        ${l.multi && tag ? html`<span class="tag-multi">${l.values.filter((v) => v !== tag.value).map((v) => html`<label key=${v} class="tag-extra">
+            <input type="checkbox" checked=${(tag[l.multi] || []).includes(v)} disabled=${S.busy.value}
+              onChange=${(e) => {
+                const cur = new Set(tag[l.multi] || []);
+                e.target.checked ? cur.add(v) : cur.delete(v);
+                S.setTag(p.id, l.key, { value: tag.value, extras: { [l.multi]: [...cur] } });
+              }} /> ${v}</label>`)}</span>` : null}
         ${(l.extras || []).map((x) => html`<label key=${x.key} class="tag-extra">
           <input type="checkbox" checked=${!!tag?.[x.key]} disabled=${!tag || S.busy.value}
             onChange=${(e) => S.setTag(p.id, l.key, { value: tag.value, extras: { [x.key]: e.target.checked } })} /> ${x.label}</label>`)}

@@ -124,6 +124,10 @@ class AxesIn(BaseModel):
     author: str = "strategist"
 
 
+class SuggestIn(BaseModel):
+    goal: str
+
+
 class ImportIn(BaseModel):
     log: str
     author: str = "strategist"
@@ -240,6 +244,14 @@ def create_app(
     @app.get("/api/runs/{run_id}/futures/anchors")
     def futures_anchors(run_id: str) -> list[dict]:
         return futures.anchors(run_id)
+
+    @app.post("/api/runs/{run_id}/futures/anchors/pestle")
+    def anchor_pestle(run_id: str) -> dict:
+        return futures.anchor_pestle(run_id)
+
+    @app.post("/api/runs/{run_id}/futures/suggest")
+    def suggest_anchors(run_id: str, body: SuggestIn) -> dict:
+        return futures.suggest_anchors(run_id, body.goal)
 
     @app.get("/api/runs/{run_id}/explorations")
     def list_explorations(run_id: str) -> list[dict]:
@@ -376,6 +388,10 @@ def create_app(
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/matrix/quadrants/{quadrant}/narrative")
     def write_narrative(run_id: str, exp_id: str, quadrant: str) -> dict:
         return futures.write_narrative(run_id, exp_id, quadrant)
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/pestle/{dimension}/seed")
+    def seed_dimension(run_id: str, exp_id: str, dimension: str) -> dict:
+        return futures.seed_dimension(run_id, exp_id, dimension)
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/undo")
     def undo_exploration(run_id: str, exp_id: str) -> dict:

@@ -358,3 +358,38 @@ def summarize_reference(url: str, excerpt: str, live: bool) -> dict:
         "input": {"system": SUMMARY_SYSTEM, "prompt": prompt},
         "output": text,
     }
+
+
+SUGGEST_SYSTEM = (
+    "You help a strategist choose the evidence a futures exploration should grow from. "
+    "Return a single JSON object only."
+)
+
+
+def suggest_anchors(goal: str, anchors: list[dict]) -> dict:
+    """Which anchors bear on a goal, with a short reason each (cheap model)."""
+    lines = [f"Exploration goal: {goal}", "", "Available evidence:"]
+    for a in anchors:
+        flag = f" [{a['flag']}]" if a.get("flag") else ""
+        lines.append(f"- {a['id']} ({a['kind']}{flag}): {a['text']}")
+    lines += [
+        "",
+        "Pick the items this exploration should grow from: relevant to the goal, including "
+        "contested or flagged ones when they matter. Give a short reason for each pick.",
+        'Return JSON: {"picks": [{"id", "reason"}]}',
+    ]
+    prompt = "\n".join(lines)
+    model, temperature = futures_model("suggest")
+    with get_tracer().start_as_current_span("futures_suggest_anchors"):
+        with model_span() as model_call:
+            text, usage = call_model(model, SUGGEST_SYSTEM, prompt, max_tokens=2000, temperature=temperature)
+            record_usage(model_call, usage)
+    known = {a["id"] for a in anchors}
+    picks = [p for p in json.loads(extract_json(text)).get("picks", []) if p.get("id") in known]
+    return {
+        "anchor_ids": [p["id"] for p in picks],
+        "reasons": {p["id"]: str(p.get("reason", "")) for p in picks},
+        "model": model,
+        "input": {"system": SUGGEST_SYSTEM, "prompt": prompt},
+        "output": text,
+    }

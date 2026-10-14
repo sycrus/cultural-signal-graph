@@ -32,7 +32,7 @@ function useWidth(ref) {
   return width;
 }
 
-export function Scroll({ snap, selectedId, onSelect, laneKey = null, laneLabel = null, dimmed = () => false }) {
+export function Scroll({ snap, selectedId, onSelect, laneKey = null, laneLabel = null, dimmed = () => false, onLaneDrop = null, chips = null }) {
   const ref = useRef(null);
   const width = useWidth(ref);
   const e = snap.exploration;
@@ -42,6 +42,7 @@ export function Scroll({ snap, selectedId, onSelect, laneKey = null, laneLabel =
 
   const [range, setRange] = useState([first, last]);
   const [shownOrders, setShownOrders] = useState(null); // null = all
+  const [drag, setDrag] = useState(null); // {id, dy} while moving a card between swimlanes
   useEffect(() => setRange([first, last]), [e.id]);
 
   const trackW = Math.max(width - PRESENT_W - CARD_W - 24, 200);
@@ -135,16 +136,40 @@ export function Scroll({ snap, selectedId, onSelect, laneKey = null, laneLabel =
         const shown = visible.has(p.id);
         const left = shown ? x(p.window[0]) : p.window[1] < range[0] ? PRESENT_W : width;
         const barW = Math.max(((p.window[1] + 1 - p.window[0]) / span) * trackW, 6);
+        const top = y(lane[p.id]) + (drag?.id === p.id ? drag.dy : 0);
+        const laneDrag = bands && onLaneDrop
+          ? (ev) => {
+              ev.preventDefault();
+              const y0 = ev.clientY;
+              let moved = false;
+              const move = (m) => {
+                if (Math.abs(m.clientY - y0) > 4) moved = true;
+                setDrag({ id: p.id, dy: m.clientY - y0 });
+              };
+              const up = (u) => {
+                window.removeEventListener("pointermove", move);
+                window.removeEventListener("pointerup", up);
+                setDrag(null);
+                if (!moved) return onSelect(p.id);
+                const target = Math.round((y(lane[p.id]) + u.clientY - y0 - TOP) / LANE_H);
+                const band = bands.find((b) => target >= b.from && target < b.to) || (target < 0 ? bands[0] : bands[bands.length - 1]);
+                if (band && band.key !== laneKey(p)) onLaneDrop(p, band.key);
+              };
+              window.addEventListener("pointermove", move);
+              window.addEventListener("pointerup", up);
+            }
+          : null;
         return html`<div key=${p.id}
           class=${`proj-node ${p.baseline ? "baseline" : ""} ${p.discontinuity ? "discontinuity" : ""} ${p.stale ? "stale" : ""} ${p.origin} ${selectedId === p.id ? "selected" : ""} ${path.size && !path.has(p.id) ? "faded" : ""} ${dimmed(p) ? "dimmed" : ""} ${shown ? "" : "rolled"}`}
-          style=${{ left: `${left}px`, top: `${y(lane[p.id])}px`, width: `${CARD_W}px`, height: `${CARD_H}px` }}
-          onClick=${() => onSelect(p.id)} title=${p.statement}>
+          style=${{ left: `${left}px`, top: `${top}px`, width: `${CARD_W}px`, height: `${CARD_H}px`, ...(drag?.id === p.id ? { transition: "none", zIndex: 4, cursor: "grabbing" } : {}) }}
+          onPointerDown=${laneDrag} onClick=${laneDrag ? null : () => onSelect(p.id)} title=${p.statement}>
           <div class="proj-meta">
             <span class="order-badge">${p.order}</span>
             <span class="years">${p.window[0] === p.window[1] ? p.window[0] : `${p.window[0]}–${p.window[1]}`}</span>
             ${p.timing_conflict ? html`<span class="warn-mark" title="Timing conflict: starts before what it grows from">⚠</span>` : null}
             ${p.stale ? html`<span class="stale-mark" title="Stale: an ancestor or anchor changed after this was generated">stale</span>` : null}
             ${p.parents.length + p.anchors.length > 1 ? html`<span class="converge-mark" title="Convergence">⋈</span>` : null}
+            ${chips ? chips(p) : null}
           </div>
           <div class="proj-text">${p.statement}</div>
           <div class="window-bar" style=${{ width: `${Math.min(barW, CARD_W)}px` }}></div>

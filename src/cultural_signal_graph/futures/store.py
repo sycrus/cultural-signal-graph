@@ -18,6 +18,7 @@ from ..flags import detect_flags
 from rdflib.namespace import RDFS
 
 from ..models import extraction_from_dict
+from .generator import suggest_anchors as generator_suggest
 from .generator import (
     summarize_reference,
     fixture_branch_generator,
@@ -54,6 +55,35 @@ class ExplorationStore:
 
     # --- anchors -------------------------------------------------------------
 
+    # --- run-level helpers for the anchor picker -----------------------------------
+
+    def anchor_pestle(self, run_id: str) -> dict[str, dict]:
+        """PESTLE tags for the run's anchors, before any exploration exists — one
+        cheap call, cached in the run directory so reopening the picker is free."""
+        cache = self.root / run_id / "futures-pestle.json"
+        anchors = {a["id"]: a for a in self.anchors(run_id)}
+        cached = json.loads(cache.read_text(encoding="utf-8")) if cache.is_file() else {}
+        missing = [a for aid, a in anchors.items() if aid not in cached]
+        if missing:
+            run = self._run(run_id)
+            pseudo = {"exploration": {"goal": run["ask"]["question"], "start_year": 0}, "anchors": {a["id"]: a for a in missing}, "projections": {}}
+            payload = lens_registry.classify(lens_registry.PESTLE, pseudo, lens_registry.taggable(lens_registry.PESTLE, pseudo), live=self.mode == "live")
+            cached.update({k: {kk: vv for kk, vv in v.items() if kk != "fixed"} for k, v in payload["tags"].items()})
+            cache.write_text(json.dumps(cached, indent=2), encoding="utf-8")
+        return {aid: cached[aid] for aid in anchors if aid in cached}
+
+    def suggest_anchors(self, run_id: str, goal: str) -> dict:
+        """Anchors relevant to a goal, with a reason each (one cheap call; advisory —
+        the strategist confirms in the picker)."""
+        if not goal.strip():
+            raise ValueError("give the exploration a goal first")
+        anchors = self.anchors(run_id)
+        if self.mode != "live":
+            words = {w for w in goal.lower().split() if len(w) > 3}
+            ids = [a["id"] for a in anchors if words & set(a["text"].lower().split()) or a["kind"] in ("claim", "signal")]
+            return {"anchor_ids": ids or [a["id"] for a in anchors], "reasons": {}, "model": "fixture"}
+        return generator_suggest(goal, anchors)
+
     def _values(self, run_id: str) -> tuple[dict, dict, bool]:
         """(run record, pipeline state, finalized?) — ValueError before extraction."""
         run = self._run(run_id)
@@ -66,6 +96,13 @@ class ExplorationStore:
             raise ValueError(f"run {run_id} has not passed extraction yet")
         values = json.loads(state_path.read_text(encoding="utf-8"))
         return run, values, state_path.name == "state-final.json"
+
+    def _cached_pestle(self, run_id: str, anchor_ids: list[str]) -> dict:
+        cache = self.root / run_id / "futures-pestle.json"
+        if not cache.is_file():
+            return {}
+        cached = json.loads(cache.read_text(encoding="utf-8"))
+        return {a: cached[a] for a in anchor_ids if a in cached}
 
     def gate(self, run_id: str) -> dict[str, str]:
         """Each proposed cross-domain edge's current gate status, read live from the
@@ -141,6 +178,8 @@ class ExplorationStore:
         author: str = "strategist",
         start_year: int | None = None,
     ) -> dict:
+        """A new exploration. Anchor PESTLE tags already computed for the picker are
+        carried into the create op, so the lens does not ask again."""
         if not goal.strip():
             raise ValueError("an exploration needs a goal")
         if horizon < 1 or orders < 1:
@@ -166,6 +205,7 @@ class ExplorationStore:
                     "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 },
                 "anchors": [available[a] for a in anchor_ids],
+                "anchor_tags": {"pestle": self._cached_pestle(run_id, anchor_ids)},
             },
             author=author,
         )
@@ -403,11 +443,26 @@ class ExplorationStore:
         log, state = self._mutable(run_id, exp_id)
         axes = self._axes(state, quadrant)
         constraint = {a["name"]: a[pole] for a, pole in zip(axes, matrix.POLES[quadrant])}
+        payloads = self._seed(state, matrix.world(axes, quadrant))
+        log.append({"op": "seed_fork", "lens": "matrix", "quadrant": quadrant, "constraint": constraint, "orders": payloads}, author=author)
+        return self.snapshot(run_id, exp_id)
+
+    def seed_dimension(self, run_id: str, exp_id: str, dimension: str, author: str = "strategist") -> dict:
+        """Fill a PESTLE gap: a branch from the present that follows one dimension."""
+        if dimension not in lens_registry.PESTLE_VALUES:
+            raise KeyError(f"unknown PESTLE dimension: {dimension}")
+        log, state = self._mutable(run_id, exp_id)
+        world = f"the {dimension} dimension of {state['exploration']['goal']}: follow {dimension} forces and consequences"
+        payloads = self._seed(state, world)
+        log.append({"op": "seed_fork", "lens": "pestle", "quadrant": dimension, "constraint": {"pestle": dimension}, "orders": payloads}, author=author)
+        return self.snapshot(run_id, exp_id)
+
+    def _seed(self, state: dict, world: str) -> list[dict]:
         working = {**state}
         frontier = list(state["anchors"])
         payloads = []
         for order in range(1, state["exploration"]["orders"] + 1):
-            branch = {"kind": "seeded", "frontier": frontier, "baseline": False, "world": matrix.world(axes, quadrant)}
+            branch = {"kind": "seeded", "frontier": frontier, "baseline": False, "world": world}
             payload = self._branch(working, order, branch)
             if not payload["projections"]:
                 break
@@ -416,8 +471,7 @@ class ExplorationStore:
             frontier = [p["id"] for p in payload["projections"]]
         if not payloads:
             raise ValueError("the seeded branch produced nothing")
-        log.append({"op": "seed_fork", "quadrant": quadrant, "constraint": constraint, "orders": payloads}, author=author)
-        return self.snapshot(run_id, exp_id)
+        return payloads
 
     def write_narrative(self, run_id: str, exp_id: str, quadrant: str, author: str = "strategist") -> dict:
         log, state = self._mutable(run_id, exp_id)
