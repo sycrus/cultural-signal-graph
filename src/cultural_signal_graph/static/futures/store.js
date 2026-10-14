@@ -212,3 +212,10 @@ export function setLens(key) {
     /* storage unavailable: the choice just isn't remembered */
   }
 }
+
+export const classifyLens = (lensKey) => mutate(`/lenses/${lensKey}/classify`, { method: "POST" });
+export const setTag = (pid, lensKey, tag) =>
+  mutate(`/projections/${pid}/tags/${lensKey}`, {
+    method: "PUT",
+    body: { value: tag.value, extras: tag.extras || {}, author: author.value },
+  });

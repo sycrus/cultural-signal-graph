@@ -23,6 +23,7 @@ from .generator import (
     live_branch_generator,
     live_generator,
 )
+from . import lenses as lens_registry
 from .log import OperationLog
 from .replay import derive, descendants, replay
 
@@ -349,6 +350,31 @@ class ExplorationStore:
         }
         return ref, summary
 
+    # --- lens tags ---------------------------------------------------------------
+
+    def classify(self, run_id: str, exp_id: str, lens_key: str) -> dict:
+        """Tag every projection the lens has no tag for yet — one cheap-model call,
+        cached as a `retag` op. Nothing untagged: no call, no op."""
+        spec = lens_registry.lens(lens_key)
+        log, state = self._mutable(run_id, exp_id)
+        have = state["tags"].get(lens_key, {})
+        untagged = [p for p in state["projections"].values() if p["id"] not in have]
+        if untagged:
+            payload = lens_registry.classify(spec, state, untagged, live=self.mode == "live")
+            if payload["tags"]:
+                log.append({"op": "retag", "lens": lens_key, "source": "model", **payload})
+        return self.snapshot(run_id, exp_id)
+
+    def set_tag(self, run_id: str, exp_id: str, pid: str, lens_key: str, tag: dict, author: str = "strategist") -> dict:
+        """The strategist's override (a drag in the lens view), attributed."""
+        spec = lens_registry.lens(lens_key)
+        log, state = self._mutable(run_id, exp_id)
+        self._projection(state, pid)
+        clean = lens_registry.clean_tag(spec, tag)
+        before = state["tags"].get(lens_key, {}).get(pid)
+        log.append({"op": "retag", "lens": lens_key, "source": "human", "tags": {pid: clean}, "before": before}, author=author)
+        return self.snapshot(run_id, exp_id)
+
     def _grow(self, state: dict, root: dict, depth: int, kind: str, removed=(), hint=None) -> list[dict]:
         """Grow a branch from `root`, one branch-generator call per order."""
         working = {**state, "projections": {k: v for k, v in state["projections"].items() if k not in set(removed)}}
@@ -428,8 +454,11 @@ class ExplorationStore:
         log = self._log(run_id, exp_id)
         state = replay(log.active())
         flags = self._derive(run_id, state)
+        def tags(pid: str) -> dict:
+            return {k: v[pid] for k, v in state["tags"].items() if pid in v}
+
         projections = sorted(
-            ({**p, **flags[p["id"]]} for p in state["projections"].values()),
+            ({**p, **flags[p["id"]], "tags": tags(p["id"])} for p in state["projections"].values()),
             key=lambda p: (p["order"], p["window"][0], p["id"]),
         )
         return {
@@ -441,6 +470,10 @@ class ExplorationStore:
             "generating": self.is_generating(exp_id),
             "stopped_at": state.get("stopped_at"),
             "removed": state["removed"],
+            "lenses": {
+                key: {"untagged": sum(1 for p in state["projections"] if p not in state["tags"].get(key, {}))}
+                for key in lens_registry.LENSES
+            },
             "cursor": log.cursor(),
             "can_undo": log.can_undo(),
             "can_redo": log.can_redo(),

@@ -6,6 +6,7 @@ import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
+import { TagEditor } from "./lenses.js";
 
 const html = htm.bind(h);
 const opCache = {};
@@ -76,6 +77,8 @@ export function DetailPanel({ id, onSelect, onClose, actions = null }) {
           : `Grows from a ${p.human_root === "wildcard" ? "wild card" : "grounded assumption"}: it traces back to a human assumption, not only to evidence.`}</div>`
       : null}
     ${actions}
+    <h4>Lens tags</h4>
+    <${TagEditor} p=${p} />
     <h4>Grows from</h4>
     <ul class="refs">${[...p.anchors, ...p.parents].map((s) => html`<${Ref} key=${s} id=${s} onSelect=${onSelect} />`)}</ul>
     ${children.length ? html`<h4>Grows into</h4><ul class="refs">${children.map((c) => html`<${Ref} key=${c.id} id=${c.id} onSelect=${onSelect} />`)}</ul>` : null}

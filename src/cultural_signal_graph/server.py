@@ -106,6 +106,12 @@ class HumanProjectionIn(BaseModel):
     author: str = "strategist"
 
 
+class TagIn(BaseModel):
+    value: str
+    extras: dict = {}
+    author: str = "strategist"
+
+
 class ForkIn(BaseModel):
     hint: str | None = None
     author: str = "strategist"
@@ -293,6 +299,15 @@ def create_app(
             reference_id=body.reference_id,
             author=body.author,
         )
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/{lens}/classify")
+    def classify_lens(run_id: str, exp_id: str, lens: str) -> dict:
+        return futures.classify(run_id, exp_id, lens)
+
+    @app.put("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}/tags/{lens}")
+    def set_lens_tag(run_id: str, exp_id: str, pid: str, lens: str, body: TagIn) -> dict:
+        tag = {"value": body.value, **body.extras}
+        return futures.set_tag(run_id, exp_id, pid, lens, tag, author=body.author)
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/undo")
     def undo_exploration(run_id: str, exp_id: str) -> dict:

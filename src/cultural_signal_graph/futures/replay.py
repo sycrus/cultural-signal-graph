@@ -107,6 +107,7 @@ def _create(state: dict, op: dict) -> None:
     state["orders_generated"] = 0
     state["changed"] = {}
     state["removed"] = {}
+    state["tags"] = {}  # lens -> projection id -> {value, ..., source, op}
 
 
 def _add(state: dict, projections: list[dict], seq: int) -> None:
@@ -166,8 +167,21 @@ def _add_human_projection(state: dict, op: dict) -> None:
     _add(state, [op["projection"]], op["seq"])
 
 
+def _retag(state: dict, op: dict) -> None:
+    """Lens tags: from the model (first open) or the strategist (an override)."""
+    tags = state["tags"].setdefault(op["lens"], {})
+    for pid, tag in op["tags"].items():
+        prev = tags.get(pid)
+        new = {**copy.deepcopy(tag), "source": op["source"], "op": op["seq"]}
+        if op["source"] == "human" and prev:
+            # keep what the model said, so both judgements stay visible
+            new["model_value"] = prev["value"] if prev["source"] == "model" else prev.get("model_value")
+        tags[pid] = new
+
+
 _HANDLERS = {
     "create": _create,
+    "retag": _retag,
     "add_reference": _add_reference,
     "add_assumption": _add_human_projection,
     "add_wildcard": _add_human_projection,

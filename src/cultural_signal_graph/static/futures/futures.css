@@ -180,3 +180,33 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 .wheel-node.dimmed { opacity: .35; }
 .wheel-label { font-size: 10.5px; fill: #374151; pointer-events: none; }
 .wheel .faded { opacity: .22; }
+
+/* --- Cone ----------------------------------------------------------------------- */
+.cone { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.cone svg { display: block; }
+.cone-wedge { stroke: none; }
+.cone-wedge.preposterous { fill: #fafafa; }
+.cone-wedge.possible { fill: #f5f3ff; }
+.cone-wedge.plausible { fill: #ede9fe; }
+.cone-axis { stroke: #9ca3af; stroke-dasharray: 6 4; stroke-width: 1.5; }
+.cone-label { font-size: 10.5px; fill: #8b5cf6; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
+.cone-label.present { fill: var(--evidence); }
+.cone .edge { stroke: #c4b5fd; fill: none; stroke-width: 1.2; }
+.cone .edge.lit { stroke: var(--futures); stroke-width: 2; }
+.cone .edge.faded { opacity: .2; }
+.cone-node { position: absolute; display: flex; align-items: center; gap: 4px; padding: 0 8px; border-radius: 15px; background: #fff; border: 1px solid #c4b5fd; font-size: 11.5px; cursor: grab; user-select: none; transition: left .3s, top .3s, box-shadow .15s; touch-action: none; }
+.cone-node.dragging { transition: none; cursor: grabbing; box-shadow: 0 6px 18px rgba(124,58,237,.3); z-index: 3; }
+.cone-node.projected { border-color: #9ca3af; background: #f9fafb; }
+.cone-node.possible { border-style: dashed; }
+.cone-node.preposterous { opacity: .6; border-style: dotted; }
+.cone-node.selected { box-shadow: 0 0 0 2px var(--futures); }
+.cone-node.faded { opacity: .3; }
+.cone-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cone-node .pref { color: #d97706; }
+.cone-node .by-you { color: var(--futures); font-size: 10px; }
+.tag-editor { display: flex; flex-direction: column; gap: 6px; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; }
+.tag-lens { font-weight: 600; min-width: 64px; }
+.tag-row select { font: inherit; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border); }
+.tag-extra { display: inline-flex; gap: 4px; align-items: center; font-weight: 400; margin: 0; }
+.tag-extra input { width: auto; margin: 0; }
