@@ -103,7 +103,9 @@ svg.edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow:
 .roller.end { right: -5px; }
 
 /* --- detail panel --------------------------------------------------------------- */
-.detail-panel { width: 360px; position: absolute; top: 0; right: 0; z-index: 5; max-height: calc(100vh - 120px); overflow: auto; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: -8px 8px 28px rgba(17,24,39,.12); animation: drawer-in .25s ease; }
+/* Fixed to the viewport (below the topbar): the drawer overlays the lens and
+   follows the scroll, so what you're reading never slides away. */
+.detail-panel { width: 360px; position: fixed; top: 64px; right: 24px; z-index: 5; max-height: calc(100vh - 88px); overflow: auto; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: -8px 8px 28px rgba(17,24,39,.12); animation: drawer-in .25s ease; }
 @keyframes drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 .detail-panel h3 { margin: 6px 0 8px; font-size: 15px; line-height: 1.35; }
 .detail-panel h4 { margin: 14px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
