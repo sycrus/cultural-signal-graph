@@ -154,14 +154,21 @@ function ExplorationView() {
       <span class="hint">${e.start_year} → ${e.start_year + e.horizon} · ${e.orders} orders · ${s.anchors.length} anchors · ${s.projections.length} projections</span>
     </div>
     <${ErrorLine} />
-    ${s.can_continue && !S.busy.value
-      ? html`<div class="card" style="display:flex; gap:12px; align-items:center">
-          <button class="primary" onClick=${S.continueGeneration}>
-            ${s.orders_generated ? `Continue from order ${s.orders_generated + 1} →` : "Generate →"}</button>
-          <span class="hint">${s.orders_generated} of ${e.orders} orders generated.</span>
+    ${S.generating.value
+      ? html`<div class="card gen-bar">
+          <span class="spinner"></span>
+          <span>Generating order ${Math.min(s.orders_generated + 1, e.orders)} of ${e.orders}…</span>
+          <span class="spacer"></span>
+          <button onClick=${S.stopGeneration} disabled=${S.stopping.value}>
+            ${S.stopping.value ? "Stopping after this order…" : "■ Stop"}</button>
         </div>`
-      : null}
-    ${S.busy.value ? html`<div class="card"><span class="spinner"></span> Generating…</div>` : null}
+      : s.can_continue
+        ? html`<div class="card gen-bar">
+            <button class="primary" onClick=${S.continueGeneration}>
+              ${s.orders_generated ? `Continue from order ${s.orders_generated + 1} →` : "Generate →"}</button>
+            <span class="hint">${s.orders_generated} of ${e.orders} orders generated${s.stopped_at ? " — stopped" : ""}.</span>
+          </div>`
+        : null}
     <div class="exp-body">
       <div class="exp-main"><${Scroll} snap=${s} selectedId=${S.selectedId.value} onSelect=${select} /></div>
       ${S.selectedId.value

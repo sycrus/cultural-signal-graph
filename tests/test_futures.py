@@ -178,3 +178,68 @@ def test_timing_conflict_is_derived():
     }
     flags = derive(state)
     assert flags["b"]["timing_conflict"] and not flags["c"]["timing_conflict"]
+
+
+def _events(body: str) -> list[tuple[str, dict]]:
+    out = []
+    for block in body.strip().split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in block.splitlines())
+        out.append((lines["event"], json.loads(lines["data"])))
+    return out
+
+
+def test_stream_emits_one_event_per_order(store):
+    client = TestClient(create_app(store, fixture_delay=0))
+    run_id = _new_run(client)
+    client.post(f"/api/runs/{run_id}/start")
+    exp_id = _explore(client, run_id)["exploration"]["id"]
+    res = client.post(f"/api/runs/{run_id}/explorations/{exp_id}/generate/stream")
+    assert res.headers["content-type"].startswith("text/event-stream")
+    events = _events(res.text)
+    assert [e for e, _ in events] == ["order"] * 5 + ["done"]
+    assert [d["orders_generated"] for _, d in events[:5]] == [1, 2, 3, 4, 5]
+    # each snapshot grows: the live fill
+    counts = [len(d["projections"]) for _, d in events[:5]]
+    assert counts == sorted(counts) and counts[0] > 0
+    assert events[-1][1]["generating"] is False
+
+
+def test_stop_halts_after_the_current_order_and_keeps_it(store, client, extracted_run):
+    from cultural_signal_graph.futures.store import ExplorationStore
+
+    futures = ExplorationStore(store.root)
+    exp_id = _explore(client, extracted_run)["exploration"]["id"]
+    it = futures.generate_iter(extracted_run, exp_id)
+    first = next(it)
+    assert first["orders_generated"] == 1 and first["generating"]
+    assert futures.stop(extracted_run, exp_id) == {"stopping": True}
+    rest = list(it)
+    snap = futures.snapshot(extracted_run, exp_id)
+    assert snap["orders_generated"] == 1 and snap["stopped_at"] == 2
+    assert not snap["generating"] and snap["can_continue"]
+    assert [o["op"] for o in futures.ops(extracted_run, exp_id)] == ["create", "generate_order", "stop"]
+    assert len(rest) == 1
+    # continuing picks up at order 2 — no order generated twice
+    snap = futures.generate(extracted_run, exp_id)
+    orders = [o["order"] for o in futures.ops(extracted_run, exp_id) if o["op"] == "generate_order"]
+    assert orders == [1, 2, 3, 4, 5] and snap["stopped_at"] is None
+
+
+def test_dropped_stream_resyncs_from_the_log(store, client, extracted_run):
+    from cultural_signal_graph.futures.store import ExplorationStore
+
+    futures = ExplorationStore(store.root)
+    exp_id = _explore(client, extracted_run)["exploration"]["id"]
+    it = futures.generate_iter(extracted_run, exp_id)
+    next(it), next(it)
+    it.close()  # the client went away mid-stream
+    snap = client.get(f"/api/runs/{extracted_run}/explorations/{exp_id}").json()
+    assert snap["orders_generated"] == 2 and not snap["generating"]
+    snap = client.post(f"/api/runs/{extracted_run}/explorations/{exp_id}/generate").json()
+    orders = [o["order"] for o in futures.ops(extracted_run, exp_id) if o["op"] == "generate_order"]
+    assert orders == [1, 2, 3, 4, 5]
+
+
+def test_stop_without_a_generation_is_a_conflict(client, extracted_run):
+    exp_id = _explore(client, extracted_run)["exploration"]["id"]
+    assert client.post(f"/api/runs/{extracted_run}/explorations/{exp_id}/stop").status_code == 409

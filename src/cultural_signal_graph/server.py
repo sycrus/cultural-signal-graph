@@ -12,10 +12,11 @@ Sync route functions (not `async`) so the LangGraph runs execute on the threadpo
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -78,7 +79,11 @@ class ExplorationIn(BaseModel):
     author: str = "strategist"
 
 
-def create_app(store: RunStore | None = None, futures: ExplorationStore | None = None) -> FastAPI:
+def create_app(
+    store: RunStore | None = None,
+    futures: ExplorationStore | None = None,
+    fixture_delay: float = 0.4,
+) -> FastAPI:
     store = store or RunStore()
     futures = futures or ExplorationStore(store.root, mode=store.mode)
     app = FastAPI(title="Cultural Signal Graph")
@@ -198,6 +203,31 @@ def create_app(store: RunStore | None = None, futures: ExplorationStore | None =
     def generate_exploration(run_id: str, exp_id: str) -> dict:
         return futures.generate(run_id, exp_id)
 
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/generate/stream")
+    def stream_generation(run_id: str, exp_id: str) -> StreamingResponse:
+        """Live fill: one Server-Sent Event per generated order, then `done`. A
+        dropped connection ends generation after the current order; the client
+        re-syncs from the log (each order is appended exactly once)."""
+        futures.snapshot(run_id, exp_id)  # 404 before the stream opens
+        if futures.is_generating(exp_id):
+            raise ValueError(f"exploration {exp_id} is already generating")
+
+        def events():
+            try:
+                for snap in futures.generate_iter(run_id, exp_id):
+                    yield _sse("order", snap)
+                    if futures.mode == "fixture" and fixture_delay:
+                        time.sleep(fixture_delay)  # recorded output is instant; pace the fill
+                yield _sse("done", futures.snapshot(run_id, exp_id))
+            except Exception as exc:  # surfaced to the client; completed orders are kept
+                yield _sse("error", {"detail": str(exc)})
+
+        return StreamingResponse(events(), media_type="text/event-stream")
+
+    @app.post("/api/runs/{run_id}/explorations/{exp_id}/stop")
+    def stop_generation(run_id: str, exp_id: str) -> dict:
+        return futures.stop(run_id, exp_id)
+
     @app.get("/runs/{run_id}/graph.html", response_class=HTMLResponse)
     def graph_html(run_id: str) -> HTMLResponse:
         """The graph explorer, served for embedding in the Graph tab. Rebuilt from
@@ -215,6 +245,10 @@ def create_app(store: RunStore | None = None, futures: ExplorationStore | None =
         )
 
     return app
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
 def main() -> None:

@@ -121,3 +121,6 @@ svg.edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow:
 .warn-line { color: var(--warn); font-size: 12px; margin-top: 4px; }
 .tag.warn { background: #fef3c7; color: var(--warn); }
 blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evidence-soft); color: var(--muted); }
+
+.gen-bar { display: flex; gap: 12px; align-items: center; }
+.gen-bar .spacer { flex: 1; }

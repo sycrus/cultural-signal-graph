@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
@@ -24,10 +25,17 @@ _RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 
 
 class ExplorationStore:
-    def __init__(self, runs_root: str | Path = "runs", generator=None, mode: str = "fixture"):
+    def __init__(
+        self,
+        runs_root: str | Path = "runs",
+        generator=None,
+        mode: str = "fixture",
+    ):
         self.root = Path(runs_root)
         self._generate = generator or (live_generator if mode == "live" else fixture_generator)
         self.mode = mode
+        self._lock = threading.Lock()
+        self._running: dict[str, threading.Event] = {}  # exploration -> stop flag
 
     # --- anchors -------------------------------------------------------------
 
@@ -116,18 +124,53 @@ class ExplorationStore:
 
     def generate(self, run_id: str, exp_id: str) -> dict:
         """Run the remaining orders, one generator call (and one op) each."""
-        log = self._log(run_id, exp_id)
-        state = replay(log.active())
-        for order in range(state["orders_generated"] + 1, state["exploration"]["orders"] + 1):
-            payload = self._generate(state, order)
-            log.append({"op": "generate_order", **payload})
-            state = replay(log.active())
-            if not payload["projections"]:
-                break  # nothing grew from the previous order; deeper orders can't either
-            e = state["exploration"]
-            if min(p["window"][0] for p in payload["projections"]) >= e["start_year"] + e["horizon"]:
-                break  # the time limit: no years left for a deeper order
+        for _ in self.generate_iter(run_id, exp_id):
+            pass
         return self.snapshot(run_id, exp_id)
+
+    def generate_iter(self, run_id: str, exp_id: str):
+        """Generate order by order, yielding the snapshot after each one. Stops at the
+        depth or time limit, or after the current order once `stop` is requested
+        (recording a `stop` op). One generation per exploration at a time."""
+        log = self._log(run_id, exp_id)
+        stop = threading.Event()
+        with self._lock:
+            if exp_id in self._running:
+                raise ValueError(f"exploration {exp_id} is already generating")
+            self._running[exp_id] = stop
+        try:
+            state = replay(log.active())
+            for order in range(state["orders_generated"] + 1, state["exploration"]["orders"] + 1):
+                if stop.is_set():
+                    log.append({"op": "stop", "order": order})
+                    yield self.snapshot(run_id, exp_id)
+                    return
+                payload = self._generate(state, order)
+                log.append({"op": "generate_order", **payload})
+                state = replay(log.active())
+                yield self.snapshot(run_id, exp_id)
+                if not payload["projections"]:
+                    return  # nothing grew from the previous order; deeper orders can't either
+                e = state["exploration"]
+                if min(p["window"][0] for p in payload["projections"]) >= e["start_year"] + e["horizon"]:
+                    return  # the time limit: no years left for a deeper order
+        finally:
+            with self._lock:
+                self._running.pop(exp_id, None)
+
+    def stop(self, run_id: str, exp_id: str) -> dict:
+        """Ask a running generation to halt after its current order."""
+        self._log(run_id, exp_id)
+        with self._lock:
+            flag = self._running.get(exp_id)
+        if flag is None:
+            raise ValueError(f"exploration {exp_id} is not generating")
+        flag.set()
+        return {"stopping": True}
+
+    def is_generating(self, exp_id: str) -> bool:
+        with self._lock:
+            return exp_id in self._running
 
     # --- reads ---------------------------------------------------------------
 
@@ -166,6 +209,8 @@ class ExplorationStore:
             "projections": projections,
             "orders_generated": state["orders_generated"],
             "can_continue": self._can_continue(state),
+            "generating": self.is_generating(exp_id),
+            "stopped_at": state.get("stopped_at"),
             "cursor": log.cursor(),
             "can_undo": log.can_undo(),
             "can_redo": log.can_redo(),

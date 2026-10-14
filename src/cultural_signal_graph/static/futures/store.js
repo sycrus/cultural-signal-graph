@@ -91,21 +91,70 @@ export function newExploration(prefill = null) {
   view.value = "new";
 }
 
+export const generating = signal(false);
+export const stopping = signal(false);
+
+async function streamGeneration(expId) {
+  /* Live fill: one SSE event per order, read from a POST response stream. If the
+     connection drops, the log already holds every finished order — re-sync. */
+  generating.value = true;
+  stopping.value = false;
+  error.value = null;
+  try {
+    const res = await fetch(`${base()}/explorations/${expId}/generate/stream`, { method: "POST" });
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail.detail || `${res.status} ${res.statusText}`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let cut;
+      while ((cut = buffer.indexOf("\n\n")) >= 0) {
+        const block = buffer.slice(0, cut);
+        buffer = buffer.slice(cut + 2);
+        const event = /^event: (.*)$/m.exec(block)?.[1];
+        const data = JSON.parse(/^data: (.*)$/m.exec(block)?.[1] || "{}");
+        if (event === "error") error.value = data.detail;
+        else if (snap.value?.exploration.id === expId) snap.value = data;
+      }
+    }
+  } catch (err) {
+    error.value = String(err.message || err);
+  } finally {
+    generating.value = false;
+    stopping.value = false;
+    if (snap.value?.exploration.id === expId) {
+      snap.value = await api(`${base()}/explorations/${expId}`).catch(() => snap.value);
+    }
+  }
+}
+
 export async function createAndGenerate(body) {
   await guarded(async () => {
     const created = await api(`${base()}/explorations`, { method: "POST", body });
     snap.value = created;
     view.value = "exploration";
     setUrl(created.exploration.id);
-    snap.value = await api(`${base()}/explorations/${created.exploration.id}/generate`, { method: "POST" });
   });
+  if (snap.value) await streamGeneration(snap.value.exploration.id);
 }
 
 export async function continueGeneration() {
-  const expId = snap.value.exploration.id;
-  await guarded(async () => {
-    snap.value = await api(`${base()}/explorations/${expId}/generate`, { method: "POST" });
-  });
+  await streamGeneration(snap.value.exploration.id);
+}
+
+export async function stopGeneration() {
+  stopping.value = true;
+  try {
+    await api(`${base()}/explorations/${snap.value.exploration.id}/stop`, { method: "POST" });
+  } catch (err) {
+    error.value = String(err.message || err);
+  }
 }
 
 export async function fetchOp(seq) {

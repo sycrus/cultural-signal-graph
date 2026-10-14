@@ -55,9 +55,15 @@ def _generate_order(state: dict, op: dict) -> None:
     for p in op["projections"]:
         state["projections"][p["id"]] = {**copy.deepcopy(p), "op": op["seq"]}
     state["orders_generated"] = max(state["orders_generated"], op["order"])
+    state.pop("stopped_at", None)
+
+
+def _stop(state: dict, op: dict) -> None:
+    state["stopped_at"] = op["order"]
 
 
 _HANDLERS = {
+    "stop": _stop,
     "create": _create,
     "generate_order": _generate_order,
 }
