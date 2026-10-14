@@ -14,7 +14,7 @@ export const busy = signal(false);
 export const error = signal(null);
 export const draft = signal(null); // prefill for the new-exploration form
 export const selectedId = signal(null); // the projection open in the detail panel
-export const spread = signal(1); // time-axis stretch for the time lenses (Scroll, Cone, Horizons)
+export const spread = signal(1); // time-axis stretch for the time lenses (Scroll, Cone, Horizons, PESTLE)
 
 export const projectionsById = computed(() =>
   Object.fromEntries((snap.value?.projections || []).map((p) => [p.id, p])),

@@ -74,7 +74,7 @@ function SpreadPicker() {
 }
 
 export function LensTabs() {
-  const timeLens = ["scroll", "cone", "horizons"].includes(S.lens.value);
+  const timeLens = ["scroll", "cone", "horizons", "pestle"].includes(S.lens.value);
   return html`<div class="lens-bar">
     <div class="lens-tabs" role="tablist">
       ${LENSES.map(
