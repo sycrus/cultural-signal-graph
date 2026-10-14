@@ -37,6 +37,14 @@ def test_root_serves_the_stepper_shell(client):
     assert "app.js" in res.text
 
 
+def test_static_modules_revalidate_no_cache(client):
+    """The no-build module graph breaks when the browser heuristically caches
+    one module but refetches another (fresh code reading a stale store)."""
+    res = client.get("/static/futures/futures.js")
+    assert res.status_code == 200
+    assert res.headers["cache-control"] == "no-cache"
+
+
 def test_runs_api_round_trip(client):
     res = client.post(
         "/api/runs",

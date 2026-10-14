@@ -28,6 +28,17 @@ from .viz import build_cyto_elements, render_html
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
+
+class NoCacheStaticFiles(StaticFiles):
+    """Static files with no heuristic caching: the futures UI is a no-build
+    module graph, so a page mixing a fresh module with a cached one crashes.
+    no-cache still allows 304 revalidation, so unchanged loads stay cheap."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
 # The exportable, versionable outputs of a run: the batch-path artifacts plus the
 # discovery search trail. An allowlist, so run_id/name can't traverse out of runs/.
 EXPORT_FILES = (
@@ -159,7 +170,7 @@ def create_app(
     store = store or RunStore()
     futures = futures or ExplorationStore(store.root, mode=store.mode)
     app = FastAPI(title="Cultural Signal Graph")
-    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+    app.mount("/static", NoCacheStaticFiles(directory=_STATIC_DIR), name="static")
 
     @app.exception_handler(KeyError)
     def unknown_run(request: Request, exc: KeyError) -> JSONResponse:
