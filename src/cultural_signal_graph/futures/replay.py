@@ -18,6 +18,7 @@ from directly. Order is causal depth, `window` is [start_year, end_year] — sep
 from __future__ import annotations
 
 import copy
+import math
 
 
 def replay(ops: list[dict]) -> dict:
@@ -27,13 +28,13 @@ def replay(ops: list[dict]) -> dict:
     return state
 
 
-def derive(state: dict) -> dict[str, dict]:
+def derive(state: dict, rejected: frozenset = frozenset()) -> dict[str, dict]:
     """Per-projection flags computed from the DAG, not stored in any op:
     `timing_conflict` — it starts before something it grows from;
     `stale` — something it grows from (transitively) was edited or removed after
-    it was generated."""
+    it was generated, or rests on a cross-domain edge the gate `rejected`."""
     projections = state["projections"]
-    changed = state.get("changed", {})
+    changed = {**state.get("changed", {}), **{r: math.inf for r in rejected}}
     latest: dict[str, int] = {}
 
     def last_change(node_id: str, seen: frozenset = frozenset()) -> int:

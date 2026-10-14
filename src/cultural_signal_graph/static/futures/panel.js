@@ -45,7 +45,9 @@ export function DetailPanel({ id, onSelect, onClose, actions = null }) {
   if (a) {
     return html`<aside class="detail-panel">
       <button class="ghost close" onClick=${onClose}>✕</button>
-      <div class=${`panel-kind ${a.kind}`}>${a.scope === "futures" ? "futures-scoped reference" : `evidence · ${a.kind}`}${a.flag ? ` · ${a.flag}` : ""}${a.pending ? " · pending edge" : ""}</div>
+      <div class=${`panel-kind ${a.kind}`}>${a.scope === "futures" ? "futures-scoped reference" : `evidence · ${a.kind}`}${a.flag ? ` · ${a.flag}` : ""}${a.status ? ` · ${a.status === "proposed" ? "pending sign-off" : a.status}` : ""}</div>
+      ${a.status === "rejected" ? html`<div class="human-root">Rejected at the sign-off gate: everything resting on it is stale.</div>` : null}
+      ${a.pending ? html`<div class="hint">Proposed cross-domain edge, not yet signed off. If it is rejected, what grows from it goes stale.</div>` : null}
       <h3>${a.text}</h3>
       ${a.entity ? html`<div class="hint">about ${a.entity}${a.confidence != null ? ` · confidence ${a.confidence}` : ""}</div>` : null}
       ${a.source_uri ? html`<div><a href=${a.source_uri} target="_blank" rel="noopener">source ↗</a></div>` : null}

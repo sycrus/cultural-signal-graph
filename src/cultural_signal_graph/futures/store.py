@@ -48,10 +48,8 @@ class ExplorationStore:
 
     # --- anchors -------------------------------------------------------------
 
-    def anchors(self, run_id: str) -> list[dict]:
-        """The evidence an exploration can grow from: every extracted signal, marked
-        as a claim (made it into the brief), flagged (with its reason), or a plain
-        signal. Raises ValueError if the run has not passed extraction."""
+    def _values(self, run_id: str) -> tuple[dict, dict, bool]:
+        """(run record, pipeline state, finalized?) — ValueError before extraction."""
         run = self._run(run_id)
         run_dir = self.root / run_id
         state_path = next(
@@ -61,10 +59,28 @@ class ExplorationStore:
         if state_path is None:
             raise ValueError(f"run {run_id} has not passed extraction yet")
         values = json.loads(state_path.read_text(encoding="utf-8"))
+        return run, values, state_path.name == "state-final.json"
+
+    def gate(self, run_id: str) -> dict[str, str]:
+        """Each proposed cross-domain edge's current gate status, read live from the
+        run: proposed (pending sign-off), real (approved), or rejected."""
+        try:
+            run, values, _ = self._values(run_id)
+        except ValueError:
+            return {}
+        decisions = run.get("decisions", {}) if run["status"] == "completed" else {}
+        status = {True: "real", False: "rejected"}
+        return {e["id"]: status.get(decisions.get(e["id"]), "proposed") for e in values.get("edges", [])}
+
+    def anchors(self, run_id: str) -> list[dict]:
+        """The evidence an exploration can grow from: every extracted signal, marked
+        as a claim (made it into the brief), flagged (with its reason), or a plain
+        signal; plus each cross-domain edge the gate has not rejected (tagged
+        pending until signed off). Raises ValueError before extraction."""
+        run, values, finalized = self._values(run_id)
         extraction = extraction_from_dict(values["extraction"])
         flags = {f.signal_id: f.reason for f in detect_flags(extraction.signals)}
         entity = {e.id: e for e in extraction.entities}
-        finalized = state_path.name == "state-final.json"
         category = run["ask"]["category"]
         anchors = []
         for s in extraction.signals:
@@ -85,6 +101,24 @@ class ExplorationStore:
                     "category": about.category if about else None,
                     "source_uri": s.source_uri,
                     "confidence": s.confidence,
+                }
+            )
+        gate = self.gate(run_id)
+        for e in values.get("edges", []):
+            if gate.get(e["id"]) == "rejected":
+                continue  # dropped at the gate: not evidence anything can grow from
+            left, right = entity.get(e["left_entity_id"]), entity.get(e["right_entity_id"])
+            anchors.append(
+                {
+                    "id": e["id"],
+                    "kind": "edge",
+                    "text": f"{left.name if left else e['left_entity_id']} ≈ {right.name if right else e['right_entity_id']}",
+                    "flag": None,
+                    "entity": " ⇄ ".join(c for c in (left and left.category, right and right.category) if c),
+                    "category": None,
+                    "confidence": e["confidence"],
+                    "status": gate.get(e["id"], "proposed"),
+                    "pending": gate.get(e["id"], "proposed") == "proposed",
                 }
             )
         return anchors
@@ -208,7 +242,7 @@ class ExplorationStore:
         from it, as deep as the ones it replaces. One op, so one undo."""
         log, state = self._mutable(run_id, exp_id)
         root = self._projection(state, pid)
-        flags = derive(state)
+        flags = self._derive(run_id, state)
         removed = [d for d in descendants(state, pid) if flags[d]["stale"]]
         if not removed:
             raise ValueError("nothing downstream of this projection is stale")
@@ -393,14 +427,14 @@ class ExplorationStore:
     def snapshot(self, run_id: str, exp_id: str) -> dict:
         log = self._log(run_id, exp_id)
         state = replay(log.active())
-        flags = derive(state)
+        flags = self._derive(run_id, state)
         projections = sorted(
             ({**p, **flags[p["id"]]} for p in state["projections"].values()),
             key=lambda p: (p["order"], p["window"][0], p["id"]),
         )
         return {
             "exploration": state["exploration"],
-            "anchors": list(state["anchors"].values()),
+            "anchors": self._live_anchors(run_id, state),
             "projections": projections,
             "orders_generated": state["orders_generated"],
             "can_continue": self._can_continue(state),
@@ -412,6 +446,22 @@ class ExplorationStore:
             "can_redo": log.can_redo(),
             "mode": self.mode,
         }
+
+    def _derive(self, run_id: str, state: dict) -> dict[str, dict]:
+        """Derived flags, with the gate's current rejections making their dependents stale."""
+        gate = self.gate(run_id)
+        rejected = frozenset(a for a in state["anchors"] if gate.get(a) == "rejected")
+        return derive(state, rejected)
+
+    def _live_anchors(self, run_id: str, state: dict) -> list[dict]:
+        """Anchors as snapshotted at create time, with edge anchors following the gate."""
+        gate = self.gate(run_id)
+        out = []
+        for a in state["anchors"].values():
+            if a.get("kind") == "edge" and a["id"] in gate:
+                a = {**a, "status": gate[a["id"]], "pending": gate[a["id"]] == "proposed"}
+            out.append(a)
+        return out
 
     @staticmethod
     def _can_continue(state: dict) -> bool:

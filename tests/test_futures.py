@@ -73,7 +73,9 @@ def test_futures_unavailable_before_extraction(client):
 
 def test_anchors_after_extraction_mark_flagged_signals(client, extracted_run):
     anchors = {a["id"]: a for a in client.get(f"/api/runs/{extracted_run}/futures/anchors").json()}
-    assert set(anchors) == set(SEED_ANCHORS)
+    assert set(anchors) == set(SEED_ANCHORS) | {"edge-ai-headset-wearables"}
+    assert anchors["edge-ai-headset-wearables"]["kind"] == "edge"
+    assert anchors["edge-ai-headset-wearables"]["pending"] is True
     assert anchors["sig-viral-fad"]["kind"] == "flagged"
     assert anchors["sig-viral-fad"]["flag"] == "conflict"
     # not finalized yet: nothing is a claim

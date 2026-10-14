@@ -125,7 +125,7 @@ export function Scroll({ snap, selectedId, onSelect, laneKey = null, laneLabel =
         )}
       </svg>
       ${snap.anchors.map(
-        (a) => html`<div key=${a.id} class=${`anchor-card ${a.kind} ${a.pending ? "pending" : ""} ${path.size && !path.has(a.id) ? "faded" : ""}`}
+        (a) => html`<div key=${a.id} class=${`anchor-card ${a.kind} ${a.pending ? "pending" : ""} ${a.status === "rejected" ? "rejected" : ""} ${path.size && !path.has(a.id) ? "faded" : ""}`}
           style=${{ top: `${y(lane[a.id])}px`, width: `${PRESENT_W - 18}px`, height: `${CARD_H}px` }}
           title=${a.text} onClick=${() => onSelect(a.id)}>
           <span class="anchor-kind-dot"></span>${a.text}

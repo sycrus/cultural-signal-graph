@@ -12,7 +12,7 @@ import { AddPanel } from "./add.js";
 
 const html = htm.bind(h);
 
-const KIND_LABEL = { claim: "claim", signal: "signal", flagged: "flagged" };
+const KIND_LABEL = { claim: "claim", signal: "signal", flagged: "flagged", edge: "cross-domain edge", reference: "reference" };
 
 function TopBar() {
   const r = S.run.value;
@@ -79,7 +79,7 @@ function ExplorationList() {
 function AnchorRow({ a, checked, onToggle }) {
   return html`<label class="anchor-row">
     <input type="checkbox" checked=${checked} onChange=${onToggle} />
-    <span class=${`anchor-kind ${a.kind}`}>${KIND_LABEL[a.kind]}${a.flag ? ` · ${a.flag}` : ""}</span>
+    <span class=${`anchor-kind ${a.kind}`}>${KIND_LABEL[a.kind]}${a.flag ? ` · ${a.flag}` : ""}${a.pending ? " · pending sign-off" : ""}</span>
     <span class="anchor-text">${a.text}</span>
     <span class="hint">${a.entity}</span>
   </label>`;

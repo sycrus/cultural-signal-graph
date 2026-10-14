@@ -46,7 +46,7 @@ _ORDERS = [
            ["o1-glasses-default"], [2028, 2030], baseline=True),
         _p("o2-headset-merge",
            "Gaming headsets and everyday glasses converge into one AI audio-visual wearable",
-           ["o1-glasses-default", "sig-gaming-chatter"], [2029, 2030]),
+           ["o1-glasses-default", "sig-gaming-chatter", "edge-ai-headset-wearables"], [2029, 2030]),
         _p("o2-audio-only",
            "Camera-free, audio-only AI wearables win in markets with strict privacy rules",
            ["o1-privacy-rules", "o1-backlash"], [2028, 2030]),
