@@ -152,3 +152,31 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 .anchor-kind.edge { background: #e0e7ff; color: #3730a3; }
 .anchor-card.edge { background: #e0e7ff; color: #312e81; }
 .anchor-card.rejected { text-decoration: line-through; opacity: .6; }
+
+/* --- lenses --------------------------------------------------------------------- */
+.lens-tabs { display: inline-flex; gap: 2px; padding: 3px; margin-bottom: 8px; border-radius: 9px; background: var(--card); border: 1px solid var(--border); }
+.lens-tabs button { border: 0; background: none; padding: 5px 14px; border-radius: 7px; font: inherit; color: var(--muted); cursor: pointer; }
+.lens-tabs button.on { background: var(--futures); color: #fff; font-weight: 600; }
+.wheel { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 10px; display: flex; justify-content: center; padding: 8px; }
+.wheel-tools { position: absolute; top: 10px; left: 12px; }
+.wheel svg { overflow: visible; }
+.wheel-ring { fill: none; stroke: #ece8fb; stroke-dasharray: 3 4; }
+.wheel-ring-label { font-size: 10px; fill: #a78bfa; letter-spacing: .06em; text-transform: uppercase; }
+.wheel-core { fill: var(--evidence-soft); stroke: #99f6e4; }
+.wheel-goal { font-size: 11px; font-weight: 600; fill: #134e4a; }
+.wheel .edge { stroke: #c4b5fd; fill: none; }
+.wheel-anchor rect { fill: var(--evidence); cursor: pointer; }
+.wheel-anchor.flagged rect { fill: var(--warn); }
+.wheel-anchor.edge rect { fill: #4f46e5; }
+.wheel-anchor.reference rect { fill: #fff; stroke: var(--evidence); stroke-dasharray: 2 2; }
+.wheel-node { cursor: pointer; }
+.wheel-node circle { fill: #fff; stroke: var(--futures); stroke-width: 2; transition: r .15s; }
+.wheel-node.baseline circle { stroke: #9ca3af; fill: #f3f4f6; }
+.wheel-node.discontinuity circle { stroke: var(--danger); }
+.wheel-node.wildcard circle { stroke-dasharray: 3 2; opacity: .7; }
+.wheel-node.assumption circle { stroke: var(--evidence); }
+.wheel-node.stale circle { fill: #fee2e2; }
+.wheel-node.selected circle { fill: var(--futures); }
+.wheel-node.dimmed { opacity: .35; }
+.wheel-label { font-size: 10.5px; fill: #374151; pointer-events: none; }
+.wheel .faded { opacity: .22; }

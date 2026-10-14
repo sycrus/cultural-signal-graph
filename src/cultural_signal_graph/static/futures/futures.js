@@ -5,7 +5,7 @@ import { h, render } from "preact";
 import { useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
-import { Scroll } from "./scroll.js";
+import { LensTabs, LensView } from "./lenses.js";
 import { DetailPanel } from "./panel.js";
 import { HistoryBar, ProjectionActions } from "./actions.js";
 import { AddPanel } from "./add.js";
@@ -179,7 +179,10 @@ function ExplorationView() {
           </div>`
         : null}
     <div class="exp-body">
-      <div class="exp-main"><${Scroll} snap=${s} selectedId=${S.selectedId.value} onSelect=${select} /></div>
+      <div class="exp-main">
+        <${LensTabs} />
+        <${LensView} snap=${s} selectedId=${S.selectedId.value} onSelect=${select} />
+      </div>
       ${S.adding.value
         ? html`<${AddPanel} key=${JSON.stringify(S.adding.value)} />`
         : S.selectedId.value

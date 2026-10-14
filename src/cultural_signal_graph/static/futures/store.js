@@ -191,3 +191,24 @@ export const addReference = (url, excerpt) =>
   mutate("/references", { method: "POST", body: { url, excerpt, author: author.value } });
 export const addProjection = (body) =>
   mutate("/projections", { method: "POST", body: { ...body, author: author.value } });
+
+/* --- lenses: a per-viewer convenience, so remembered in this browser only --- */
+
+function storedLens() {
+  try {
+    return localStorage.getItem("csg-lens") || "scroll";
+  } catch {
+    return "scroll";
+  }
+}
+
+export const lens = signal(storedLens());
+
+export function setLens(key) {
+  lens.value = key;
+  try {
+    localStorage.setItem("csg-lens", key);
+  } catch {
+    /* storage unavailable: the choice just isn't remembered */
+  }
+}
