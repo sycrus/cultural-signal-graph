@@ -188,7 +188,7 @@ function ExplorationView() {
     S.adding.value = null;
     S.selectedId.value = S.selectedId.value === id ? null : id;
   };
-  return html`<div class="exploration">
+  return html`<div class=${`exploration ${S.selectedId.value || S.adding.value ? "panel-open" : ""}`}>
     <div class="exp-head">
       <h1>${e.goal}</h1>
       <span class="hint">${e.start_year} → ${e.start_year + e.horizon} · ${e.orders} orders · ${s.anchors.length} anchors · ${s.projections.length} projections</span>
