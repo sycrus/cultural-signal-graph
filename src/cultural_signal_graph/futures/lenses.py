@@ -29,6 +29,7 @@ class LensSpec:
     extras: dict[str, str] = field(default_factory=dict)  # extra field -> its description
     clean_extras: Callable[[dict], dict] = lambda t: {}
     context: Callable[[dict], str] = lambda state: ""  # state-dependent instructions
+    include_anchors: bool = False  # tag the evidence anchors too, not only projections
     ready: Callable[[dict], str | None] = lambda state: None  # why it can't classify yet
 
 
@@ -85,7 +86,46 @@ MATRIX = LensSpec(
     ready=lambda state: None if state.get("axes") else "pick two axes for the matrix first",
 )
 
-LENSES: dict[str, LensSpec] = {CONE.key: CONE, MATRIX.key: MATRIX}
+def _horizons_fixture(p: dict) -> dict:
+    if p.get("origin") == "anchor":
+        return {"value": "H3" if p.get("flag") else "H1" if p.get("kind") == "claim" else "H2+"}
+    if p.get("baseline"):
+        return {"value": "H1"}
+    if p.get("discontinuity") or p.get("origin") == "wildcard":
+        return {"value": "H3"}
+    return {"value": ("H2+", "H2-")[sum(map(ord, p["id"])) % 2]}
+
+
+HORIZONS = LensSpec(
+    key="horizons",
+    values=("H1", "H2-", "H2+", "H3"),
+    instructions=(
+        "Classify each item with Three Horizons (Sharpe) by its ROLE in the system, not by how "
+        "far away it is in time — all three horizons exist now, at different strengths. "
+        "'H1' = sustains the currently dominant system (business as usual, declining in fit); "
+        "'H2-' = a transitional innovation that the dominant system captures and uses to extend "
+        "itself; 'H2+' = a transitional innovation that bridges toward a new pattern; 'H3' = the "
+        "emerging pattern itself, or a seed of it — a pocket of the future in the present. "
+        "Weak, contested or flagged evidence is often an H3 seed."
+    ),
+    fixture=_horizons_fixture,
+    include_anchors=True,
+)
+
+LENSES: dict[str, LensSpec] = {CONE.key: CONE, MATRIX.key: MATRIX, HORIZONS.key: HORIZONS}
+
+
+def taggable(spec: LensSpec, state: dict) -> list[dict]:
+    """What a lens tags: the projections, plus the anchors when the lens asks for them
+    (presented as items of the present)."""
+    items = list(state["projections"].values())
+    if spec.include_anchors:
+        start = state["exploration"]["start_year"]
+        items += [
+            {**a, "statement": a["text"], "window": [start, start], "origin": "anchor"}
+            for a in state["anchors"].values()
+        ]
+    return items
 
 CLASSIFY_SYSTEM = (
     "You organize speculative projections with a futures-thinking framework. You give "

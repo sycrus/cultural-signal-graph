@@ -53,6 +53,7 @@ export function DetailPanel({ id, onSelect, onClose, actions = null }) {
       ${a.entity ? html`<div class="hint">about ${a.entity}${a.confidence != null ? ` · confidence ${a.confidence}` : ""}</div>` : null}
       ${a.source_uri ? html`<div><a href=${a.source_uri} target="_blank" rel="noopener">source ↗</a></div>` : null}
       ${a.excerpt ? html`<blockquote>${a.excerpt}</blockquote>` : null}
+      <${TagEditor} p=${a} anchorsOnly=${true} />
       ${children.length ? html`<h4>Grows into</h4><ul class="refs">${children.map((c) => html`<${Ref} key=${c.id} id=${c.id} onSelect=${onSelect} />`)}</ul>` : null}
       ${actions}
     </aside>`;

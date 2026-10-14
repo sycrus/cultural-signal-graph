@@ -363,7 +363,7 @@ class ExplorationStore:
         spec = lens_registry.lens(lens_key)
         log, state = self._mutable(run_id, exp_id)
         have = state["tags"].get(lens_key, {})
-        untagged = [p for p in state["projections"].values() if p["id"] not in have]
+        untagged = [p for p in lens_registry.taggable(spec, state) if p["id"] not in have]
         if untagged:
             payload = lens_registry.classify(spec, state, untagged, live=self.mode == "live")
             if payload["tags"]:
@@ -374,7 +374,8 @@ class ExplorationStore:
         """The strategist's override (a drag in the lens view), attributed."""
         spec = lens_registry.lens(lens_key)
         log, state = self._mutable(run_id, exp_id)
-        self._projection(state, pid)
+        if not (spec.include_anchors and pid in state["anchors"]):
+            self._projection(state, pid)
         clean = lens_registry.clean_tag(spec, tag)
         before = state["tags"].get(lens_key, {}).get(pid)
         log.append({"op": "retag", "lens": lens_key, "source": "human", "tags": {pid: clean}, "before": before}, author=author)
@@ -553,7 +554,7 @@ class ExplorationStore:
             "annotations": self._annotations(state),
             "lenses": {
                 key: {
-                    "untagged": sum(1 for p in state["projections"] if p not in state["tags"].get(key, {})),
+                    "untagged": sum(1 for p in lens_registry.taggable(spec, state) if p["id"] not in state["tags"].get(key, {})),
                     "ready": spec.ready(state) is None,
                 }
                 for key, spec in lens_registry.LENSES.items()
@@ -577,7 +578,8 @@ class ExplorationStore:
         for a in state["anchors"].values():
             if a.get("kind") == "edge" and a["id"] in gate:
                 a = {**a, "status": gate[a["id"]], "pending": gate[a["id"]] == "proposed"}
-            out.append(a)
+            tags = {k: v[a["id"]] for k, v in state["tags"].items() if a["id"] in v}
+            out.append({**a, "tags": tags})
         return out
 
     @staticmethod

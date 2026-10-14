@@ -11,6 +11,7 @@ import { Scroll } from "./scroll.js";
 import { Wheel } from "./wheel.js";
 import { Cone, CONE_CLASSES } from "./cone.js";
 import { Matrix, MATRIX_VALUES } from "./matrix.js";
+import { Horizons, HORIZON_VALUES } from "./horizons.js";
 
 const html = htm.bind(h);
 
@@ -33,6 +34,15 @@ export const LENSES = [
     view: Matrix,
     tags: true,
     values: MATRIX_VALUES,
+  },
+  {
+    key: "horizons",
+    label: "Horizons",
+    hint: "Three Horizons: by role — dominant (H1), transition (H2±), emerging (H3) — anchors too",
+    view: Horizons,
+    tags: true,
+    anchors: true,
+    values: HORIZON_VALUES,
   },
 ];
 
@@ -66,8 +76,9 @@ export function LensView({ snap, selectedId, onSelect }) {
 }
 
 /* The drawer's view of a projection's lens tags: what the model said, what you set. */
-export function TagEditor({ p }) {
-  const tagged = LENSES.filter((l) => l.tags);
+export function TagEditor({ p, anchorsOnly = false }) {
+  const tagged = LENSES.filter((l) => l.tags && (!anchorsOnly || l.anchors));
+  if (!tagged.length) return null;
   return html`<div class="tag-editor">
     ${tagged.map((l) => {
       const tag = p.tags?.[l.key];

@@ -252,3 +252,28 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 
 .m-chip .order-badge { margin-right: 5px; vertical-align: 1px; }
 .m-chips { max-height: 210px; overflow: auto; }
+
+/* --- Three Horizons ------------------------------------------------------------- */
+.horizons { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 6px 8px 10px; }
+.h-grid { stroke: #f1f2f5; }
+.h-year, .h-axis { font-size: 10.5px; fill: var(--muted); }
+.h-curve { fill: none; stroke-width: 3; opacity: .55; }
+.h-curve.H1 { stroke: #64748b; }
+.h-curve.H2 { stroke: #d97706; }
+.h-curve.H3 { stroke: #7c3aed; }
+.h-label { font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.h-label.H1 { fill: #475569; }
+.h-label.H2 { fill: #b45309; }
+.h-label.H3 { fill: #6d28d9; }
+.h-node { cursor: grab; }
+.h-node circle, .h-node rect { stroke-width: 2; fill: #fff; }
+.h-node.H1 circle, .h-node.H1 rect { stroke: #64748b; fill: #e2e8f0; }
+.h-node.H2 circle, .h-node.H2 rect { stroke: #d97706; fill: #fde68a; }
+.h-node.H2.captured circle, .h-node.H2.captured rect { fill: #fff; }
+.h-node.H3 circle, .h-node.H3 rect { stroke: #7c3aed; fill: #ddd6fe; }
+.h-node.anchor rect { stroke-dasharray: 2 1; }
+.h-node.by-human circle, .h-node.by-human rect { stroke-dasharray: 3 2; }
+.h-node.selected circle, .h-node.selected rect { stroke: var(--ink); stroke-width: 3; }
+.h-node.faded { opacity: .25; }
+.h-selected-label { font-size: 12px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: #fff; stroke-width: 4px; }
+.h-legend { padding: 0 8px; }
