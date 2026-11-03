@@ -16,8 +16,9 @@ sources → extract (deepseek-v4-flash) → align (deepseek-v4-pro) → ⛔ sign
 ```
 
 - **Source discovery** — the ask drives model-guided web search (a cheap-model call
-  writes 2-3 queries; free Wikipedia API), pooled and deduplicated; the known index
-  contributes high-credibility sources when it covers the category. The search trail
+  writes 2-3 queries; Brave web + news when `BRAVE_API_KEY` is set, else Wikipedia
+  full-text), pooled and deduplicated; the known index contributes high-credibility
+  sources only when they share a topic with the question. The search trail
   (queries, results examined, what was selected) is stored per run as `discovery.json`.
 - **Extraction** (cheap model) — sources → typed entities + signals with confidence and
   temporal validity.
@@ -39,9 +40,13 @@ cp .env.example .env         # then set DEEPSEEK_API_KEY=sk-...  (auto-loaded)
                              # optional: BRAVE_API_KEY=... — live web search (news
                              # + web via Brave); without it, search is Wikipedia-only
 
-python -m cultural_signal_graph         # batch run: writes the six files into out/
-python -m cultural_signal_graph.server  # UI: local web app, opens in the browser
+uv run python -m cultural_signal_graph         # batch run: writes the six files into out/
+uv run python -m cultural_signal_graph.server  # UI: local web app, opens in the browser
 ```
+
+Use `uv run` (or activate `.venv`): the package lives under `src/`, so a bare
+`python` doesn't pick it up from the working directory — it imports whatever copy
+that interpreter has installed, which may be a different checkout.
 
 The provider is **DeepSeek**, called through its Anthropic-compatible endpoint
 (`https://api.deepseek.com/anthropic`): `deepseek-v4-flash` for the cheap tier, `deepseek-v4-pro`
@@ -56,14 +61,17 @@ until the strategist signs off, which is the moment the product adds judgment.
 Ask  →  Sources  →  Run  →  ⛔ Sign-off  →  Brief  →  Graph / Metrics
 ```
 
-- **Ask** — category, question, window, optional market; discovery searches the web
+- **Ask** — category, question, window, optional market (suggests region blocs like
+  SEA, LATAM, GCC and every country; any free text works too); discovery searches the web
   with cheap-model-generated queries and supplements from the known index.
 - **Sources** — collapsed by default, auditable (the discovery trace shows the
-  queries and what they returned); add, remove, or reset before extraction runs.
-  Sources lock once the run starts.
+  queries and what they returned); each source shows its full URL as a link. Add,
+  remove, or reset before extraction runs. Sources lock once the run starts.
 - **Run** — each stage reports its tokens + latency, recorded at the stage boundary.
 - **Sign-off** — the run stops at the gate; approve or reject each proposed
-  cross-domain equivalence edge (approve → "real", reject → dropped). The decision
+  cross-domain equivalence edge (approve → "real", reject → dropped). Each edge
+  lists the source links behind both of its entities, so the evidence can be
+  checked before deciding. The decision
   stays editable until export: undo re-parks the run at the gate, and the downstream
   re-runs.
 - **Brief** — claims as headlines with confidence, expandable reasoning and sources,
@@ -101,9 +109,17 @@ never enters the forecast's evidence or brief; crossing back is deliberate
   grew from it stale; regenerate-downstream replaces the stale branch.
 - **Ground this** — the one agent: a bounded search for evidence *for and
   against* a projection (model-written queries → search → each result judged
-  support / contradict, one refinement round at most). Proposals are never
-  auto-added: the strategist accepts them one by one as references that record
-  which projection they ground and their stance.
+  support / contradict, one refinement round at most). Searches Brave (web +
+  news) when `BRAVE_API_KEY` is set, else Wikipedia; a failed query is recorded
+  in the op trail (panel + export), so an empty round explains itself. The judge
+  only quotes complete clauses and prefers no judgment to a keyword stretch.
+  Proposals are never auto-added: the strategist accepts them one by one as
+  references that record which projection they ground and their stance.
+- **Reading the lenses** — hover any mark (baseline, discontinuity, timing
+  conflict, stale) for a plain-language tooltip. The detail panel docks beside
+  the lens rather than covering it (overlay below 1100px wide). Time-axis lenses
+  (Scroll, Cone, Three Horizons) stretch to 1.5×/2×/3× and pan left/right, with
+  swimlane labels pinned while panning.
 - **Promotion** — a futures-scoped reference becomes forecast evidence only by
   creating a new run (sources lock once a run starts); the original run and its
   explorations are untouched.
@@ -165,7 +181,7 @@ src/cultural_signal_graph/
 uv run pytest
 ```
 
-187 tests, all fixture-based — no network or API key required. The eval harness
+194 tests, all fixture-based — no network or API key required. The eval harness
 (`python -m cultural_signal_graph.eval_main`) runs the golden set and enforces the regression
 gate.
 
@@ -177,5 +193,7 @@ gate.
   lenses, Ground this, promotion.
 - **[CONTEXT.md](CONTEXT.md)** — the domain glossary (Entity, Signal, Source, Provenance, …).
 - **[docs/adr/](docs/adr/)** — architecture decision records (LangGraph, RDFLib+files,
-  category-as-input, source discovery, ontology retrieval, OTel+Langfuse).
+  category-as-input, ontology retrieval, OTel+Langfuse, search-first source discovery,
+  futures lenses as views over one projection DAG, the futures operation log, the
+  one-way futures→evidence boundary via promotion, the no-build Preact + D3 futures UI).
 - **[docs/observability.md](docs/observability.md)** — OTel + Langfuse setup.

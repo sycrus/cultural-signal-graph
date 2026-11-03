@@ -513,11 +513,17 @@ class RunStore:
 
     @staticmethod
     def _pending(payload: list[dict], extraction: dict) -> list[dict]:
-        """The gate's sign_off payload, with entity ids resolved to display names."""
+        """The gate's sign_off payload, with entity ids resolved to display names
+        and each side's evidence (the source URIs of signals about that entity),
+        so the reviewer can check before deciding."""
         by_id = {e["id"]: e for e in extraction["entities"]}
 
         def field(entity_id: str, key: str, fallback: str) -> str:
             return by_id.get(entity_id, {}).get(key, fallback)
+
+        def sources(entity_id: str) -> list[str]:
+            uris = [s["source_uri"] for s in extraction["signals"] if s["about_entity_id"] == entity_id]
+            return list(dict.fromkeys(uris))  # dedupe, keep order
 
         return [
             {
@@ -528,6 +534,8 @@ class RunStore:
                 "right": field(e["right_entity_id"], "name", e["right_entity_id"]),
                 "left_category": field(e["left_entity_id"], "category", "?"),
                 "right_category": field(e["right_entity_id"], "category", "?"),
+                "left_sources": sources(e["left_entity_id"]),
+                "right_sources": sources(e["right_entity_id"]),
                 "confidence": e["confidence"],
             }
             for e in payload

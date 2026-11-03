@@ -79,6 +79,10 @@ def test_start_pauses_at_the_gate_with_named_pending_edges(tmp_path):
     assert [e["id"] for e in snap["pending"]] == [EDGE_ID]
     edge = snap["pending"][0]
     assert edge["left"] == "AI headset" and edge["right"] == "AI wearables"
+    # each side carries the source URIs behind it, so the reviewer can check
+    corpus = {s.uri for s in SEED_CORPUS}
+    assert edge["left_sources"] and edge["right_sources"]
+    assert set(edge["left_sources"] + edge["right_sources"]) <= corpus
     assert (tmp_path / run_id / "state-pause.json").exists()
     assert (tmp_path / run_id / "checkpoints.sqlite").exists()
 

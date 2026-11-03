@@ -59,6 +59,22 @@ def test_known_category_uses_index_not_backfill():
     assert all(s in SOURCE_INDEX for s in selected)
 
 
+def test_irrelevant_index_sources_are_not_selected(monkeypatch):
+    # A tech ask sharing no topic with any indexed source gets web sources only —
+    # never the top-credibility index rows by default.
+    monkeypatch.setattr(
+        "cultural_signal_graph.discovery._fetch_search_results",
+        lambda query, limit: [
+            {"title": "Origami robot", "url": "https://news.example.org/origami-robot", "snippet": "x"}
+        ],
+    )
+    ask = _ask("tech", "origami in robots")
+    assert all(s not in SOURCE_INDEX for s in discover_sources(ask))
+    trace = discover_with_trace(ask, queries=["origami robots"])
+    assert trace["mode"] == "web"
+    assert [s.uri for s in trace["sources"]] == ["https://news.example.org/origami-robot"]
+
+
 def test_web_backfill_returns_typed_sources(monkeypatch):
     monkeypatch.setattr(
         "cultural_signal_graph.discovery._fetch_search_results",

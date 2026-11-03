@@ -141,6 +141,14 @@ def _rank(ask: Ask):
     return rank
 
 
+def _index_candidates(ask: Ask, index: list[SourceDoc]) -> list[SourceDoc]:
+    """Index sources in the ask's category that share at least one topic with the
+    question. A category match alone is not relevance: without this, an ask the
+    index doesn't cover ("origami in robots") got the top-credibility rows anyway."""
+    words = _tokenize(ask.question)
+    return [s for s in index if s.category == ask.category and set(s.topics) & words]
+
+
 # --- model-guided queries (issue #28) ----------------------------------------
 
 
@@ -329,7 +337,7 @@ def discover_sources(ask: Ask, index: list[SourceDoc] = SOURCE_INDEX) -> list[So
     ranking); backfill from the web when the index has no coverage for the
     category. The offline-compatible path — see `discover_with_trace` for the
     model-guided, audited variant the run store uses."""
-    candidates = [source for source in index if source.category == ask.category]
+    candidates = _index_candidates(ask, index)
     if not candidates:
         return _web_backfill(ask)[:MAX_SOURCES]
     return sorted(candidates, key=_rank(ask), reverse=True)[:MAX_SOURCES]
@@ -345,7 +353,7 @@ def discover_with_trace(
     unindexed categories), the queries actually searched, every unique result
     examined, and per-source origin — the payload for `discovery.json`.
     """
-    candidates = [source for source in index if source.category == ask.category]
+    candidates = _index_candidates(ask, index)
     index_selected = sorted(candidates, key=_rank(ask), reverse=True)[:MAX_SOURCES]
 
     used, query_source = _queries_with_source(ask, queries)

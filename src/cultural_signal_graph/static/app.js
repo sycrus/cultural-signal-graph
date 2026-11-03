@@ -174,8 +174,8 @@ function renderAsk() {
       </div>
 
       <label for="ask-market">Market <span style="font-weight:400; color:var(--muted)">(optional)</span></label>
-      <input id="ask-market" list="markets" placeholder="SEA">
-      <datalist id="markets"><option value="SEA"></option></datalist>
+      <input id="ask-market" list="markets" placeholder="e.g. SEA, Japan, LATAM — or type any market">
+      <datalist id="markets">${MARKETS.map((m) => `<option value="${escapeHtml(m)}"></option>`).join("")}</datalist>
 
       ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
       <div style="margin-top:16px; text-align:right">
@@ -185,10 +185,54 @@ function renderAsk() {
   </div>`;
 }
 
+// Market suggestions for the Ask form: region blocs first, then every country.
+// Suggestions only — the market is free text end to end (it shapes search
+// queries and the seeded ontology), so anything typed is accepted.
+const MARKET_REGIONS = [
+  "Global", "SEA", "APAC", "East Asia", "South Asia", "Central Asia", "Oceania", "ANZ",
+  "North America", "LATAM", "Caribbean", "EMEA", "Europe", "Western Europe", "Eastern Europe",
+  "Nordics", "DACH", "Benelux", "MENA", "GCC", "Sub-Saharan Africa",
+];
+const MARKET_COUNTRIES = [
+  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina",
+  "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados",
+  "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana",
+  "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon",
+  "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo",
+  "Costa Rica", "Côte d'Ivoire", "Croatia", "Cuba", "Cyprus", "Czechia",
+  "Democratic Republic of the Congo", "Denmark", "Djibouti", "Dominica", "Dominican Republic",
+  "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini",
+  "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana",
+  "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras",
+  "Hong Kong", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel",
+  "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Kosovo", "Kuwait",
+  "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein",
+  "Lithuania", "Luxembourg", "Macau", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali",
+  "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova",
+  "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru",
+  "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea",
+  "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama",
+  "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Puerto Rico",
+  "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia",
+  "Saint Vincent and the Grenadines", "Samoa", "San Marino", "São Tomé and Príncipe",
+  "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia",
+  "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain",
+  "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan",
+  "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia",
+  "Türkiye", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates",
+  "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City",
+  "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe",
+];
+const MARKETS = [...MARKET_REGIONS, ...MARKET_COUNTRIES];
+
+// Readable full URI: drop the scheme and "www.", decode %-escapes (Wikipedia
+// titles), keep the whole path so the source is identifiable at a glance.
 function shortUri(uri) {
   try {
     const u = new URL(uri);
-    return u.hostname + (u.pathname.length > 1 ? "/…" : "");
+    let path = u.pathname + u.search;
+    try { path = decodeURIComponent(path); } catch {}
+    return u.hostname.replace(/^www\./, "") + (path === "/" ? "" : path);
   } catch {
     return uri;
   }
@@ -204,7 +248,7 @@ function renderSources() {
   const rows = s.sources
     .map(
       (src, i) => `<tr data-index="${i}">
-        <td title="${escapeHtml(src.uri)}">${escapeHtml(shortUri(src.uri))}</td>
+        <td style="max-width:280px; overflow-wrap:anywhere"><a href="${escapeHtml(src.uri)}" target="_blank" rel="noopener" title="${escapeHtml(src.uri)}">${escapeHtml(shortUri(src.uri))}</a></td>
         <td>${escapeHtml(shortType(src.source_type))}</td>
         <td>${src.credibility}</td>
         <td style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(src.text)}</td>
@@ -341,6 +385,8 @@ function renderSignOff() {
     <div class="edge-card">
       <div class="edge-head">${escapeHtml(e.left)} <span class="approx">≈</span> ${escapeHtml(e.right)}</div>
       <div class="edge-meta">confidence ${e.confidence} · ${escapeHtml(e.left_category)} ⇄ ${escapeHtml(e.right_category)}</div>
+      ${edgeEvidence(e.left, e.left_sources)}
+      ${edgeEvidence(e.right, e.right_sources)}
       <div class="edge-actions">
         <button class="${decided[e.id] === true ? "primary" : ""}" data-decide="${e.id}" data-value="true"
           ${decided[e.id] === false ? "disabled" : ""}>✓ Approve</button>
@@ -365,6 +411,17 @@ function renderSignOff() {
       ${all ? "" : `<span class="hint">Decide every proposed edge to resume the run.</span>`}
     </div>
   </div>`;
+}
+
+// The sources behind one side of a proposed edge, as links to check before deciding.
+// Runs paused before this field existed have no list, so render nothing.
+function edgeEvidence(name, uris) {
+  if (!uris || !uris.length) return "";
+  const links = uris
+    .map((u) => `<li style="overflow-wrap:anywhere"><a href="${escapeHtml(u)}" target="_blank" rel="noopener" title="${escapeHtml(u)}">${escapeHtml(shortUri(u))}</a></li>`)
+    .join("");
+  return `<div class="edge-meta" style="margin-top:6px">Sources for <b>${escapeHtml(name)}</b>:
+    <ul style="margin:2px 0 0; padding-left:18px">${links}</ul></div>`;
 }
 
 function renderPlaceholder(title, note) {
