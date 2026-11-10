@@ -42,3 +42,11 @@ def test_graph_page_inlines_tokens_and_reads_them():
     script = page[page.index("function graphStyle"):page.index("const cy = cytoscape")]
     assert _colors(script) == []
     assert "tok('--graph-entity')" in script
+    assert "data:font/woff2;base64," in page and "/static/vendor/fonts/" not in page  # font embedded too
+
+
+def test_vendored_font_is_served_and_licensed():
+    fonts = STATIC / "vendor" / "fonts"
+    assert (fonts / "VT323-Regular.woff2").read_bytes()[:4] == b"wOF2"
+    assert "Open Font License" in (fonts / "VT323-OFL.txt").read_text(encoding="utf-8")
+    assert "/static/vendor/fonts/VT323-Regular.woff2" in (STATIC / "tokens.css").read_text(encoding="utf-8")

@@ -7,6 +7,17 @@
    the viewer's choice or the system setting, which turns on the phosphor console.
    Change a value here and it changes everywhere. */
 
+/* VT323 (SIL OFL 1.1, vendor/fonts/VT323-OFL.txt): a CRT terminal face, the
+   phosphor screen's display and data font. viz.py swaps this url for a data: URI
+   so the exported graph.html stays offline. */
+@font-face {
+  font-family: "VT323";
+  src: url("/static/vendor/fonts/VT323-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* --- type ------------------------------------------------------------------- */
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -18,6 +29,7 @@
   --text-lg: 18px;
   --font-display: var(--font-sans); /* brand, headings, uppercase labels */
   --font-data: var(--font-sans);    /* years, orders, counts */
+  --font-display-adjust: none;      /* x-height match: VT323 is drawn small for its size */
   --tracking-label: .05em;         /* uppercase labels */
 
   /* --- glow: none in daylight; the dark theme lights it -------------------------- */
@@ -141,8 +153,9 @@
    brightness, line style and glow, not by more colors. */
 
 :root[data-theme="dark"] {
-  --font-display: var(--font-mono);
-  --font-data: var(--font-mono);
+  --font-display: "VT323", var(--font-mono);
+  --font-data: "VT323", var(--font-mono);
+  --font-display-adjust: .53;
   --tracking-label: .12em;
   --glow-text: 0 0 6px color-mix(in srgb, currentColor 55%, transparent);
   --glow-text-soft: 0 0 10px color-mix(in srgb, currentColor 22%, transparent);
