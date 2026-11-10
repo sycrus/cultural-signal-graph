@@ -535,6 +535,12 @@ function reviewPlaceholder(tab, note) {
   return `${tabsHtml(tab)}${renderPlaceholder(tab === "graph" ? "Graph" : "Metrics", note)}`;
 }
 
+function graphViewHash() {
+  const v = state.graphView;
+  if (!v || !v.zoom) return "";
+  return `#zoom=${v.zoom.toFixed(3)}${v.focus ? `&focus=${encodeURIComponent(v.focus)}` : ""}`;
+}
+
 function futuresToggle() {
   /* The futures layer adds this run's explorations to the graph; say what it adds,
      and say so plainly when there is nothing to add yet. */
@@ -559,7 +565,7 @@ function renderGraph() {
   return `
   ${tabsHtml("graph")}
   ${futuresToggle()}
-  <iframe class="graph-frame" src="/runs/${state.runId}/graph.html${state.futuresLayer ? "?futures_layer=true" : ""}"
+  <iframe class="graph-frame" src="/runs/${state.runId}/graph.html${state.futuresLayer ? "?futures_layer=true" : ""}${graphViewHash()}"
     title="Graph explorer — search, layout, click-to-trace"></iframe>`;
 }
 
@@ -699,6 +705,10 @@ function bind() {
   });
   on("btn-confirm-signoff", "click", confirmSignoff);
   on("toggle-futures", "change", (e) => {
+    // Keep the viewer's zoom and centre across the reload the toggle causes.
+    try {
+      state.graphView = document.querySelector(".graph-frame")?.contentWindow?.graphView?.() || null;
+    } catch { state.graphView = null; }
     state.futuresLayer = e.target.checked;
     render();
   });
@@ -795,6 +805,7 @@ async function openRun(runId) {
   state.signoffDraft = {};
   state.metrics = null;
   state.futures = null;
+  state.graphView = null;
   state.view = currentStage(state.snap);
   render();
   if (state.view === "metrics") fetchMetrics();

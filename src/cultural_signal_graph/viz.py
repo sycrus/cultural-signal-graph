@@ -341,7 +341,27 @@ document.getElementById('search').addEventListener('input', (e) => {
 
 window.addEventListener('csg-theme', () => cy.style(graphStyle()));
 
-cy.ready(readableFit);
+// The page that embeds the graph can ask for a view in the hash
+// (#zoom=0.9&focus=<node id>): the Graph tab does, so turning the futures layer on
+// or off keeps your zoom and the node you were looking at in the middle.
+function initialView() {
+  const want = new URLSearchParams(location.hash.slice(1));
+  const zoom = Number(want.get('zoom'));
+  if (!zoom) return readableFit();
+  separate();
+  cy.zoom(Math.min(cy.maxZoom(), Math.max(cy.minZoom(), zoom)));
+  const focus = want.get('focus') && cy.getElementById(want.get('focus'));
+  if (focus && focus.length) cy.center(focus);
+  else cy.center(cy.nodes('[kind = "entity"]').max((n) => n.degree()).ele || cy.nodes());
+}
+// What the embedding page reads before it reloads the graph.
+window.graphView = () => {
+  const e = cy.extent();
+  const mid = { x: (e.x1 + e.x2) / 2, y: (e.y1 + e.y2) / 2 };
+  const near = cy.nodes().min((n) => (n.position('x') - mid.x) ** 2 + (n.position('y') - mid.y) ** 2).ele;
+  return { zoom: cy.zoom(), focus: near ? near.id() : null };
+};
+cy.ready(initialView);
 document.getElementById('btn-fit').onclick = () => cy.fit(undefined, 30);
 document.getElementById('btn-cose').onclick = () => cy.layout({ ...COSE, animate: false, stop: readableFit }).run();
 document.getElementById('btn-grid').onclick = () => cy.layout({ name: 'grid', animate: true, fit: true, padding: 30 }).run();
