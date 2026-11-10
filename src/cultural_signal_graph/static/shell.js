@@ -62,8 +62,8 @@ function Identity() {
 
 /* --- logotype ----------------------------------------------------------------------
    A signal trace (a pulse on a flat line: a signal picked out of the noise) and the
-   name in lowercase Kode Mono. Chosen from three in a prototype (branch
-   prototype/app-bar, logotype C). */
+   name in lowercase Kode Mono. Chosen from three prototyped in the
+   real bar (see docs/design/hierarchy.md). */
 function Logo() {
   return html`<span class="logo" aria-hidden="true">
     <svg viewBox="0 0 28 14" class="logo-trace"><polyline points="0,7 6,7 9,2 13,12 17,4 20,7 28,7" /></svg>
