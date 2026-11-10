@@ -10,7 +10,8 @@ import { DetailPanel } from "./panel.js";
 import { HistoryBar, ProjectionActions } from "./actions.js";
 import { AddPanel } from "./add.js";
 import { Coverage } from "./pestle.js";
-import { Button, Chip, EmptyState, Panel, Toasts } from "../ui.js";
+import { Button, Chip, EmptyState, List, ListRow, PageHead, Panel, Toasts } from "../ui.js";
+import { Fingerprint } from "../shape_glyph.js"; // not "fingerprint.js": privacy blockers block that name
 import { AppBar, Crumbs } from "../shell.js";
 
 const html = htm.bind(h);
@@ -21,59 +22,43 @@ function ErrorLine() {
   return S.error.value ? html`<div class="error">${S.error.value}</div>` : null;
 }
 
+const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
+const plural = (n, w, many = `${w}s`) => `${n} ${n === 1 ? w : many}`;
+
 function ExplorationList() {
   const r = S.run.value;
   const items = S.explorations.value;
-  return html`<div class="canvas-narrow">
-    <h1>Futures</h1>
-    <p class="lede">
-      ${r ? `Speculative futures grown from the evidence of “${r.ask.question}”. ` : "Speculative futures, grown from a forecast run's evidence. "}
-      Projections carry no probability — only where they came from.
-    </p>
-    ${S.runId.value
-      ? html`<${Panel} row>
-          <${Button} variant="primary" onClick=${() => S.newExploration()} disabled=${!S.anchors.value.length}>New exploration<//>
-          <span class="hint">Goal, initial anchors, horizon, orders.</span>
-          <span class="spacer"></span>
-          <label class="import-label" title="Re-open an exported log.jsonl as a new exploration">
-            Import log…
-            <input type="file" accept=".jsonl,application/x-ndjson" hidden
-              onChange=${async (ev) => { const f = ev.target.files[0]; if (f) await S.importExploration(await f.text()); }} />
-          </label>
-        <//>`
-      : null}
+  const canStart = !!S.anchors.value.length;
+  const importLog = html`<label class="btn import-label" title="Re-open an exported log.jsonl as a new exploration">
+    Import log…
+    <input type="file" accept=".jsonl,application/x-ndjson" hidden
+      onChange=${async (ev) => { const f = ev.target.files[0]; if (f) await S.importExploration(await f.text()); }} />
+  </label>`;
+  return html`<div class="page-list">
+    <${PageHead} title="Futures"
+      lede=${`${r ? `Speculative futures grown from the evidence of “${r.ask.question}”.` : "Speculative futures, grown from a forecast run's evidence."} Projections carry no probability, only where they came from.`}
+      actions=${S.runId.value ? html`${importLog}<${Button} variant="primary" onClick=${() => S.newExploration()} disabled=${!canStart}>New exploration<//>` : null} />
     ${S.runId.value ? html`<${ErrorLine} />` : null}
-    <h2>Explorations</h2>
-    <${Panel} flush>
-      ${!S.runId.value
-        ? html`<${EmptyState} title="No forecast run open"
-            action=${html`<${Button} href="/">Open a forecast run<//>`}>
-            Futures grow from a forecast run's evidence. Open a run, then choose Futures.<//>`
-        : items.length
-        ? html`<table>
-            <thead><tr><th>Goal</th><th>Horizon</th><th>Orders</th><th>Projections</th><th></th></tr></thead>
-            <tbody>
-              ${items.map(
-                (e) => html`<tr key=${e.id}>
-                  <td><a href="#" onClick=${(ev) => { ev.preventDefault(); S.openExploration(e.id); }}>${e.goal}</a></td>
-                  <td>${e.horizon} yr</td>
-                  <td>${e.orders}</td>
-                  <td>${e.projections}</td>
-                  <td><${Button} variant="ghost" title="Start a new exploration from these settings"
-                    onClick=${() => S.newExploration({ goal: e.goal, anchor_ids: e.anchor_ids, horizon: e.horizon, orders: e.orders })}>
-                    Duplicate with changes<//></td>
-                </tr>`,
-              )}
-            </tbody>
-          </table>`
-        : html`<${EmptyState} title="No explorations yet"
-            action=${S.anchors.value.length
-              ? html`<${Button} variant="primary" onClick=${() => S.newExploration()}>New exploration<//>`
-              : null}>
-            ${S.anchors.value.length
-              ? "An exploration grows possible futures from this run's evidence, toward a goal you set."
-              : "This run has no evidence to grow from yet. Finish the forecast first."}<//>`}
-    <//>
+    ${!S.runId.value
+      ? html`<${Panel}><${EmptyState} title="No forecast run open" action=${html`<${Button} href="/">Open a forecast run<//>`}>
+          Futures grow from a forecast run's evidence. Open a run, then choose Futures.<//><//>`
+      : items.length
+      ? html`<${List} label="Explorations">
+          ${items.map((e) => html`<${ListRow} key=${e.id} href=${`/futures?run=${encodeURIComponent(S.runId.value)}&x=${encodeURIComponent(e.id)}`}
+            onOpen=${() => S.openExploration(e.id)}
+            fingerprint=${html`<${Fingerprint} shape=${e.shape} label=${`${e.projections} projections`} />`}
+            title=${e.goal}
+            scope=${`${e.horizon}-year horizon · ${plural(e.orders, "order")} · ${plural(e.anchor_ids.length, "anchor")}`}
+            outcome=${e.projections ? html`<span class="futures">◇ ${plural(e.projections, "projection")}</span>` : "Not generated yet"}
+            side=${e.created_at ? html`<span>${dateFmt.format(new Date(e.created_at))}</span>` : null}
+            actions=${html`<${Button} variant="ghost" class="bar-button" title="Start a new exploration from these settings"
+              onClick=${() => S.newExploration({ goal: e.goal, anchor_ids: e.anchor_ids, horizon: e.horizon, orders: e.orders })}>Duplicate with changes<//>`} />`)}
+        <//>`
+      : html`<${Panel}><${EmptyState} title="No explorations yet"
+          action=${canStart ? html`<${Button} variant="primary" onClick=${() => S.newExploration()}>New exploration<//>` : null}>
+          ${canStart
+            ? "An exploration grows possible futures from this run's evidence, toward a goal you set."
+            : "This run has no evidence to grow from yet. Finish the forecast first."}<//><//>`}
   </div>`;
 }
 

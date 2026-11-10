@@ -12,9 +12,10 @@ button.btn.primary:not(:disabled):hover { background: var(--accent-ink); border-
 .ui-roller-handle:focus-visible, .proj-node:focus-visible, .anchor-card:focus-visible, .ui-toggle input:focus-visible + .ui-toggle-track {
   outline: 2px solid var(--accent); outline-offset: 2px; }
 .btn-icon { font-size: 1.05em; line-height: 1; }
-a.btn { padding: 5px 10px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--card);
-  text-decoration: none; color: var(--ink); font-size: 12.5px; }
-a.btn:hover { border-color: var(--accent-ring); }
+a.btn, label.btn { padding: 7px 14px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--card);
+  text-decoration: none; color: var(--ink); font-size: var(--text-base); font-weight: 400; cursor: pointer; }
+a.btn:visited { color: var(--ink); }
+a.btn:hover, label.btn:hover { border-color: var(--accent-ring); }
 .spinner.sm { width: 10px; height: 10px; border-width: 1.5px; }
 
 /* --- Chip -------------------------------------------------------------------------- */
@@ -146,3 +147,48 @@ a.btn:hover { border-color: var(--accent-ring); }
 .crumbs li::after { content: "›"; margin-left: 6px; color: var(--faint); }
 .crumbs a { color: var(--muted); text-decoration: none; }
 .crumbs a:hover { color: var(--accent-ink); text-decoration: underline; }
+
+/* --- Page head and list pages ---------------------------------------------------- */
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.page-head h1 { margin: 0 0 4px; }
+.page-head .lede { margin: 0; }
+.page-head-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+/* list pages: one centred column, wide enough for fingerprint + text + side */
+.page-list { max-width: 880px; margin: 0 auto; }
+
+/* --- List rows --------------------------------------------------------------------- */
+.list-rows { list-style: none; margin: 0; padding: 0; }
+.list-row { position: relative; display: grid; grid-template-columns: 140px 1fr auto; gap: 16px; align-items: center;
+  padding: 12px 16px; border-bottom: 1px solid var(--border-soft); transition: background var(--dur-fast); }
+.list-row:last-child { border-bottom: 0; }
+.list-row:hover { background: var(--hover); }
+.list-row:focus-within { background: var(--hover); }
+.list-row-fp { display: flex; justify-content: center; align-items: center; min-height: 52px; background: var(--sunken); border-radius: var(--radius-sm); padding: 4px; }
+.list-row-main { min-width: 0; }
+.list-row-title, .list-row-title:visited { display: block; font-size: var(--text-md); font-weight: 600; color: var(--ink); text-decoration: none; line-height: 1.35; }
+.list-row-title::after { content: ""; position: absolute; inset: 0; } /* the whole row opens it */
+.list-row-title:focus-visible { outline: none; }
+.list-row:has(.list-row-title:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.list-row-scope { font-size: var(--text-sm); color: var(--muted); margin-top: 1px; }
+.list-row-outcome { font-size: var(--text-sm); color: var(--ink-soft); margin-top: 3px; }
+.list-row-outcome .futures { color: var(--futures-ink); }
+.list-row-side { display: grid; justify-items: end; gap: 4px; font-size: var(--text-sm); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.list-row-actions { position: relative; z-index: 1; } /* above the row's stretched link */
+
+/* --- Fingerprint (shape_glyph.js) ----------------------------------------------------- */
+.fp { width: 100%; max-width: 132px; display: block; }
+.fp-edge { stroke: var(--border); stroke-width: .8; }
+.fp-edge.about { stroke: var(--graph-about); }
+.fp-edge.equivalence { stroke: var(--graph-equiv); stroke-width: 1.1; }
+.fp-edge.growsFrom { stroke: var(--futures-line); stroke-dasharray: 1.5 1.5; }
+.fp-node { stroke-width: .8; }
+.fp-node.entity { fill: var(--graph-entity); }
+.fp-node.signal { fill: var(--evidence); }
+.fp-node.flagged { fill: var(--warn); }
+.fp-node.source { fill: none; stroke: var(--faint); stroke-dasharray: 1.5 1; }
+.fp-node.reference { fill: none; stroke: var(--evidence); }
+.fp-node.projection { fill: var(--futures); }
+.fp-step { fill: var(--card); stroke: var(--border); stroke-width: 1.5; }
+.fp-step.done { fill: var(--ok); stroke: var(--ok); }
+.fp-step.paused { fill: var(--warn-soft); stroke: var(--warn); }
+.fp-step.failed { fill: var(--danger); stroke: var(--danger); }

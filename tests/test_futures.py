@@ -245,3 +245,16 @@ def test_dropped_stream_resyncs_from_the_log(store, client, extracted_run):
 def test_stop_without_a_generation_is_a_conflict(client, extracted_run):
     exp_id = _explore(client, extracted_run)["exploration"]["id"]
     assert client.post(f"/api/runs/{extracted_run}/explorations/{exp_id}/stop").status_code == 409
+
+
+def test_lists_carry_exploration_shapes_and_futures_counts(client, extracted_run):
+    """The explorations list draws each exploration's shape; the runs list counts a
+    run's futures work."""
+    exp_id = _explore(client, extracted_run)["exploration"]["id"]
+    client.post(f"/api/runs/{extracted_run}/explorations/{exp_id}/generate")
+    listed = client.get(f"/api/runs/{extracted_run}/explorations").json()[0]
+    kinds = [n["kind"] for n in listed["shape"]["nodes"]]
+    assert kinds.count("projection") == listed["projections"] > 0 and "signal" in kinds
+    assert listed["shape"]["edges"] and all(e["kind"] == "growsFrom" for e in listed["shape"]["edges"])
+    run = next(r for r in client.get("/api/runs").json() if r["id"] == extracted_run)
+    assert run["summary"]["futures"] == {"explorations": 1, "projections": listed["projections"]}

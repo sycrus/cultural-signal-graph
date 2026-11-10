@@ -6,7 +6,8 @@ import { h, render } from "preact";
 import { useState } from "preact/hooks";
 import { signal } from "@preact/signals";
 import htm from "htm";
-import { Button, Chip, EmptyState, Panel, Tabs, Toasts, Toggle, toast } from "./ui.js";
+import { Button, Chip, EmptyState, List, ListRow, PageHead, Panel, Tabs, Toasts, Toggle, toast } from "./ui.js";
+import { Fingerprint } from "./shape_glyph.js"; // not "fingerprint.js": privacy blockers block that name
 import { AppBar, Crumbs } from "./shell.js";
 
 const html = htm.bind(h);
@@ -219,33 +220,40 @@ function Rail() {
 
 /* --- canvas views ---------------------------------------------------------- */
 
+const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+// A run's outcome in one line, for its row in the runs list.
+function runOutcome(r) {
+  const sm = r.summary || {};
+  const fut = sm.futures?.explorations
+    ? html` <span class="futures">· ◇ ${plural(sm.futures.explorations, "exploration")} · ${plural(sm.futures.projections, "projection")}</span>`
+    : null;
+  if (r.status === "completed") {
+    const signed = sm.decisions ? ` · ${plural(sm.decisions, "link")} signed off` : "";
+    return html`${plural(sm.claims ?? 0, "claim")} · ${sm.flags ?? 0} flagged${signed}${fut}`;
+  }
+  if (r.status === "paused") return html`Waiting for your sign-off: ${plural(sm.pending, "proposed link")}${fut}`;
+  if (r.status === "running") return "Running…";
+  return `Not started · ${plural(sm.sources ?? 0, "source")} ready`;
+}
+
 function Home() {
   const { runs } = get();
-  return html`<div class="canvas-narrow">
-    <h1>Forecast runs</h1>
-    <p class="lede">Start a forecast by entering an ask — or reopen a past run to
-    read its brief and graph.</p>
-    <${Panel} row>
-      <${Button} variant="primary" onClick=${() => set({ view: "ask", error: null })}>New run<//>
-      <span class="hint">Category, question, window, market.</span>
-    <//>
-    <h2>Past runs</h2>
-    <${Panel} flush>
-      ${runs.length
-        ? html`<table>
-            <thead><tr><th>Run</th><th>Ask</th><th>Status</th><th>Created</th></tr></thead>
-            <tbody>${runs.map((r) => html`<tr key=${r.id} class="row-link" tabindex="0"
-                onClick=${() => openRun(r.id)} onKeyDown=${(e) => e.key === "Enter" && openRun(r.id)}>
-                <td>${r.id}</td>
-                <td>${r.ask.category} — ${r.ask.question}</td>
-                <td><${StatusChip} status=${r.status} /></td>
-                <td>${r.created_at.replace("T", " ").slice(0, 16)}</td>
-              </tr>`)}</tbody>
-          </table>`
-        : html`<${EmptyState} title="No runs yet"
-            action=${html`<${Button} variant="primary" onClick=${() => set({ view: "ask", error: null })}>New run<//>`}>
-            A run answers one ask: it discovers sources, extracts signals and drafts a brief you sign off.<//>`}
-    <//>
+  const newRun = () => set({ view: "ask", error: null });
+  return html`<div class="page-list">
+    <${PageHead} title="Forecast runs" lede="Start a forecast from an ask, or reopen a run to read its brief and graph."
+      actions=${html`<${Button} variant="primary" onClick=${newRun}>New run<//>`} />
+    ${runs.length
+      ? html`<${List} label="Forecast runs">
+          ${runs.map((r) => html`<${ListRow} key=${r.id} href=${`/?run=${encodeURIComponent(r.id)}`} onOpen=${() => openRun(r.id)}
+            fingerprint=${html`<${Fingerprint} shape=${r.summary?.shape} stages=${r.summary?.stages} />`}
+            title=${r.ask.question}
+            scope=${`${r.ask.category}${r.ask.market ? ` · ${r.ask.market}` : ""}`}
+            outcome=${runOutcome(r)}
+            side=${html`<${StatusChip} status=${r.status} /><span>${dateFmt.format(new Date(r.created_at))}</span>`} />`)}
+        <//>`
+      : html`<${Panel}><${EmptyState} title="No runs yet" action=${html`<${Button} variant="primary" onClick=${newRun}>New run<//>`}>
+          A run answers one ask: it discovers sources, extracts signals and drafts a brief you sign off.<//><//>`}
   </div>`;
 }
 

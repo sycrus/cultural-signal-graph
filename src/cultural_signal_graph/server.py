@@ -198,7 +198,22 @@ def create_app(
 
     @app.get("/api/runs")
     def list_runs() -> list[dict]:
-        return store.list()
+        """The runs list: each run with its summary, plus its futures work (counts,
+        and the projections merged into its graph's shape)."""
+        runs = store.list()
+        for r in runs:
+            exps = futures.list(r["id"])
+            r["summary"]["futures"] = {"explorations": len(exps), "projections": sum(e["projections"] for e in exps)}
+            shape = r["summary"].get("shape")
+            if exps and shape:
+                layer = futures.graph_layer(r["id"])
+                ids = {n["id"] for n in shape["nodes"]} | {n["data"]["id"] for n in layer["nodes"]}
+                shape["nodes"] += [{"id": n["data"]["id"], "kind": n["data"]["kind"]} for n in layer["nodes"]]
+                shape["edges"] += [
+                    {"source": e["data"]["source"], "target": e["data"]["target"], "kind": e["data"]["kind"]}
+                    for e in layer["edges"] if e["data"]["source"] in ids and e["data"]["target"] in ids
+                ]
+        return runs
 
     @app.post("/api/runs", status_code=201)
     def create_run(ask: AskIn) -> dict:
@@ -281,7 +296,8 @@ def create_app(
 
     @app.get("/api/runs/{run_id}/explorations")
     def list_explorations(run_id: str) -> list[dict]:
-        return futures.list(run_id)
+        """The explorations list: each with its shape, for the list's fingerprint."""
+        return [{**e, "shape": futures.exploration_shape(run_id, e["id"])} for e in futures.list(run_id)]
 
     @app.post("/api/runs/{run_id}/explorations", status_code=201)
     def create_exploration(run_id: str, body: ExplorationIn) -> dict:

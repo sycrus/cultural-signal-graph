@@ -717,29 +717,50 @@ class ExplorationStore:
         states = [replay(self._log(run_id, e["id"]).active()) for e in self.list(run_id)]
         return run_dataset(evidence, states).serialize(format="trig")
 
-    def graph_layer(self, run_id: str) -> dict:
-        """Cytoscape elements for the forecast Graph tab's futures layer: every
-        exploration's projections and references, linked to the evidence they grow
-        from (signal nodes share their ids with the evidence graph)."""
+    def _exploration_layer(self, run_id: str, exp_id: str) -> tuple[list, list]:
+        """One exploration's projections and references, and its "grows from" links
+        (to evidence by the evidence graph's ids, or to other projections)."""
         from rdflib.namespace import RDF
 
         from .rdf import CSGF
 
+        state = replay(self._log(run_id, exp_id).active())
+        g = exploration_graph(state)
+        nodes, edges = [], []
+        for node in g.subjects(RDF.type, CSGF.Projection):
+            p = state["projections"][str(node).rsplit("#", 1)[-1]]
+            nodes.append({"data": {
+                "id": str(node), "label": p["statement"][:72] + ("…" if len(p["statement"]) > 72 else ""),
+                "statement": p["statement"], "kind": "projection", "exploration": state["exploration"]["goal"],
+                "valid": f"{p['window'][0]} -> {p['window'][1]}", "origin": p["origin"],
+            }})
+        for node in g.subjects(RDF.type, CSGF.Reference):
+            nodes.append({"data": {"id": str(node), "label": str(g.value(node, RDFS.label))[:72], "kind": "reference"}})
+        for s, o in g.subject_objects(CSGF.growsFrom):
+            edges.append({"data": {"id": f"grows:{s}:{o}", "source": str(o), "target": str(s), "kind": "growsFrom"}})
+        return nodes, edges
+
+    def exploration_shape(self, run_id: str, exp_id: str) -> dict:
+        """An exploration's shape for the explorations list: its projections, the
+        evidence they grow from (as plain evidence nodes), and the links."""
+        nodes, edges = self._exploration_layer(run_id, exp_id)
+        known = {n["data"]["id"] for n in nodes}
+        evidence = {e["data"]["source"] for e in edges} - known
+        return {
+            "nodes": [{"id": n["data"]["id"], "kind": n["data"]["kind"]} for n in nodes]
+            + [{"id": i, "kind": "signal"} for i in sorted(evidence)],
+            "edges": [{"source": e["data"]["source"], "target": e["data"]["target"], "kind": "growsFrom"} for e in edges],
+        }
+
+    def graph_layer(self, run_id: str) -> dict:
+        """Cytoscape elements for the forecast Graph tab's futures layer: every
+        exploration's projections and references, linked to the evidence they grow
+        from (signal nodes share their ids with the evidence graph)."""
         nodes, edges = [], []
         for e in self.list(run_id):
-            state = replay(self._log(run_id, e["id"]).active())
-            g = exploration_graph(state)
-            for node in g.subjects(RDF.type, CSGF.Projection):
-                p = state["projections"][str(node).rsplit("#", 1)[-1]]
-                nodes.append({"data": {
-                    "id": str(node), "label": p["statement"][:72] + ("…" if len(p["statement"]) > 72 else ""),
-                    "statement": p["statement"], "kind": "projection", "exploration": e["goal"],
-                    "valid": f"{p['window'][0]} -> {p['window'][1]}", "origin": p["origin"],
-                }})
-            for node in g.subjects(RDF.type, CSGF.Reference):
-                nodes.append({"data": {"id": str(node), "label": str(g.value(node, RDFS.label))[:72], "kind": "reference"}})
-            for s, o in g.subject_objects(CSGF.growsFrom):
-                edges.append({"data": {"id": f"grows:{s}:{o}", "source": str(o), "target": str(s), "kind": "growsFrom"}})
+            n, ed = self._exploration_layer(run_id, e["id"])
+            nodes += n
+            edges += ed
         return {"nodes": nodes, "edges": edges}
 
     def ops(self, run_id: str, exp_id: str) -> list[dict]:
