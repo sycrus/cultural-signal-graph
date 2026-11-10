@@ -4,7 +4,7 @@
    inlines this file and reads the --graph-* tokens at runtime).
 
    Both themes are the same instrument with the power on or off. Light is a
-   reflective LCD: cool grey-blue glass, near-black segments, the same rationed
+   reflective LCD: warm yellow-grey glass, near-black segments, the same rationed
    hues (amber chrome, cyan evidence, magenta futures) darkened to read on it, and
    a slight ink bleed. theme.js sets data-theme="dark" on <html> from the viewer's
    choice or the system setting, which lights it up as the phosphor console.
@@ -89,92 +89,92 @@
   --dur-slide: .35s;
 
   /* --- surfaces & text -------------------------------------------------------- */
-  --bg: #bfc8cc;
-  --card: #ccd4d7;
-  --sunken: #b5bec3;
-  --hover: #d6dde0;
-  --border: #98a4aa;
-  --border-soft: #aab4b9;
-  --grid: #b8c1c5;
-  --ink: #111a20;
-  --ink-soft: #27323a;
-  --muted: #434e56;
-  --faint: #6f7a81;
-  --neutral-soft: #c3cbcf;
-  --neutral-chip: #b3bdc2;
+  --bg: #c9c4a3;
+  --card: #d6d2b4;
+  --sunken: #bfba98;
+  --hover: #dfdbc0;
+  --border: #a29d7e;
+  --border-soft: #b4af8f;
+  --grid: #c1bc9b;
+  --ink: #1c1a10;
+  --ink-soft: #34311f;
+  --muted: #48442f;
+  --faint: #77725a;
+  --neutral-soft: #cfcaab;
+  --neutral-chip: #bdb896;
 
   /* --- interaction ------------------------------------------------------------ */
   --accent: #7a4200;
   --on-accent: #f3e7d0;
-  --accent-soft: #cfc6b0;
-  --accent-tint: #d4c7a6;
+  --accent-soft: #d4c79c;
+  --accent-tint: #d9c890;
   --accent-ring: #a88a50;
   --accent-ink: #5c3100;
 
   /* --- status ----------------------------------------------------------------- */
   --ok: #155c31;
-  --ok-soft: #b9cfbf;
-  --ok-wash: #c6d3cb;
-  --ok-line: #6e9a7c;
+  --ok-soft: #bfc8a2;
+  --ok-wash: #ccccaa;
+  --ok-line: #7f9a6c;
   --ok-ink: #12502a;
   --warn: #8a3600;
-  --warn-soft: #d6c0ab;
-  --warn-wash: #d2cabe;
+  --warn-soft: #dbc19d;
+  --warn-wash: #d4c7a5;
   --warn-line: #b8805a;
   --warn-ink: #6e2a00;
-  --danger: #a3112f;
+  --danger: #960e2a;
   --on-danger: #f6e8ea;
-  --danger-soft: #d7b9be;
-  --danger-wash: #d3c6c9;
-  --danger-line: #bc7380;
+  --danger-soft: #dbbcab;
+  --danger-wash: #d3c3a7;
+  --danger-line: #bf7d76;
   --danger-ink: #750a20;
 
   /* --- evidence palette: anchors, the audited side --------------------------- */
   --evidence: #005a62;
-  --evidence-soft: #b0cdcf;
-  --evidence-line: #5f9da2;
+  --evidence-soft: #b3c6b4;
+  --evidence-line: #6a9a8c;
   --evidence-ink: #003f45;
   --xedge: #1f3f9a;          /* a cross-domain edge used as an anchor */
-  --xedge-soft: #b8c3dc;
+  --xedge-soft: #bfc0b8;
   --xedge-ink: #142c70;
 
   /* --- futures palette: projections, the speculative side -------------------- */
-  --futures: #9a0f7c;
+  --futures: #8e0b72;
   --on-futures: #f9e6f4;
-  --futures-soft: #d6bcd0;
-  --futures-wash: #c9c4cc;
-  --futures-faint: #c9aac2;
-  --futures-line: #b26aa2;
+  --futures-soft: #d8bcbc;
+  --futures-wash: #cec3a8;
+  --futures-faint: #d0b2b0;
+  --futures-line: #b4719a;
   --futures-label: #7e3470;
-  --futures-grid: #c0bcc6;
+  --futures-grid: #c6bca0;
   --futures-ink: #6a0855;
-  --baseline: #6f7a81;       /* the business-as-usual branch */
+  --baseline: #77725a;       /* the business-as-usual branch */
 
   /* --- lens-tag palette: Three Horizons -------------------------------------- */
-  --h1: #4b5a66;
-  --h1-soft: #b3bec6;
-  --h1-ink: #34414b;
+  --h1: #504c38;
+  --h1-soft: #bcb698;
+  --h1-ink: #3f3c2a;
   --h2: #7a4200;
-  --h2-soft: #d4c7a6;
+  --h2-soft: #d9c890;
   --h2-ink: #5c3100;
-  --h3: #9a0f7c;
-  --h3-soft: #d6bcd0;
+  --h3: #8e0b72;
+  --h3-soft: #d8bcbc;
   --h3-ink: #6a0855;
 
   /* --- forecast Graph tab (Cytoscape) ---------------------------------------- */
   --graph-entity: #1f3f9a;
   --graph-signal: #1d6b3a;
-  --graph-flagged: #a3112f;
-  --graph-source: #6f7a81;
-  --graph-edge: #98a4aa;
+  --graph-flagged: #960e2a;
+  --graph-source: #77725a;
+  --graph-edge: #a29d7e;
   --graph-about: #3d5fb8;
-  --graph-equiv: #9a0f7c;
-  --graph-equiv-pending: #b26aa2;
+  --graph-equiv: #8e0b72;
+  --graph-equiv-pending: #b4719a;
 
   /* --- elevation -------------------------------------------------------------- */
-  --shadow-sm: 0 1px 0 rgba(17, 26, 32, .12);
-  --shadow-md: 0 6px 16px rgba(17, 26, 32, .18);
-  --shadow-drawer: -8px 8px 24px rgba(17, 26, 32, .2);
+  --shadow-sm: 0 1px 0 rgba(28, 26, 16, .12);
+  --shadow-md: 0 6px 16px rgba(28, 26, 16, .18);
+  --shadow-drawer: -8px 8px 24px rgba(28, 26, 16, .2);
   --shadow-futures: 0 0 10px color-mix(in srgb, var(--futures) 25%, transparent);
   --shadow-futures-lift: 0 0 16px color-mix(in srgb, var(--futures) 38%, transparent);
 
