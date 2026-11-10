@@ -37,6 +37,17 @@ CREATE TABLE IF NOT EXISTS cursors (
 """
 
 
+def _who(author: str | dict) -> tuple[str, str | None]:
+    """Normalise an author to (name, role). Blank names fall back to 'strategist'."""
+    if isinstance(author, dict):
+        name, role = author.get("author"), author.get("role")
+    else:
+        name, role = author, None
+    name = (name or "").strip() or "strategist"
+    role = (role or "").strip() or None
+    return name, role
+
+
 class OperationLog:
     def __init__(self, directory: Path):
         # `directory` is runs/<run>/explorations/<id>; the database is per run
@@ -74,8 +85,12 @@ class OperationLog:
 
     # --- writes (one transaction each) -----------------------------------------
 
-    def append(self, op: dict, author: str = "system") -> dict:
-        """Record an op (dropping any redo tail) and advance the cursor past it."""
+    def append(self, op: dict, author: str | dict = "system") -> dict:
+        """Record an op (dropping any redo tail) and advance the cursor past it.
+
+        `author` is a name, or {"author": name, "role": role}: who made the op, or for
+        a model op, who triggered it (the model call itself is on the op)."""
+        name, role = _who(author)
         self.dir.mkdir(parents=True, exist_ok=True)  # exports and uploads live beside it
         with self._tx() as db:
             cursor = self._cursor_in(db) or 0
@@ -83,7 +98,8 @@ class OperationLog:
             op = {
                 "seq": cursor,
                 "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                "author": author,
+                "author": name,
+                **({"author_role": role} if role else {}),
                 **op,
             }
             db.execute(

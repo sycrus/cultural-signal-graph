@@ -15,6 +15,29 @@ const html = htm.bind(h);
 
 const KIND_LABEL = { claim: "claim", signal: "signal", flagged: "flagged", edge: "cross-domain edge", reference: "reference" };
 
+function Identity() {
+  /* Who is acting (Workshop B, #52): every change is recorded under this name + role,
+     and model calls record who asked for them. Remembered in this browser. */
+  const named = S.author.value !== "strategist";
+  const save = (ev) => {
+    ev.preventDefault();
+    const f = ev.currentTarget;
+    S.setIdentity(f.elements.name.value, f.elements.role.value);
+    f.closest("details").open = false;
+  };
+  return html`<details class="identity">
+    <summary class=${named ? "" : "unset"} title="Every change you make is recorded under this name">
+      ${named ? `You: ${S.author.value}${S.role.value ? ` · ${S.role.value}` : ""}` : "Set your name"}
+    </summary>
+    <form class="identity-form" onSubmit=${save}>
+      <label>Name <input name="name" value=${named ? S.author.value : ""} placeholder="Your name" /></label>
+      <label>Role <input name="role" value=${S.role.value} placeholder="e.g. Strategist, Designer" /></label>
+      <div class="hint">Every change you make is recorded under this name, so teammates can see who wrote what.</div>
+      <button type="submit">Save</button>
+    </form>
+  </details>`;
+}
+
 function TopBar() {
   const r = S.run.value;
   return html`<header id="topbar">
@@ -27,6 +50,7 @@ function TopBar() {
       ? html`<span class="badge" title="Recorded outputs — no model, no network">fixture mode</span>`
       : null}
     <span class="spacer"></span>
+    <${Identity} />
     ${S.view.value !== "list" && S.runId.value
       ? html`<button class="ghost" onClick=${S.showList}>← Explorations</button>`
       : null}

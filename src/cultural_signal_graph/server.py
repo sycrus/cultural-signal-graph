@@ -15,7 +15,7 @@ import json
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -83,24 +83,36 @@ class NoteIn(BaseModel):
     author: str = "strategist"
 
 
-class ExplorationIn(BaseModel):
+class Authored(BaseModel):
+    """Who is acting: a name plus a role / discipline (Workshop B, #52)."""
+
+    author: str = "strategist"
+    role: str | None = None
+
+    def who(self) -> dict:
+        return {"author": self.author, "role": self.role}
+
+
+def who_query(author: str = "strategist", role: str | None = None) -> dict:
+    """The acting human for routes without a body (model calls they trigger)."""
+    return {"author": author, "role": role}
+
+
+class ExplorationIn(Authored):
     goal: str
     anchor_ids: list[str]
     horizon: int = 10
     orders: int = 5
-    author: str = "strategist"
 
 
-class ProjectionEditIn(BaseModel):
+class ProjectionEditIn(Authored):
     statement: str | None = None
     window: list[int] | None = None
-    author: str = "strategist"
 
 
-class ReferenceIn(BaseModel):
+class ReferenceIn(Authored):
     url: str
     excerpt: str
-    author: str = "strategist"
     stance: str | None = None
     grounds: str | None = None
 
@@ -110,14 +122,13 @@ class NewReferenceIn(BaseModel):
     excerpt: str
 
 
-class HumanProjectionIn(BaseModel):
+class HumanProjectionIn(Authored):
     kind: str
     statement: str
     window: list[int]
     parent_id: str | None = None
     reference: NewReferenceIn | None = None
     reference_id: str | None = None
-    author: str = "strategist"
 
 
 class AxisIn(BaseModel):
@@ -133,33 +144,29 @@ class AxisIn(BaseModel):
         return d
 
 
-class AxesIn(BaseModel):
+class AxesIn(Authored):
     axes: list[AxisIn]
-    author: str = "strategist"
 
 
 class SuggestIn(BaseModel):
     goal: str
 
 
-class ImportIn(BaseModel):
+class ImportIn(Authored):
     log: str
-    author: str = "strategist"
 
 
-class TagIn(BaseModel):
+class TagIn(Authored):
     value: str
     extras: dict = {}
-    author: str = "strategist"
 
 
-class ForkIn(BaseModel):
+class ForkIn(Authored):
     hint: str | None = None
-    author: str = "strategist"
 
 
-class AuthorIn(BaseModel):
-    author: str = "strategist"
+class AuthorIn(Authored):
+    pass
 
 
 def create_app(
@@ -279,7 +286,7 @@ def create_app(
             anchor_ids=body.anchor_ids,
             horizon=body.horizon,
             orders=body.orders,
-            author=body.author,
+            author=body.who(),
         )
 
     @app.get("/api/runs/{run_id}/explorations/{exp_id}")
@@ -291,11 +298,11 @@ def create_app(
         return futures.op(run_id, exp_id, seq)
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/generate")
-    def generate_exploration(run_id: str, exp_id: str) -> dict:
-        return futures.generate(run_id, exp_id)
+    def generate_exploration(run_id: str, exp_id: str, who: dict = Depends(who_query)) -> dict:
+        return futures.generate(run_id, exp_id, author=who)
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/generate/stream")
-    def stream_generation(run_id: str, exp_id: str) -> StreamingResponse:
+    def stream_generation(run_id: str, exp_id: str, who: dict = Depends(who_query)) -> StreamingResponse:
         """Live fill: one Server-Sent Event per generated order, then `done`. A
         dropped connection ends generation after the current order; the client
         re-syncs from the log (each order is appended exactly once)."""
@@ -305,7 +312,7 @@ def create_app(
 
         def events():
             try:
-                for snap in futures.generate_iter(run_id, exp_id):
+                for snap in futures.generate_iter(run_id, exp_id, author=who):
                     yield _sse("order", snap)
                     if futures.mode == "fixture" and fixture_delay:
                         time.sleep(fixture_delay)  # recorded output is instant; pace the fill
@@ -317,29 +324,29 @@ def create_app(
 
     @app.patch("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}")
     def edit_projection(run_id: str, exp_id: str, pid: str, body: ProjectionEditIn) -> dict:
-        return futures.edit(run_id, exp_id, pid, statement=body.statement, window=body.window, author=body.author)
+        return futures.edit(run_id, exp_id, pid, statement=body.statement, window=body.window, author=body.who())
 
     @app.delete("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}")
-    def delete_projection(run_id: str, exp_id: str, pid: str, author: str = "strategist") -> dict:
-        return futures.delete(run_id, exp_id, pid, author=author)
+    def delete_projection(run_id: str, exp_id: str, pid: str, who: dict = Depends(who_query)) -> dict:
+        return futures.delete(run_id, exp_id, pid, author=who)
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}/regenerate")
-    def regenerate_downstream(run_id: str, exp_id: str, pid: str, body: AuthorIn | None = None) -> dict:
-        return futures.regenerate(run_id, exp_id, pid, author=(body.author if body else "strategist"))
+    def regenerate_downstream(run_id: str, exp_id: str, pid: str, body: AuthorIn | None = None, who: dict = Depends(who_query)) -> dict:
+        return futures.regenerate(run_id, exp_id, pid, author=(body.who() if body else who))
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}/fork")
     def fork_projection(run_id: str, exp_id: str, pid: str, body: ForkIn) -> dict:
-        return futures.fork(run_id, exp_id, pid, hint=body.hint, author=body.author)
+        return futures.fork(run_id, exp_id, pid, hint=body.hint, author=body.who())
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/references")
     def add_reference(run_id: str, exp_id: str, body: ReferenceIn) -> dict:
         return futures.add_reference(
-            run_id, exp_id, url=body.url, excerpt=body.excerpt, author=body.author, stance=body.stance, grounds=body.grounds
+            run_id, exp_id, url=body.url, excerpt=body.excerpt, author=body.who(), stance=body.stance, grounds=body.grounds
         )
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}/ground")
-    def ground_projection(run_id: str, exp_id: str, pid: str, body: AuthorIn | None = None) -> dict:
-        return futures.ground(run_id, exp_id, pid, author=(body.author if body else "strategist"))
+    def ground_projection(run_id: str, exp_id: str, pid: str, body: AuthorIn | None = None, who: dict = Depends(who_query)) -> dict:
+        return futures.ground(run_id, exp_id, pid, author=(body.who() if body else who))
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/projections")
     def add_projection(run_id: str, exp_id: str, body: HumanProjectionIn) -> dict:
@@ -352,17 +359,17 @@ def create_app(
             parent_id=body.parent_id,
             reference=body.reference.model_dump() if body.reference else None,
             reference_id=body.reference_id,
-            author=body.author,
+            author=body.who(),
         )
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/{lens}/classify")
-    def classify_lens(run_id: str, exp_id: str, lens: str) -> dict:
-        return futures.classify(run_id, exp_id, lens)
+    def classify_lens(run_id: str, exp_id: str, lens: str, who: dict = Depends(who_query)) -> dict:
+        return futures.classify(run_id, exp_id, lens, author=who)
 
     @app.put("/api/runs/{run_id}/explorations/{exp_id}/projections/{pid}/tags/{lens}")
     def set_lens_tag(run_id: str, exp_id: str, pid: str, lens: str, body: TagIn) -> dict:
         tag = {"value": body.value, **body.extras}
-        return futures.set_tag(run_id, exp_id, pid, lens, tag, author=body.author)
+        return futures.set_tag(run_id, exp_id, pid, lens, tag, author=body.who())
 
     @app.get("/api/runs/{run_id}/explorations/{exp_id}/exports/{name}")
     def export_exploration(run_id: str, exp_id: str, name: str) -> Response:
@@ -376,7 +383,7 @@ def create_app(
 
     @app.post("/api/runs/{run_id}/explorations/import", status_code=201)
     def import_exploration(run_id: str, body: ImportIn) -> dict:
-        return futures.import_log(run_id, body.log, author=body.author)
+        return futures.import_log(run_id, body.log, author=body.who())
 
     @app.get("/api/runs/{run_id}/futures.trig")
     def export_futures_trig(run_id: str) -> Response:
@@ -394,29 +401,29 @@ def create_app(
         )
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/matrix/axes/propose")
-    def propose_axes(run_id: str, exp_id: str) -> dict:
-        return futures.propose_axes(run_id, exp_id)
+    def propose_axes(run_id: str, exp_id: str, who: dict = Depends(who_query)) -> dict:
+        return futures.propose_axes(run_id, exp_id, author=who)
 
     @app.put("/api/runs/{run_id}/explorations/{exp_id}/lenses/matrix/axes")
     def set_axes(run_id: str, exp_id: str, body: AxesIn) -> dict:
-        return futures.set_axes(run_id, exp_id, [a.model_dump() for a in body.axes], author=body.author)
+        return futures.set_axes(run_id, exp_id, [a.model_dump() for a in body.axes], author=body.who())
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/matrix/quadrants/{quadrant}/seed")
-    def seed_quadrant(run_id: str, exp_id: str, quadrant: str) -> dict:
-        return futures.seed_quadrant(run_id, exp_id, quadrant)
+    def seed_quadrant(run_id: str, exp_id: str, quadrant: str, who: dict = Depends(who_query)) -> dict:
+        return futures.seed_quadrant(run_id, exp_id, quadrant, author=who)
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/matrix/quadrants/{quadrant}/narrative")
-    def write_narrative(run_id: str, exp_id: str, quadrant: str) -> dict:
-        return futures.write_narrative(run_id, exp_id, quadrant)
+    def write_narrative(run_id: str, exp_id: str, quadrant: str, who: dict = Depends(who_query)) -> dict:
+        return futures.write_narrative(run_id, exp_id, quadrant, author=who)
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/lenses/pestle/{dimension}/seed")
-    def seed_dimension(run_id: str, exp_id: str, dimension: str) -> dict:
-        return futures.seed_dimension(run_id, exp_id, dimension)
+    def seed_dimension(run_id: str, exp_id: str, dimension: str, who: dict = Depends(who_query)) -> dict:
+        return futures.seed_dimension(run_id, exp_id, dimension, author=who)
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/references/{ref_id}/promote", status_code=201)
-    def promote_reference(run_id: str, exp_id: str, ref_id: str, body: AuthorIn | None = None) -> dict:
+    def promote_reference(run_id: str, exp_id: str, ref_id: str, body: AuthorIn | None = None, who: dict = Depends(who_query)) -> dict:
         """The deliberate crossing: a new forecast run with the reference as a source."""
-        return promote(store, futures, run_id, exp_id, ref_id, author=(body.author if body else "strategist"))
+        return promote(store, futures, run_id, exp_id, ref_id, author=(body.who() if body else who))
 
     @app.post("/api/runs/{run_id}/explorations/{exp_id}/undo")
     def undo_exploration(run_id: str, exp_id: str) -> dict:

@@ -176,7 +176,7 @@ class ExplorationStore:
         anchor_ids: list[str],
         horizon: int = 10,
         orders: int = 5,
-        author: str = "strategist",
+        author: str | dict = "strategist",
         start_year: int | None = None,
     ) -> dict:
         """A new exploration. Anchor PESTLE tags already computed for the picker are
@@ -212,13 +212,14 @@ class ExplorationStore:
         )
         return self.snapshot(run_id, exp_id)
 
-    def generate(self, run_id: str, exp_id: str) -> dict:
-        """Run the remaining orders, one generator call (and one op) each."""
-        for _ in self.generate_iter(run_id, exp_id):
+    def generate(self, run_id: str, exp_id: str, author: str | dict = "strategist") -> dict:
+        """Run the remaining orders, one generator call (and one op) each. `author` is
+        the human who asked for it; each op also records its model call."""
+        for _ in self.generate_iter(run_id, exp_id, author=author):
             pass
         return self.snapshot(run_id, exp_id)
 
-    def generate_iter(self, run_id: str, exp_id: str):
+    def generate_iter(self, run_id: str, exp_id: str, author: str | dict = "strategist"):
         """Generate order by order, yielding the snapshot after each one. Stops at the
         depth or time limit, or after the current order once `stop` is requested
         (recording a `stop` op). One generation per exploration at a time."""
@@ -232,11 +233,11 @@ class ExplorationStore:
             state = replay(log.active())
             for order in range(state["orders_generated"] + 1, state["exploration"]["orders"] + 1):
                 if stop.is_set():
-                    log.append({"op": "stop", "order": order})
+                    log.append({"op": "stop", "order": order}, author=author)
                     yield self.snapshot(run_id, exp_id)
                     return
                 payload = self._generate(state, order)
-                log.append({"op": "generate_order", **payload})
+                log.append({"op": "generate_order", **payload}, author=author)
                 state = replay(log.active())
                 yield self.snapshot(run_id, exp_id)
                 if not payload["projections"]:
@@ -257,7 +258,7 @@ class ExplorationStore:
         pid: str,
         statement: str | None = None,
         window: list[int] | None = None,
-        author: str = "strategist",
+        author: str | dict = "strategist",
     ) -> dict:
         """Change a projection's statement and/or time window. A new statement makes
         its descendants stale; a new window only shows up as timing conflicts."""
@@ -277,14 +278,14 @@ class ExplorationStore:
         log.append(op, author=author)
         return self.snapshot(run_id, exp_id)
 
-    def delete(self, run_id: str, exp_id: str, pid: str, author: str = "strategist") -> dict:
+    def delete(self, run_id: str, exp_id: str, pid: str, author: str | dict = "strategist") -> dict:
         """Remove a projection; what grew from it is marked stale, never removed."""
         log, state = self._mutable(run_id, exp_id)
         p = self._projection(state, pid)
         log.append({"op": "delete", "id": pid, "before": p}, author=author)
         return self.snapshot(run_id, exp_id)
 
-    def regenerate(self, run_id: str, exp_id: str, pid: str, author: str = "strategist") -> dict:
+    def regenerate(self, run_id: str, exp_id: str, pid: str, author: str | dict = "strategist") -> dict:
         """Replace the stale projections downstream of `pid` with a fresh branch grown
         from it, as deep as the ones it replaces. One op, so one undo."""
         log, state = self._mutable(run_id, exp_id)
@@ -298,7 +299,7 @@ class ExplorationStore:
         log.append({"op": "regenerate", "root": pid, "removed": removed, "orders": orders}, author=author)
         return self.snapshot(run_id, exp_id)
 
-    def fork(self, run_id: str, exp_id: str, pid: str, hint: str | None = None, author: str = "strategist") -> dict:
+    def fork(self, run_id: str, exp_id: str, pid: str, hint: str | None = None, author: str | dict = "strategist") -> dict:
         """A sibling branch from `pid` down to the depth limit, optionally steered by a
         "what if" hint. The original branch is kept; a fork never carries the baseline."""
         log, state = self._mutable(run_id, exp_id)
@@ -321,7 +322,7 @@ class ExplorationStore:
         exp_id: str,
         url: str,
         excerpt: str,
-        author: str = "strategist",
+        author: str | dict = "strategist",
         stance: str | None = None,
         grounds: str | None = None,
     ) -> dict:
@@ -337,7 +338,7 @@ class ExplorationStore:
         log.append({"op": "add_reference", "reference": ref, "summary": summary}, author=author)
         return self.snapshot(run_id, exp_id)
 
-    def ground(self, run_id: str, exp_id: str, pid: str, author: str = "strategist") -> dict:
+    def ground(self, run_id: str, exp_id: str, pid: str, author: str | dict = "strategist") -> dict:
         """Ground this: search for evidence for and against a projection (bounded
         agent loop); proposals are kept with the whole trail, never auto-added."""
         log, state = self._mutable(run_id, exp_id)
@@ -356,7 +357,7 @@ class ExplorationStore:
         parent_id: str | None = None,
         reference: dict | None = None,
         reference_id: str | None = None,
-        author: str = "strategist",
+        author: str | dict = "strategist",
     ) -> dict:
         """A grounded assumption (needs a reference: a new one or an existing one) or a
         wild card (no reference). Its order follows from its parent, or 1."""
@@ -422,7 +423,7 @@ class ExplorationStore:
 
     # --- lens tags ---------------------------------------------------------------
 
-    def classify(self, run_id: str, exp_id: str, lens_key: str) -> dict:
+    def classify(self, run_id: str, exp_id: str, lens_key: str, author: str | dict = "strategist") -> dict:
         """Tag every projection the lens has no tag for yet — one cheap-model call,
         cached as a `retag` op. Nothing untagged: no call, no op."""
         spec = lens_registry.lens(lens_key)
@@ -432,10 +433,10 @@ class ExplorationStore:
         if untagged:
             payload = lens_registry.classify(spec, state, untagged, live=self.mode == "live")
             if payload["tags"]:
-                log.append({"op": "retag", "lens": lens_key, "source": "model", **payload})
+                log.append({"op": "retag", "lens": lens_key, "source": "model", **payload}, author=author)
         return self.snapshot(run_id, exp_id)
 
-    def set_tag(self, run_id: str, exp_id: str, pid: str, lens_key: str, tag: dict, author: str = "strategist") -> dict:
+    def set_tag(self, run_id: str, exp_id: str, pid: str, lens_key: str, tag: dict, author: str | dict = "strategist") -> dict:
         """The strategist's override (a drag in the lens view), attributed."""
         spec = lens_registry.lens(lens_key)
         log, state = self._mutable(run_id, exp_id)
@@ -448,13 +449,13 @@ class ExplorationStore:
 
     # --- the Matrix: axes first, then seeded worlds and narratives ------------------
 
-    def propose_axes(self, run_id: str, exp_id: str, author: str = "strategist") -> dict:
+    def propose_axes(self, run_id: str, exp_id: str, author: str | dict = "strategist") -> dict:
         log, state = self._mutable(run_id, exp_id)
         payload = matrix.propose_axes(state, live=self.mode == "live")
         log.append({"op": "propose_axes", **payload}, author=author)
         return self.snapshot(run_id, exp_id)
 
-    def set_axes(self, run_id: str, exp_id: str, axes: list[dict], author: str = "strategist") -> dict:
+    def set_axes(self, run_id: str, exp_id: str, axes: list[dict], author: str | dict = "strategist") -> dict:
         log, state = self._mutable(run_id, exp_id)
         if len(axes) != 2:
             raise ValueError("a matrix needs exactly two axes")
@@ -462,7 +463,7 @@ class ExplorationStore:
         log.append({"op": "set_axes", "axes": clean, "before": state["axes"]}, author=author)
         return self.snapshot(run_id, exp_id)
 
-    def seed_quadrant(self, run_id: str, exp_id: str, quadrant: str, author: str = "strategist") -> dict:
+    def seed_quadrant(self, run_id: str, exp_id: str, quadrant: str, author: str | dict = "strategist") -> dict:
         """Generate a branch from the present for one quadrant's world, down to the
         depth limit, conditioned on that quadrant's axis values."""
         log, state = self._mutable(run_id, exp_id)
@@ -472,7 +473,7 @@ class ExplorationStore:
         log.append({"op": "seed_fork", "lens": "matrix", "quadrant": quadrant, "constraint": constraint, "orders": payloads}, author=author)
         return self.snapshot(run_id, exp_id)
 
-    def seed_dimension(self, run_id: str, exp_id: str, dimension: str, author: str = "strategist") -> dict:
+    def seed_dimension(self, run_id: str, exp_id: str, dimension: str, author: str | dict = "strategist") -> dict:
         """Fill a PESTLE gap: a branch from the present that follows one dimension."""
         if dimension not in lens_registry.PESTLE_VALUES:
             raise KeyError(f"unknown PESTLE dimension: {dimension}")
@@ -498,7 +499,7 @@ class ExplorationStore:
             raise ValueError("the seeded branch produced nothing")
         return payloads
 
-    def write_narrative(self, run_id: str, exp_id: str, quadrant: str, author: str = "strategist") -> dict:
+    def write_narrative(self, run_id: str, exp_id: str, quadrant: str, author: str | dict = "strategist") -> dict:
         log, state = self._mutable(run_id, exp_id)
         axes = self._axes(state, quadrant)
         members = self._members(state, quadrant)
@@ -692,7 +693,7 @@ class ExplorationStore:
         state = replay(self.ops(run_id, exp_id))
         return run_dataset(None, [state]).serialize(format="trig")
 
-    def import_log(self, run_id: str, text: str, author: str = "strategist") -> dict:
+    def import_log(self, run_id: str, text: str, author: str | dict = "strategist") -> dict:
         """Re-open an exported log as a new exploration on this run: same ops, same
         state, a fresh id."""
         self._run(run_id)

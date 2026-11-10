@@ -17,7 +17,7 @@ from .replay import replay
 PROMOTED_CREDIBILITY = 0.6  # a strategist-supplied source, like one added by hand in Sources
 
 
-def promote(runs, futures, run_id: str, exp_id: str, ref_id: str, author: str = "strategist") -> dict:
+def promote(runs, futures, run_id: str, exp_id: str, ref_id: str, author: str | dict = "strategist") -> dict:
     state = replay(futures.ops(run_id, exp_id))
     ref = state["anchors"].get(ref_id)
     if ref is None or ref.get("scope") != "futures":
