@@ -10,13 +10,18 @@ hold the rules below.
 
 | Level | What | Style | Where it comes from |
 |---|---|---|---|
-| 0 | App bar | 52px, fixed. Brand · Forecast \| Futures · the open run's question · name · theme | `AppBar` (shell.js) |
+| 0 | App bar | 52px, fixed, three zones: logotype (home) · the open run's question, centred · Forecast \| Futures, name, theme | `AppBar` (shell.js) |
 | 1 | Page head | Breadcrumb (`--text-sm`, muted) → title (Kode Mono, `--text-lg`) with the page's actions on the right of the title row → one line of lede (`--text-base`, muted) | `Crumbs`, `PageHead` |
 | 2 | Section heading | Kode Mono, `--text-md`, 24px above, 8px below | `h2` |
 | 3 | Item title | Barlow 600, `--text-md`: a run's question, a claim, an edge | list rows, cards |
 | 4 | Body | Barlow, `--text-base` | |
 | 5 | Meta / hint | Barlow, `--text-sm`, muted: scope, dates, counts, explanations | `.hint`, `.list-row-scope` |
-| 6 | Uppercase label | Kode Mono, uppercase, tracked: the brand, mode switch, tabs, drawer kind only | |
+| 6 | Uppercase label | Kode Mono, uppercase, tracked: tabs and the drawer kind only | |
+
+**Logotype.** A small mark in the graph's own grammar and colours (two cyan signals → a
+blue entity → a magenta projection) and "Cultural Signal Graph" in Barlow 600, sentence
+case. The mode switch sits apart from it, at the right, in plain sentence case, so it can't
+read as part of the name. Chosen from three in a prototype (branch `prototype/app-bar`).
 
 Every page has a level-1 head, including the Graph tab and an exploration (whose title is
 its goal). Hints say what something is or does; they are never the only place an action
@@ -26,7 +31,7 @@ lives.
 
 | Weight | Where | Look |
 |---|---|---|
-| **Solid** (filled pill) | Only the app bar's Forecast \| Futures switch: which app you are in | `AppBar` |
+| **Solid** (filled pill) | Only the app bar's Forecast \| Futures switch: which app you are in. Sentence case, active in the mode's hue | `AppBar` |
 | **Line** (underline) | Tabs within a page: Brief \| Graph, the futures lenses (Scroll, Wheel, Cone…) | `Tabs variant="line"`: no box, `--text-sm`, active in ink with an underline in the mode's hue |
 | **Soft** (tinted segment) | A choice inside a form or a toolbar: what to add, Fit / 1.5× / 2× / 3× | `Tabs variant="soft"` |
 
