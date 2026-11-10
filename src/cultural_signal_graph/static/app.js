@@ -21,7 +21,6 @@ const RAIL_STAGES = [
   { key: "metrics", label: "Metrics" },
 ];
 
-const RUN_STAGES = ["extract", "align", "sign-off", "draft", "brief"];
 
 /* --- state: one signal; set() merges, every view re-renders from it --------- */
 
@@ -481,20 +480,93 @@ function Sources() {
   </div>`;
 }
 
-function StageChip({ name, st }) {
-  const done = st?.status === "done";
-  const paused = st?.status === "paused";
-  return html`<${Chip} tone=${done ? "ok" : paused ? "warn" : "neutral"} class="stage-chip">
-    ${name} ${done ? "✓" : paused ? "…" : "·"}<//>`;
+/* The Run step: the pipeline as one column, each stage a node joined to the next,
+   with a line beside it saying what that stage did (or is waiting for). A tick
+   means the stage finished; a stage that raised shows as failed, with why. */
+const FLOW = [
+  { key: "ask", label: "Ask" },
+  { key: "sources", label: "Sources" },
+  { key: "extract", label: "Extract signals" },
+  { key: "align", label: "Propose links" },
+  { key: "sign-off", label: "Sign-off" },
+  { key: "draft", label: "Draft" },
+  { key: "brief", label: "Brief" },
+];
+const MARK = { done: "✓", failed: "!", action: "…", pending: "", running: "" };
+
+function stageMessage(key, st, s) {
+  const counts = st?.counts || {};
+  const status = st?.status;
+  if (status === "failed") return html`Failed: ${st.error || "the stage raised an error"}. Fix the cause, then start the run again from Sources.`;
+  switch (key) {
+    case "ask": {
+      const a = s.ask;
+      return html`“${a.question}” — ${a.category}${a.market ? `, ${a.market}` : ""}, ${a.window.start} → ${a.window.end}`;
+    }
+    case "sources": {
+      const d = s.discovery;
+      return html`${plural(s.sources.length, "source")}${d ? ` from ${plural(d.queries.length, "web search", "web searches")}` : ""}${s.status === "created" ? ", editable until you start the run" : ""}.`;
+    }
+    case "extract":
+      if (status !== "done") return "Reads the sources for signals: claims about entities, each with a confidence.";
+      return counts.signals != null ? `${plural(counts.signals, "signal")} about ${plural(counts.entities, "entity", "entities")}.` : "Signals extracted from the sources.";
+    case "align":
+      if (status !== "done") return "Looks for the same thing named differently across categories.";
+      if (counts.edges == null) return "Cross-domain links proposed.";
+      return counts.edges ? `${plural(counts.edges, "cross-domain link")} proposed for your sign-off.` : "No cross-domain links proposed, so there is nothing to sign off.";
+    case "sign-off": {
+      if (status === "paused") {
+        return html`Waiting for you: ${plural(s.pending.length, "proposed link")} to approve or reject.
+          <a href="#" onClick=${(e) => { e.preventDefault(); showStage("sign-off"); }}>Review</a>`;
+      }
+      if (status !== "done") return "You approve or reject each proposed link before the brief is drafted.";
+      const ds = Object.values(s.decisions || {});
+      if (!ds.length) return "Nothing needed a decision.";
+      const yes = ds.filter(Boolean).length;
+      return `${yes} approved, ${ds.length - yes} rejected.`;
+    }
+    case "draft":
+      if (status !== "done") return "Writes the reasoning behind each claim.";
+      return s.brief ? `Reasoning written for ${plural(s.brief.claims.length, "claim")}.` : "Reasoning written.";
+    case "brief": {
+      if (status !== "done") return "Assembles the brief, the graph and the exports.";
+      const b = s.brief;
+      if (!b) return "Brief assembled.";
+      return html`${plural(b.claims.length, "claim")}, ${plural(b.flags.length, "flagged signal")}.
+        <a href="#" onClick=${(e) => { e.preventDefault(); showStage("brief"); }}>Open the brief</a>`;
+    }
+    default:
+      return null;
+  }
 }
 
 function Run() {
   const { snap: s, busy } = get();
-  const chips = RUN_STAGES.map((name) => html`<${StageChip} key=${name} name=${name} st=${s.stages[name]} />`);
+  // while the pipeline is running, the first stage not yet done is the one in progress
+  const runningKey = busy ? FLOW.find((f) => s.stages[f.key]?.status !== "done")?.key : null;
+  const stateOf = (key) => {
+    const st = s.stages[key]?.status;
+    if (key === runningKey) return "running";
+    if (st === "paused") return "action";
+    return st === "done" || st === "failed" ? st : "pending";
+  };
   return html`<div class="canvas-narrow">
     <h1>Run</h1>
-    <p class="lede">${busy ? "Extracting signals and proposing cross-domain edges…" : "Where each stage of the pipeline stands."}</p>
-    <${Panel} row class="stage-chips">${busy ? html`<span class="spinner"></span>` : null}${chips}<//>
+    <p class="lede">${busy ? "Extracting signals and proposing cross-domain links…" : "What each stage of the pipeline did, top to bottom."}</p>
+    <${Panel}>
+      <ol class="flow">
+        ${FLOW.map(({ key, label }) => {
+          const state = stateOf(key);
+          return html`<li key=${key} class=${`flow-step ${state}`} aria-current=${state === "running" || state === "action" ? "step" : undefined}>
+            <span class="flow-mark" aria-hidden="true">${state === "running" ? html`<span class="spinner sm"></span>` : MARK[state]}</span>
+            <div class="flow-body">
+              <div class="flow-name">${label}<span class="sr-only"> — ${state}</span></div>
+              <div class="flow-msg">${state === "running" ? "Working…" : stageMessage(key, s.stages[key], s)}</div>
+            </div>
+          </li>`;
+        })}
+      </ol>
+    <//>
     <${ErrorLine} />
   </div>`;
 }

@@ -191,8 +191,30 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
 .exports .hint { margin: 0 4px 0 0; }
 .exports .export-link { font-family: var(--font-data); font-size: var(--text-xs); padding: 3px 8px; }
 .review-tabs { margin-bottom: 16px; }
-.stage-chips .stage-chip { font-size: var(--text-sm); padding: 4px 10px; }
-.stage-chip small { opacity: .8; font-family: var(--font-data); }
+/* Run step: the pipeline as a directed column — node, connector, node */
+.flow { list-style: none; margin: 0; padding: 0; }
+.flow-step { position: relative; display: grid; grid-template-columns: 28px 1fr; column-gap: 14px; padding-bottom: 20px; }
+.flow-step:last-child { padding-bottom: 0; }
+.flow-step::before { content: ""; position: absolute; left: 13px; top: 30px; bottom: 4px; width: 2px; background: var(--border); }
+.flow-step::after { content: ""; position: absolute; left: 9px; bottom: 2px; border: 5px solid transparent; border-top-color: var(--border); border-bottom: 0; }
+.flow-step:last-child::before, .flow-step:last-child::after { display: none; }
+.flow-step.done::before { background: var(--ok-line); }
+.flow-step.done::after { border-top-color: var(--ok-line); }
+.flow-mark { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700;
+  border: 2px solid var(--border); background: var(--card); color: var(--muted); }
+.flow-step.done .flow-mark { background: var(--ok); border-color: var(--ok); color: var(--card); }
+.flow-step.action .flow-mark { background: var(--warn-soft); border-color: var(--warn); color: var(--warn-ink); box-shadow: 0 0 0 3px var(--warn-soft); }
+.flow-step.failed .flow-mark { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+.flow-step.running .flow-mark { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.flow-body { padding-top: 3px; min-width: 0; }
+.flow-name { font-family: var(--font-display); font-size: 14px; color: var(--ink); }
+.flow-step.pending .flow-name { color: var(--muted); }
+.flow-msg { font-size: 13px; color: var(--ink-soft); margin-top: 2px; overflow-wrap: anywhere; }
+.flow-step.pending .flow-msg { color: var(--muted); }
+.flow-step.failed .flow-msg { color: var(--danger-ink); }
+.flow-step.action .flow-msg { color: var(--warn-ink); }
+.flow-msg a { margin-left: 6px; font-weight: 600; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .status-chip { font-family: var(--font-display); letter-spacing: var(--tracking-label); }
 
