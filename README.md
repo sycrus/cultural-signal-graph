@@ -166,20 +166,16 @@ flowchart TB
         futuresui["Futures mode<br/><i>at /futures</i>"]
     end
     subgraph server [FastAPI server]
-        runstore["RunStore<br/><i>runs/ state machine</i>"]
+        direction LR
+        runstore["RunStore<br/><i>runs/ state machine</i>"] --> pipeline["LangGraph pipeline<br/><i>extract → align → ⛔ gate → draft</i>"]
         futures["Futures store<br/><i>op log, lenses, Ground this</i>"]
-        pipeline["LangGraph pipeline<br/><i>extract → align → ⛔ gate → draft</i>"]
     end
     stepper <--> runstore
     futuresui <--> futures
-    runstore --> pipeline
-    pipeline --> deepseek[(DeepSeek)]
-    futures --> deepseek
-    runstore --> search[(Brave / Wikipedia)]
-    futures --> search
-    runstore --> files[("runs/&lt;id&gt;/<br/>files + SQLite")]
-    futures --> files
-    pipeline -. OTel spans .-> langfuse[(Langfuse)]
+    server --> deepseek[(DeepSeek<br/>models)]
+    server --> search[(Brave / Wikipedia<br/>search)]
+    server --> files[("runs folder<br/>files + SQLite")]
+    server -. OTel spans .-> langfuse[(Langfuse)]
 ```
 
 ```
