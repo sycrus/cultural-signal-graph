@@ -290,6 +290,11 @@ const cy = cytoscape({
   elements: data,
   style: graphStyle(),
   layout: { ...COSE, animate: false },
+  // Gentle wheel zoom: ~9% per mouse-wheel notch (the default is ~10x that); a trackpad
+  // sends many small steps, so it stays smooth. Bounded so panels never vanish or balloon.
+  wheelSensitivity: 0.1,
+  minZoom: 0.2,
+  maxZoom: 2.5,
 });
 
 function detailHtml(id, kind) {
