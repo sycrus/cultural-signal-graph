@@ -21,7 +21,7 @@ hold the rules below.
 **Logotype.** A signal trace (a pulse on a flat line, in the accent hue, glowing in the
 dark theme) and "cultural signal graph" in lowercase Kode Mono. The mode switch sits
 apart from it, at the right, in plain sentence case, so it can't read as part of the
-name. Chosen from three in a prototype (branch `prototype/app-bar`, logotype C).
+name. Chosen from three prototyped in the real bar: a node-and-link mark with a Barlow name (built, then dropped: it read as stray blocks), a "CSG" LCD monogram, and this one.
 
 Every page has a level-1 head, including the Graph tab and an exploration (whose title is
 its goal). Hints say what something is or does; they are never the only place an action
@@ -72,8 +72,7 @@ over the row (⌘-click and middle-click open a new tab); row actions sit above 
 The fingerprint (`shape_glyph.js`) is the item's graph drawn small without labels, in the
 same layered grammar as the Graph tab (source | signal | entity | projections by order), so
 fingerprints differ by density and width rather than random shape. An item without a graph
-shows its pipeline steps instead. Chosen from a prototype of four list formats (branch
-`prototype/runs-list`, variant D).
+shows its pipeline steps instead. Chosen from four formats prototyped against real runs: text cards in one column, a card grid with a graph strip, plain rows with a fingerprint, and these rows (fingerprint plus a scope line), which were the easiest to scan.
 
 ## Not on reading surfaces
 
