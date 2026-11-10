@@ -334,3 +334,24 @@ a.btn { display: inline-block; padding: 5px 10px; border-radius: var(--radius-md
 .identity-form label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
 .identity-form input { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .identity-form button { justify-self: end; }
+
+/* --- Phosphor treatment (#46): see app.css. Hue says evidence vs futures; glow,
+   brightness and line style carry the rest. ---------------------------------------- */
+.axis-label, .band-label, .panel-kind, .detail-panel h4, .cone-label, .wheel-ring-label, .h-label, .minimap-label, .lens-tabs button, .mode-switch a, .mode-switch span { font-family: var(--font-display); letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.axis-label, .panel-kind, .cone-label, .h-label { text-shadow: var(--glow-text); }
+.years, .proj-window, .order-badge, .tick span, .rolled-count, .pc .n, .h-year { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.years, .proj-window, .order-badge { text-shadow: var(--glow-text); }
+.mode-switch .active, .lens-tabs button.on, .spread-pick button.on, .seg button.on, .chip.on { text-shadow: var(--glow-text); }
+.lens-tabs button.on, .spread-pick button.on { box-shadow: var(--shadow-futures); text-shadow: none; }
+.anchor-card { box-shadow: var(--glow-evidence); border: 1px solid var(--evidence-line); }
+.anchor-card.flagged { border-color: var(--warn-line); }
+.proj-node:hover { box-shadow: var(--shadow-futures); }
+.proj-node.selected, .cone-node.selected, .m-chip.selected { box-shadow: var(--glow-futures); }
+.edge.lit, .cone .edge.lit { filter: var(--glow-line); }
+.mini-window { box-shadow: var(--shadow-futures); }
+.roller { box-shadow: var(--glow-futures); }
+.wheel-node.selected circle, .h-node.selected circle, .h-node.selected rect { filter: var(--glow-line); }
+.h-curve { filter: drop-shadow(0 0 calc(var(--glow-on, 0) * 4px) currentColor); }
+.h-curve.H1 { color: var(--h1); } .h-curve.H2 { color: var(--h2); } .h-curve.H3 { color: var(--h3); }
+.detail-panel { border-color: var(--futures-faint); }
+.provenance pre, .ground-trail pre { font-family: var(--font-mono); }

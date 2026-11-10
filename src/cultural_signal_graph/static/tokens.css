@@ -3,8 +3,9 @@
    are styled by class, so they read these too) and the Cytoscape Graph tab (viz.py
    inlines this file and reads the --graph-* tokens at runtime).
 
-   Light is the default; theme.js sets data-theme="dark" on <html> from the viewer's
-   choice or the system setting. Change a value here and it changes everywhere. */
+   Light is the default (daylight); theme.js sets data-theme="dark" on <html> from
+   the viewer's choice or the system setting, which turns on the phosphor console.
+   Change a value here and it changes everywhere. */
 
 :root {
   /* --- type ------------------------------------------------------------------- */
@@ -15,6 +16,18 @@
   --text-base: 14px;
   --text-md: 15px;
   --text-lg: 18px;
+  --font-display: var(--font-sans); /* brand, headings, uppercase labels */
+  --font-data: var(--font-sans);    /* years, orders, counts */
+  --tracking-label: .05em;         /* uppercase labels */
+
+  /* --- glow: none in daylight; the dark theme lights it -------------------------- */
+  --glow-text: none;
+  --glow-text-soft: none;
+  --glow-text-strong: none;
+  --glow-futures: 0 0 0 2px var(--futures);
+  --glow-evidence: none;
+  --glow-line: none;
+  --glow-on: 0;                    /* 0 or 1: scales glows built with calc() */
 
   /* --- shape ------------------------------------------------------------------ */
   --radius-sm: 6px;
@@ -121,88 +134,105 @@
   color-scheme: light;
 }
 
+/* --- Dark: the phosphor console --------------------------------------------------
+   Near-black glass, light that seems to come from the screen itself. Hue is
+   rationed: one chrome hue for the interface (sodium amber), one for evidence
+   (cyan), one for futures (magenta), and alerts. Everything else is told apart by
+   brightness, line style and glow, not by more colors. */
+
 :root[data-theme="dark"] {
-  --bg: #0f1115;
-  --card: #171a21;
-  --sunken: #1c2028;
-  --hover: #1b2230;
-  --border: #2f3541;
-  --border-soft: #272c36;
-  --grid: #1f232b;
-  --ink: #e6e8ec;
-  --ink-soft: #c4c9d2;
-  --muted: #9198a4;
-  --faint: #6b7280;
-  --neutral-soft: #222730;
-  --neutral-chip: #2b313c;
+  --font-display: var(--font-mono);
+  --font-data: var(--font-mono);
+  --tracking-label: .12em;
+  --glow-text: 0 0 6px color-mix(in srgb, currentColor 55%, transparent);
+  --glow-text-soft: 0 0 10px color-mix(in srgb, currentColor 22%, transparent);
+  --glow-text-strong: 0 0 4px color-mix(in srgb, currentColor 70%, transparent), 0 0 14px color-mix(in srgb, currentColor 35%, transparent);
+  --glow-futures: 0 0 0 1px var(--futures), 0 0 16px color-mix(in srgb, var(--futures) 45%, transparent);
+  --glow-evidence: 0 0 12px color-mix(in srgb, var(--evidence) 22%, transparent);
+  --glow-line: drop-shadow(0 0 3px color-mix(in srgb, var(--futures) 80%, transparent));
+  --glow-on: 1;
 
-  --accent: #60a5fa;
-  --on-accent: #0b1220;
-  --accent-soft: #172338;
-  --accent-tint: #1c2c47;
-  --accent-ring: #1e3a66;
-  --accent-ink: #93c5fd;
+  --bg: #05070a;
+  --card: #0a0f14;
+  --sunken: #0d1318;
+  --hover: #101a21;
+  --border: #1e2b34;
+  --border-soft: #152029;
+  --grid: #0e171d;
+  --ink: #f1e6d2;
+  --ink-soft: #cdbfa6;
+  --muted: #8b8273;
+  --faint: #5e584e;
+  --neutral-soft: #121920;
+  --neutral-chip: #1a232b;
 
-  --ok: #22c55e;
-  --ok-soft: #12291c;
-  --ok-wash: #10211a;
-  --ok-line: #1f6b3d;
-  --ok-ink: #86efac;
-  --warn: #f59e0b;
-  --warn-soft: #2e2410;
-  --warn-wash: #241d0e;
-  --warn-line: #78530f;
-  --warn-ink: #fcd34d;
-  --danger: #f87171;
-  --on-danger: #1a0b0b;
-  --danger-soft: #351a1a;
-  --danger-wash: #2a1515;
-  --danger-line: #7f1d1d;
-  --danger-ink: #fca5a5;
+  --accent: #ffb000;
+  --on-accent: #140b00;
+  --accent-soft: #211805;
+  --accent-tint: #2b2008;
+  --accent-ring: #5a4010;
+  --accent-ink: #ffc94d;
 
-  --evidence: #2dd4bf;
-  --evidence-soft: #0f2e2b;
-  --evidence-line: #155e57;
-  --evidence-ink: #99f6e4;
-  --xedge: #818cf8;
-  --xedge-soft: #1e2140;
-  --xedge-ink: #c7d2fe;
+  --ok: #5dff9a;
+  --ok-soft: #0a2215;
+  --ok-wash: #07180e;
+  --ok-line: #1c6a3e;
+  --ok-ink: #8dffb8;
+  --warn: #ff7a1a;
+  --warn-soft: #291305;
+  --warn-wash: #1d0e04;
+  --warn-line: #7a3a0c;
+  --warn-ink: #ffa463;
+  --danger: #ff3b5c;
+  --on-danger: #1a0007;
+  --danger-soft: #2a0a12;
+  --danger-wash: #1e070d;
+  --danger-line: #7d1a2c;
+  --danger-ink: #ff8098;
 
-  --futures: #a78bfa;
-  --on-futures: #160f2a;
-  --futures-soft: #2a2140;
-  --futures-wash: #1c1828;
-  --futures-faint: #3d3260;
-  --futures-line: #5b4b8a;
-  --futures-label: #8b7bc8;
-  --futures-grid: #262038;
-  --futures-ink: #ddd6fe;
-  --baseline: #6b7280;
+  --evidence: #2ee6d6;
+  --evidence-soft: #062422;
+  --evidence-line: #116b64;
+  --evidence-ink: #8ff7ee;
+  --xedge: #6aa8ff;
+  --xedge-soft: #0b1931;
+  --xedge-ink: #b3d1ff;
 
-  --h1: #94a3b8;
-  --h1-soft: #283241;
-  --h1-ink: #cbd5e1;
-  --h2: #f59e0b;
-  --h2-soft: #3a2c0c;
-  --h2-ink: #fcd34d;
-  --h3: #a78bfa;
-  --h3-soft: #2e2550;
-  --h3-ink: #c4b5fd;
+  --futures: #ff4fd8;
+  --on-futures: #1a0016;
+  --futures-soft: #280a24;
+  --futures-wash: #12060f;
+  --futures-faint: #461640;
+  --futures-line: #7a2a6c;
+  --futures-label: #c45bb0;
+  --futures-grid: #1b0b18;
+  --futures-ink: #ffb3ef;
+  --baseline: #5d6670;
 
-  --graph-entity: #60a5fa;
-  --graph-signal: #4ade80;
-  --graph-flagged: #f87171;
-  --graph-source: #6b7280;
-  --graph-edge: #3a4250;
-  --graph-about: #3b82f6;
-  --graph-equiv: #c084fc;
-  --graph-equiv-pending: #a855f7;
+  --h1: #7f93a3;
+  --h1-soft: #15202a;
+  --h1-ink: #b9c9d6;
+  --h2: #ffb000;
+  --h2-soft: #2b2008;
+  --h2-ink: #ffd27a;
+  --h3: #ff4fd8;
+  --h3-soft: #280a24;
+  --h3-ink: #ffb3ef;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
-  --shadow-md: 0 6px 18px rgba(0, 0, 0, .45);
-  --shadow-drawer: -8px 8px 28px rgba(0, 0, 0, .5);
-  --shadow-futures: 0 3px 10px rgba(167, 139, 250, .2);
-  --shadow-futures-lift: 0 6px 18px rgba(167, 139, 250, .3);
+  --graph-entity: #6aa8ff;
+  --graph-signal: #5dff9a;
+  --graph-flagged: #ff3b5c;
+  --graph-source: #5d6670;
+  --graph-edge: #233039;
+  --graph-about: #3d7fd9;
+  --graph-equiv: #ff4fd8;
+  --graph-equiv-pending: #a8379a;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .6);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, .6);
+  --shadow-drawer: -10px 10px 32px rgba(0, 0, 0, .7);
+  --shadow-futures: 0 0 14px color-mix(in srgb, var(--futures) 30%, transparent);
+  --shadow-futures-lift: 0 0 22px color-mix(in srgb, var(--futures) 45%, transparent);
 
   color-scheme: dark;
 }
