@@ -8,7 +8,7 @@ import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
-import { Button, Chip, toast } from "./ui.js";
+import { Button, Chip, toast } from "../ui.js";
 
 const html = htm.bind(h);
 

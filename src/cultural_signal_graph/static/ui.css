@@ -1,4 +1,4 @@
-/* Components (#46): the styles behind futures/ui.js. Tokens only, like every
+/* Components (#46): the styles behind ui.js, shared by the stepper and futures mode. Tokens only, like every
    stylesheet here (tests/test_design_tokens.py). Buttons and the card surface
    start from app.css's shared rules; this file adds the variants. */
 

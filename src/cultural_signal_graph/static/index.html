@@ -7,20 +7,21 @@
 <script src="/static/theme.js"></script>
 <link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/ui.css">
+<script type="importmap">
+{
+  "imports": {
+    "preact": "/static/vendor/preact.module.js",
+    "preact/hooks": "/static/vendor/hooks.module.js",
+    "@preact/signals-core": "/static/vendor/signals-core.module.js",
+    "@preact/signals": "/static/vendor/signals.module.js",
+    "htm": "/static/vendor/htm.module.js"
+  }
+}
+</script>
 </head>
 <body>
-<header id="topbar">
-  <span class="brand">Cultural Signal Graph</span>
-  <span id="mode-badge" class="badge" hidden title="Fixture stages run on recorded outputs — no model, no network"></span>
-  <a id="btn-futures" class="futures-link" hidden title="Explore speculative futures from this run's evidence">Futures →</a>
-  <span class="spacer"></span>
-  <button class="theme-toggle" data-theme-toggle aria-label="Switch light / dark theme"></button>
-  <button id="btn-runs" class="ghost" hidden>&larr; Runs</button>
-</header>
-<div id="layout">
-  <nav id="rail" aria-label="Pipeline stages"></nav>
-  <main id="canvas"></main>
-</div>
-<script src="/static/app.js"></script>
+<div id="app"></div>
+<script type="module" src="/static/app.js"></script>
 </body>
 </html>

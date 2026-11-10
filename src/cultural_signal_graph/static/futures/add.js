@@ -7,7 +7,7 @@ import { h } from "preact";
 import { useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
-import { Button, Drawer, Tabs, toast } from "./ui.js";
+import { Button, Drawer, Tabs, toast } from "../ui.js";
 
 const html = htm.bind(h);
 

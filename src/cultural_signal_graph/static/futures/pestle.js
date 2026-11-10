@@ -7,7 +7,7 @@ import { h } from "preact";
 import htm from "htm";
 import * as S from "./store.js";
 import { Scroll } from "./scroll.js";
-import { Button, Chip } from "./ui.js";
+import { Button, Chip } from "../ui.js";
 
 const html = htm.bind(h);
 

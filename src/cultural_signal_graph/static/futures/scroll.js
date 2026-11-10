@@ -11,7 +11,7 @@ import htm from "htm";
 import { TAG_HINTS, nodeTitle } from "./hints.js";
 import { layoutLanes, lineage } from "./layout.js";
 import * as S from "./store.js";
-import { Button, Chip, NodeCard, Roller } from "./ui.js";
+import { Button, Chip, NodeCard, Roller } from "../ui.js";
 
 const html = htm.bind(h);
 const d3 = window.d3;

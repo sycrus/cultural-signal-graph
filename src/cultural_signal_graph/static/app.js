@@ -1,5 +1,14 @@
-/* Cultural Signal Graph — stepper UI.
-   Left rail of stages; the canvas shows the active stage. Talk to the JSON API. */
+/* Cultural Signal Graph — the forecast stepper. Preact + htm + signals, vendored,
+   no build step (ADR-0011), built from the shared components in ui.js like futures
+   mode. Left rail of stages; the canvas shows the active stage. Talks to the JSON API. */
+
+import { h, render } from "preact";
+import { useState } from "preact/hooks";
+import { signal } from "@preact/signals";
+import htm from "htm";
+import { Button, Chip, EmptyState, Panel, Tabs, Toasts, Toggle, toast } from "./ui.js";
+
+const html = htm.bind(h);
 
 const RAIL_STAGES = [
   { key: "ask", label: "Ask" },
@@ -13,7 +22,9 @@ const RAIL_STAGES = [
 
 const RUN_STAGES = ["extract", "align", "sign-off", "draft", "brief"];
 
-const state = {
+/* --- state: one signal; set() merges, every view re-renders from it --------- */
+
+const state = signal({
   view: "home",
   runId: null,
   snap: null,
@@ -24,7 +35,11 @@ const state = {
   metrics: null, // the /metrics report for the open run
   futures: null, // {explorations, projections} on the open run, for the Graph tab's futures layer
   futuresLayer: false, // Graph tab: show exploration projections (hidden by default)
-};
+  graphView: null, // {zoom, focus} carried across the futures-layer reload
+});
+const get = () => state.value;
+const set = (patch) => (state.value = { ...state.value, ...patch });
+const fail = (err) => set({ error: String(err.message || err) });
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -39,7 +54,7 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
-/* --- rail ------------------------------------------------------------- */
+/* --- navigation & loading -------------------------------------------------- */
 
 /* Derive each rail item's state from the run snapshot: done / action (blocks) /
    active / current (you are here) / blocked (upstream not finished). */
@@ -65,133 +80,207 @@ function railStates(snap) {
   };
 }
 
-function renderRail() {
-  const rail = document.getElementById("rail");
-  const states = railStates(state.snap);
-  const firstOpen = RAIL_STAGES.find((s) => states[s.key] !== "done");
-  rail.innerHTML = "";
-  for (const stage of RAIL_STAGES) {
-    const cls = states[stage.key];
-    const item = document.createElement("button");
-    item.className = `rail-item ${cls}`;
-    if (stage.key === firstOpen?.key && cls !== "action") item.classList.add("current");
-    if (cls === "action") item.classList.add("current");
-    if (cls === "active" || cls === "done") {
-      item.addEventListener("click", () => showStage(stage.key));
-    }
-    const dot = document.createElement("span");
-    dot.className = "dot";
-    item.append(dot, document.createTextNode(stage.label));
-    rail.append(item);
-  }
+function currentStage(snap) {
+  if (snap.status === "created") return "sources"; // not started: review sources, then run
+  const states = railStates(snap);
+  const action = RAIL_STAGES.find((s) => states[s.key] === "action");
+  if (action) return action.key;
+  const firstOpen = RAIL_STAGES.find((s) => states[s.key] === "active");
+  return firstOpen ? firstOpen.key : "brief";
 }
 
 function showStage(key) {
-  if (!state.snap) return;
-  state.view = key;
-  state.error = null;
-  render();
-  if (key === "metrics" && state.snap && !state.metrics) {
-    fetchMetrics();
-  }
-  if (key === "graph" && !state.futures) fetchFutures();
+  if (!get().snap) return;
+  set({ view: key, error: null });
+  if (key === "metrics" && !get().metrics) fetchMetrics();
+  if (key === "graph" && !get().futures) fetchFutures();
 }
 
 async function fetchFutures() {
-  const runId = state.runId;
+  const runId = get().runId;
   const list = await api(`/api/runs/${runId}/explorations`).catch(() => null);
-  if (state.runId !== runId || !list) return;
-  state.futures = { explorations: list.length, projections: list.reduce((n, e) => n + (e.projections || 0), 0) };
-  if (state.view === "graph") render();
+  if (get().runId !== runId || !list) return;
+  set({ futures: { explorations: list.length, projections: list.reduce((n, e) => n + (e.projections || 0), 0) } });
 }
 
 async function fetchMetrics() {
-  state.metrics = await api(`/api/runs/${state.runId}/metrics`).catch(() => null);
-  if (state.view === "metrics") render();
+  const runId = get().runId;
+  const metrics = await api(`/api/runs/${runId}/metrics`).catch(() => null);
+  if (get().runId === runId) set({ metrics });
 }
 
-/* --- canvas views ------------------------------------------------------ */
+async function openRun(runId) {
+  try {
+    const snap = await api(`/api/runs/${runId}`);
+    set({ snap, runId, signoffDraft: {}, metrics: null, futures: null, graphView: null, error: null, view: currentStage(snap) });
+    if (get().view === "metrics") fetchMetrics();
+    if (get().view === "graph") fetchFutures();
+  } catch (err) {
+    fail(err);
+  }
+}
 
-function renderHome() {
-  const rows = state.runs
-    .map(
-      (r) => `<tr data-run="${r.id}">
-        <td>${r.id}</td>
-        <td>${escapeHtml(r.ask.category)} — ${escapeHtml(r.ask.question)}</td>
-        <td><span class="status ${r.status}">${r.status}</span></td>
-        <td>${r.created_at.replace("T", " ").slice(0, 16)}</td>
-      </tr>`,
-    )
-    .join("");
-  return `
-  <div class="canvas-narrow">
-    <h1>Forecast runs</h1>
-    <p class="lede">Start a forecast by entering an ask — or reopen a past run to
-    audit its brief, graph, and metrics.</p>
-    <div class="card" style="display:flex; align-items:center; gap:14px">
-      <button class="primary" id="btn-new-run">New run</button>
-      <span class="hint">Category, question, window, market.</span>
-    </div>
-    <h2>Past runs</h2>
-    <div class="card" style="padding:0">
-      <table>
-        <thead><tr><th>Run</th><th>Ask</th><th>Status</th><th>Created</th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="4" style="color:var(--muted)">No runs yet.</td></tr>`}</tbody>
-      </table>
-    </div>
+async function goHome() {
+  const runs = await api("/api/runs").catch(() => []);
+  set({ runs, view: "home", snap: null, runId: null, error: null });
+}
+
+/* --- shared bits ----------------------------------------------------------- */
+
+// Readable full URI: drop the scheme and "www.", decode %-escapes (Wikipedia
+// titles), keep the whole path so the source is identifiable at a glance.
+function shortUri(uri) {
+  try {
+    const u = new URL(uri);
+    let path = u.pathname + u.search;
+    try { path = decodeURIComponent(path); } catch {}
+    return u.hostname.replace(/^www\./, "") + (path === "/" ? "" : path);
+  } catch {
+    return uri;
+  }
+}
+const shortType = (sourceType) => sourceType.split("#").pop();
+const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
+
+function fmtDuration(ms) {
+  if (ms == null) return "";
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
+}
+
+const ErrorLine = () => (get().error ? html`<div class="error">${get().error}</div>` : null);
+
+// Run and edge statuses as chips: the same tone means the same thing everywhere.
+const STATUS_TONE = { completed: "ok", real: "ok", paused: "warn", proposed: "warn", running: "futures", rejected: "danger", failed: "danger" };
+const StatusChip = ({ status }) => html`<${Chip} tone=${STATUS_TONE[status] || "neutral"} class="status-chip">${status}<//>`;
+
+function Placeholder({ title, note }) {
+  return html`<div class="canvas-narrow">
+    <h1>${title}</h1>
+    <${Panel}><${EmptyState} title=${`No ${title.toLowerCase()} yet`}>${note}<//><//>
   </div>`;
 }
 
-function renderAsk() {
+const REVIEW_TABS = [{ key: "brief", label: "Brief" }, { key: "graph", label: "Graph" }, { key: "metrics", label: "Metrics" }];
+const ReviewTabs = ({ active }) => html`<${Tabs} class="review-tabs" label="Review" value=${active} onChange=${showStage} items=${REVIEW_TABS} />`;
+
+/* --- rail ---------------------------------------------------------------- */
+
+function Rail() {
+  const { snap, view } = get();
+  const states = railStates(snap);
+  const firstOpen = RAIL_STAGES.find((s) => states[s.key] !== "done");
+  return html`<nav id="rail" aria-label="Pipeline stages">
+    ${RAIL_STAGES.map((stage) => {
+      const cls = states[stage.key];
+      const current = cls === "action" || (stage.key === firstOpen?.key);
+      const open = cls === "active" || cls === "done";
+      return html`<${Button} key=${stage.key} class=${`rail-item ${cls} ${current ? "current" : ""} ${snap && view === stage.key ? "here" : ""}`}
+        disabled=${!open} aria-current=${snap && view === stage.key ? "step" : undefined}
+        onClick=${open ? () => showStage(stage.key) : undefined}>
+        <span class="dot" aria-hidden="true"></span>${stage.label}<//>`;
+    })}
+  </nav>`;
+}
+
+/* --- canvas views ---------------------------------------------------------- */
+
+function Home() {
+  const { runs } = get();
+  return html`<div class="canvas-narrow">
+    <h1>Forecast runs</h1>
+    <p class="lede">Start a forecast by entering an ask — or reopen a past run to
+    audit its brief, graph, and metrics.</p>
+    <${Panel} row>
+      <${Button} variant="primary" onClick=${() => set({ view: "ask", error: null })}>New run<//>
+      <span class="hint">Category, question, window, market.</span>
+    <//>
+    <h2>Past runs</h2>
+    <${Panel} flush>
+      ${runs.length
+        ? html`<table>
+            <thead><tr><th>Run</th><th>Ask</th><th>Status</th><th>Created</th></tr></thead>
+            <tbody>${runs.map((r) => html`<tr key=${r.id} class="row-link" tabindex="0"
+                onClick=${() => openRun(r.id)} onKeyDown=${(e) => e.key === "Enter" && openRun(r.id)}>
+                <td>${r.id}</td>
+                <td>${r.ask.category} — ${r.ask.question}</td>
+                <td><${StatusChip} status=${r.status} /></td>
+                <td>${r.created_at.replace("T", " ").slice(0, 16)}</td>
+              </tr>`)}</tbody>
+          </table>`
+        : html`<${EmptyState} title="No runs yet"
+            action=${html`<${Button} variant="primary" onClick=${() => set({ view: "ask", error: null })}>New run<//>`}>
+            A run answers one ask: it discovers sources, extracts signals and drafts a brief you sign off.<//>`}
+    <//>
+  </div>`;
+}
+
+function AskRecorded({ a }) {
   /* Reopened runs show the recorded ask read-only — a resubmission would start a
      different run, not re-enter this one. New asks come from the runs list. */
-  const a = state.snap && state.snap.ask;
-  if (a) {
-    return `
-    <div class="canvas-narrow">
-      <h1>Ask</h1>
-      <p class="lede">The ask this run answers. To ask again, start a new run from the runs list.</p>
-      <div class="card">
-        <label>Category</label><div>${escapeHtml(a.category)}</div>
-        <label>Question</label><div>${escapeHtml(a.question)}</div>
-        <label>Window</label><div>${escapeHtml(a.window.start)} → ${escapeHtml(a.window.end)}</div>
-        ${a.market ? `<label>Market</label><div>${escapeHtml(a.market)}</div>` : ""}
-      </div>
-    </div>`;
-  }
-  return `
-  <div class="canvas-narrow">
+  return html`<div class="canvas-narrow">
+    <h1>Ask</h1>
+    <p class="lede">The ask this run answers. To ask again, start a new run from the runs list.</p>
+    <${Panel} class="ask-recorded">
+      <dl>
+        <dt>Category</dt><dd>${a.category}</dd>
+        <dt>Question</dt><dd>${a.question}</dd>
+        <dt>Window</dt><dd>${a.window.start} → ${a.window.end}</dd>
+        ${a.market ? html`<dt>Market</dt><dd>${a.market}</dd>` : null}
+      </dl>
+    <//>
+  </div>`;
+}
+
+function Ask() {
+  const a = get().snap?.ask;
+  const [form, setForm] = useState({ category: "tech", question: "", start: "2026-01-01", end: "2026-06-30", market: "" });
+  const [busy, setBusy] = useState(false);
+  if (a) return html`<${AskRecorded} a=${a} />`;
+  const field = (key) => ({ value: form[key], onInput: (e) => setForm({ ...form, [key]: e.target.value }) });
+  const submit = async () => {
+    if (!form.question.trim()) return set({ error: "Enter a question for the forecast." });
+    setBusy(true);
+    try {
+      const snap = await api("/api/runs", { method: "POST", body: {
+        category: form.category || "tech", question: form.question,
+        window_start: form.start || "2026-01-01", window_end: form.end || "2026-06-30", market: form.market || null,
+      } });
+      set({ snap, runId: snap.id, view: "sources", error: null, signoffDraft: {}, metrics: null, futures: null });
+    } catch (err) {
+      fail(err);
+    }
+    setBusy(false);
+  };
+  return html`<div class="canvas-narrow">
     <h1>Ask</h1>
     <p class="lede">What should the forecast cover? The ask drives source discovery
     and selects the sub-ontology to reason over.</p>
-    <div class="card">
+    <${Panel}>
       <label for="ask-category">Category</label>
-      <input id="ask-category" list="categories" value="tech">
-      <datalist id="categories">
-        <option value="tech"></option>
-        <option value="gaming"></option>
-      </datalist>
+      <input id="ask-category" list="categories" ...${field("category")} />
+      <datalist id="categories"><option value="tech"></option><option value="gaming"></option></datalist>
       <div class="hint">An unfamiliar category is backfilled from the live web.</div>
 
       <label for="ask-question">Question</label>
-      <input id="ask-question" placeholder="AI wearables adoption">
+      <input id="ask-question" placeholder="AI wearables adoption" ...${field("question")}
+        onKeyDown=${(e) => e.key === "Enter" && submit()} />
 
       <label>Window</label>
-      <div style="display:flex; gap:8px; align-items:center">
-        <input id="ask-start" type="date" value="2026-01-01" style="flex:1">
+      <div class="row">
+        <input id="ask-start" type="date" aria-label="Window start" ...${field("start")} />
         <span>→</span>
-        <input id="ask-end" type="date" value="2026-06-30" style="flex:1">
+        <input id="ask-end" type="date" aria-label="Window end" ...${field("end")} />
       </div>
 
-      <label for="ask-market">Market <span style="font-weight:400; color:var(--muted)">(optional)</span></label>
-      <input id="ask-market" list="markets" placeholder="e.g. SEA, Japan, LATAM — or type any market">
-      <datalist id="markets">${MARKETS.map((m) => `<option value="${escapeHtml(m)}"></option>`).join("")}</datalist>
+      <label for="ask-market">Market <span class="optional">(optional)</span></label>
+      <input id="ask-market" list="markets" placeholder="e.g. SEA, Japan, LATAM — or type any market" ...${field("market")} />
+      <datalist id="markets">${MARKETS.map((m) => html`<option key=${m} value=${m}></option>`)}</datalist>
 
-      ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
-      <div style="margin-top:16px; text-align:right">
-        <button class="primary" id="btn-submit-ask">Run →</button>
+      <${ErrorLine} />
+      <div class="row right">
+        <${Button} variant="primary" onClick=${submit} busy=${busy} busyLabel="Discovering sources…">Run →<//>
       </div>
-    </div>
+    <//>
   </div>`;
 }
 
@@ -235,659 +324,397 @@ const MARKET_COUNTRIES = [
 ];
 const MARKETS = [...MARKET_REGIONS, ...MARKET_COUNTRIES];
 
-// Readable full URI: drop the scheme and "www.", decode %-escapes (Wikipedia
-// titles), keep the whole path so the source is identifiable at a glance.
-function shortUri(uri) {
+async function putSources(sources, note) {
   try {
-    const u = new URL(uri);
-    let path = u.pathname + u.search;
-    try { path = decodeURIComponent(path); } catch {}
-    return u.hostname.replace(/^www\./, "") + (path === "/" ? "" : path);
-  } catch {
-    return uri;
+    const snap = await api(`/api/runs/${get().runId}/sources`, { method: "PUT", body: { sources } });
+    set({ snap, error: null });
+    if (note) toast(note);
+  } catch (err) {
+    fail(err);
   }
 }
 
-function shortType(sourceType) {
-  return sourceType.split("#").pop();
+function DiscoveryTrace({ trace }) {
+  const via = trace.query_source === "model" ? "generated by the cheap model" : trace.query_source === "given" ? "as given" : "from the ask (model generation unavailable)";
+  return html`<${Panel}><details>
+    <summary>Discovery trace — ${trace.results.length} results examined via ${plural(trace.queries.length, "query", "queries")} (${trace.mode})</summary>
+    <div class="hint">Queries ${via}:</div>
+    <ul>${trace.queries.map((q) => html`<li key=${q}>${q}</li>`)}</ul>
+    <table>
+      <thead><tr><th>Result</th><th>Found by</th><th>Selected</th></tr></thead>
+      <tbody>${trace.results.map((r) => html`<tr key=${r.url} class="static">
+        <td><a href=${r.url} target="_blank" rel="noopener">${r.title}</a></td>
+        <td class="hint">“${r.query}”</td>
+        <td>${trace.selected.some((sel) => sel.uri === r.url) ? html`<${Chip} tone="ok">✓ web<//>` : null}</td>
+      </tr>`)}</tbody>
+    </table>
+  </details><//>`;
 }
 
-function renderSources() {
-  const s = state.snap;
+function Sources() {
+  const s = get().snap;
   const editable = s.status === "created"; // sources lock once the run starts
-  const rows = s.sources
-    .map(
-      (src, i) => `<tr data-index="${i}">
-        <td style="max-width:280px; overflow-wrap:anywhere"><a href="${escapeHtml(src.uri)}" target="_blank" rel="noopener" title="${escapeHtml(src.uri)}">${escapeHtml(shortUri(src.uri))}</a></td>
-        <td>${escapeHtml(shortType(src.source_type))}</td>
-        <td>${src.credibility}</td>
-        <td style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(src.text)}</td>
-        <td>${editable ? `<button class="ghost" data-remove="${i}">✕</button>` : ""}</td>
-      </tr>`,
-    )
-    .join("");
-  const trace = s.discovery;
-  const traceBlock = trace
-    ? `<details class="card">
-        <summary>Discovery trace — ${trace.results.length} results examined via ${trace.queries.length} quer${trace.queries.length === 1 ? "y" : "ies"} (${escapeHtml(trace.mode)})</summary>
-        <div class="hint" style="margin:6px 0">Queries ${escapeHtml(trace.query_source === "model" ? "generated by the cheap model" : trace.query_source === "given" ? "as given" : "from the ask (model generation unavailable)")}:</div>
-        <ul style="margin:4px 0; padding-left:18px">${trace.queries.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>
-        <table style="margin-top:8px">
-          <thead><tr><th>Result</th><th>Found by</th><th>Selected</th></tr></thead>
-          <tbody>${trace.results
-            .map(
-              (r) => `<tr>
-                <td><a href="${escapeHtml(r.url)}" target="_blank" rel="noopener">${escapeHtml(r.title)}</a></td>
-                <td class="hint">“${escapeHtml(r.query)}”</td>
-                <td>${trace.selected.some((sel) => sel.uri === r.url) ? "✓ web" : ""}</td>
-              </tr>`,
-            )
-            .join("")}</tbody>
-        </table>
-      </details>`
-    : "";
-  return `
-  <div class="canvas-narrow">
+  const [uri, setUri] = useState("");
+  const [text, setText] = useState("");
+  const [starting, setStarting] = useState(false);
+  const add = async () => {
+    if (!uri.trim() || !text.trim()) return set({ error: "A source needs a URI and what it says." });
+    await putSources(s.sources.concat([{
+      uri: uri.trim(), text: text.trim(), source_type: "https://cultural-signal-graph.dev/ontology#Source",
+      credibility: 0.6, category: s.ask.category, topics: [],
+    }]), "Source added.");
+    if (!get().error) { setUri(""); setText(""); }
+  };
+  const remove = (i) => {
+    const removed = s.sources[i];
+    putSources(s.sources.filter((_, j) => j !== i), null).then(() => {
+      if (!get().error) toast(`Removed ${shortUri(removed.uri)}.`, { action: { label: "Undo", run: () => putSources(s.sources, "Source restored.") } });
+    });
+  };
+  const reset = async () => {
+    try {
+      set({ snap: await api(`/api/runs/${get().runId}/sources/reset`, { method: "POST" }), error: null });
+      toast("Sources reset to what discovery found.");
+    } catch (err) {
+      fail(err);
+    }
+  };
+  const start = async () => {
+    setStarting(true);
+    set({ view: "run", busy: true, error: null, signoffDraft: {} });
+    try {
+      const snap = await api(`/api/runs/${get().runId}/start`, { method: "POST" });
+      set({ snap, busy: false, view: currentStage(snap) });
+    } catch (err) {
+      set({ busy: false });
+      fail(err);
+    }
+    setStarting(false);
+  };
+  const promoted = s.origin?.promoted_from;
+  return html`<div class="canvas-narrow">
     <h1>Sources</h1>
-    <p class="lede">Discovered for “${escapeHtml(s.ask.question)}”. Auditable by
-    default — expand to review${editable ? " or override before extraction runs" : ""}.</p>
-    <details class="card" ${s.sources.length === 0 ? "open" : ""}>
-      <summary>${s.sources.length} source${s.sources.length === 1 ? "" : "s"}</summary>
-      <table>
-        <thead><tr><th>Source</th><th>Type</th><th>Credibility</th><th>Text</th><th></th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="5" style="color:var(--muted)">None — add one below.</td></tr>`}</tbody>
-      </table>
-      ${editable ? `
-      <div style="display:flex; gap:8px; margin-top:12px">
-        <input id="add-uri" placeholder="https://… (source URI)" style="flex:2">
-        <input id="add-text" placeholder="What it says" style="flex:3">
-        <button id="btn-add-source">+ Add</button>
-      </div>` : ""}
-    </details>
-    ${traceBlock}
-    ${s.origin && s.origin.promoted_from ? `<div class="card origin-note">↗ This run was created by promoting a reference from
-      <a href="/futures?run=${encodeURIComponent(s.origin.promoted_from.run)}&x=${encodeURIComponent(s.origin.promoted_from.exploration)}">an exploration</a>
-      on run ${escapeHtml(s.origin.promoted_from.run)}: <a href="${escapeHtml(s.origin.promoted_from.url)}" target="_blank" rel="noopener">${escapeHtml(shortUri(s.origin.promoted_from.url))}</a>
-      is the last source below.</div>` : ""}
-    ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
-    ${editable ? `
-    <div style="display:flex; justify-content:space-between; margin-top:14px">
-      <button id="btn-reset-sources">Reset to discovered</button>
-      <button class="primary" id="btn-start-run" ${s.sources.length === 0 ? "disabled" : ""}>Start run →</button>
-    </div>` : ""}
+    <p class="lede">Discovered for “${s.ask.question}”. Auditable by default — expand to
+      review${editable ? " or override before extraction runs" : ""}.</p>
+    <${Panel}><details open=${s.sources.length === 0 || editable}>
+      <summary>${plural(s.sources.length, "source")}</summary>
+      ${s.sources.length
+        ? html`<table>
+            <thead><tr><th>Source</th><th>Type</th><th>Credibility</th><th>Text</th><th></th></tr></thead>
+            <tbody>${s.sources.map((src, i) => html`<tr key=${src.uri + i} class="static">
+              <td class="uri"><a href=${src.uri} target="_blank" rel="noopener" title=${src.uri}>${shortUri(src.uri)}</a></td>
+              <td>${shortType(src.source_type)}</td>
+              <td class="num">${src.credibility}</td>
+              <td class="clip" title=${src.text}>${src.text}</td>
+              <td>${editable ? html`<${Button} variant="ghost" aria-label=${`Remove ${shortUri(src.uri)}`} title="Remove" onClick=${() => remove(i)}>✕<//>` : null}</td>
+            </tr>`)}</tbody>
+          </table>`
+        : html`<${EmptyState} compact title="No sources">${editable ? "Add one below, or reset to what discovery found." : null}<//>`}
+      ${editable
+        ? html`<div class="row add-source">
+            <input placeholder="https://… (source URI)" aria-label="Source URI" value=${uri} onInput=${(e) => setUri(e.target.value)} />
+            <input placeholder="What it says" aria-label="What it says" value=${text} onInput=${(e) => setText(e.target.value)}
+              onKeyDown=${(e) => e.key === "Enter" && add()} />
+            <${Button} onClick=${add}>+ Add<//>
+          </div>`
+        : null}
+    </details><//>
+    ${s.discovery ? html`<${DiscoveryTrace} trace=${s.discovery} />` : null}
+    ${promoted
+      ? html`<${Panel} class="origin-note">↗ This run was created by promoting a reference from
+          <a href=${`/futures?run=${encodeURIComponent(promoted.run)}&x=${encodeURIComponent(promoted.exploration)}`}>an exploration</a>
+          on run ${promoted.run}: <a href=${promoted.url} target="_blank" rel="noopener">${shortUri(promoted.url)}</a> is the last source below.<//>`
+      : null}
+    <${ErrorLine} />
+    ${editable
+      ? html`<div class="row spread">
+          <${Button} onClick=${reset}>Reset to discovered<//>
+          <${Button} variant="primary" onClick=${start} disabled=${s.sources.length === 0} busy=${starting} busyLabel="Starting…">Start run →<//>
+        </div>`
+      : null}
   </div>`;
 }
 
-function stageChip(name, st) {
-  const done = st && st.status === "done";
-  const paused = st && st.status === "paused";
-  const mark = done ? "✓" : paused ? "…" : "·";
-  const metric = done ? `${st.tokens} tok · ${fmtDuration(st.latency_ms)}` : "";
-  return `<span class="stage-chip ${done ? "done" : paused ? "paused" : ""}">
-    ${name} ${mark}${metric ? ` <small>${metric}</small>` : ""}</span>`;
+function StageChip({ name, st }) {
+  const done = st?.status === "done";
+  const paused = st?.status === "paused";
+  return html`<${Chip} tone=${done ? "ok" : paused ? "warn" : "neutral"} class="stage-chip">
+    ${name} ${done ? "✓" : paused ? "…" : "·"}${done ? html` <small>${st.tokens} tok · ${fmtDuration(st.latency_ms)}</small>` : null}<//>`;
 }
 
-function renderRun() {
-  const s = state.snap;
-  const chips = RUN_STAGES.map((name) => stageChip(name, s.stages[name])).join("");
-  if (state.busy) {
-    return `
-    <div class="canvas-narrow">
-      <h1>Run</h1>
-      <p class="lede">Extracting signals and proposing cross-domain edges…</p>
-      <div class="card run-busy"><span class="spinner"></span> ${chips}</div>
-    </div>`;
-  }
-  return `
-  <div class="canvas-narrow">
+function Run() {
+  const { snap: s, busy } = get();
+  const chips = RUN_STAGES.map((name) => html`<${StageChip} key=${name} name=${name} st=${s.stages[name]} />`);
+  return html`<div class="canvas-narrow">
     <h1>Run</h1>
-    <p class="lede">Per-stage tokens and latency, recorded at each stage boundary.</p>
-    <div class="card" style="display:flex; gap:8px; flex-wrap:wrap">${chips}</div>
-    ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
-  </div>`;
-}
-
-function renderSignOff() {
-  const s = state.snap;
-  const undoable = s.status === "completed" && Object.keys(s.decisions || {}).length > 0;
-  if (s.status !== "paused" && !undoable) {
-    return renderPlaceholder(
-      "Sign-off",
-      "No cross-domain edges were proposed for this run, so nothing needed a decision.",
-    );
-  }
-
-  if (undoable) {
-    // pending is empty once the run resumes — resolve names from the brief's
-    // gated edges (which carry the display names and the resolved status)
-    const gated = Object.fromEntries((s.brief ? s.brief.gated_edges : []).map((g) => [g.id, g]));
-    const rows = Object.entries(s.decisions)
-      .map(([id, approved]) => {
-        const known = (s.pending || []).find((e) => e.id === id) || gated[id];
-        const label = known
-          ? `${escapeHtml(known.left_entity || known.left)} ≈ ${escapeHtml(known.right_entity || known.right)}`
-          : id;
-        return `<div class="edge-card decided">
-          <div class="edge-head">${label}</div>
-          <div class="edge-verdict ${approved ? "approved" : "rejected"}">
-            ${approved ? "✓ approved — asserted as real" : "✕ rejected — dropped"}</div>
-        </div>`;
-      })
-      .join("");
-    return `
-    <div class="canvas-narrow">
-      <h1>Sign-off</h1>
-      <p class="lede">Your decision is recorded but stays editable until you export.
-      Undoing re-runs the downstream (draft → brief) and parks the run back here.</p>
-      ${rows}
-      ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
-      <div style="margin-top:14px">
-        <button id="btn-undo-signoff">Undo sign-off &amp; re-decide</button>
-      </div>
-    </div>`;
-  }
-
-  const decided = state.signoffDraft || {};
-  const all = s.pending.every((e) => e.id in decided);
-  const cards = s.pending
-    .map(
-      (e) => `
-    <div class="edge-card">
-      <div class="edge-head">${escapeHtml(e.left)} <span class="approx">≈</span> ${escapeHtml(e.right)}</div>
-      <div class="edge-meta">confidence ${e.confidence} · ${escapeHtml(e.left_category)} ⇄ ${escapeHtml(e.right_category)}</div>
-      ${edgeEvidence(e.left, e.left_sources)}
-      ${edgeEvidence(e.right, e.right_sources)}
-      <div class="edge-actions">
-        <button class="${decided[e.id] === true ? "primary" : ""}" data-decide="${e.id}" data-value="true"
-          ${decided[e.id] === false ? "disabled" : ""}>✓ Approve</button>
-        <button class="${decided[e.id] === false ? "danger-active" : ""}" data-decide="${e.id}" data-value="false"
-          ${decided[e.id] === true ? "disabled" : ""}>✕ Reject</button>
-        ${e.id in decided ? `<span class="edge-verdict ${decided[e.id] ? "approved" : "rejected"}">your call: ${decided[e.id] ? "real" : "dropped"} — reversible until export</span>` : ""}
-      </div>
-    </div>`,
-    )
-    .join("");
-  return `
-  <div class="canvas-narrow">
-    <h1>Sign-off</h1>
-    <p class="lede">The run is <b>paused</b> until you decide. Approving asserts a
-    cross-domain equivalence edge as real; rejecting drops it and keeps the categories separate.</p>
-    <p class="review-count">◉ Review ${s.pending.length} proposed cross-domain edge${s.pending.length === 1 ? "" : "s"}</p>
-    ${cards}
-    ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ""}
-    <div style="margin-top:14px; display:flex; gap:10px; align-items:center">
-      <button class="primary" id="btn-confirm-signoff" ${all && !state.busy ? "" : "disabled"}>
-        ${state.busy ? "Resuming the run…" : "Confirm sign-off →"}</button>
-      ${all ? "" : `<span class="hint">Decide every proposed edge to resume the run.</span>`}
-    </div>
+    <p class="lede">${busy ? "Extracting signals and proposing cross-domain edges…" : "Per-stage tokens and latency, recorded at each stage boundary."}</p>
+    <${Panel} row class="stage-chips">${busy ? html`<span class="spinner"></span>` : null}${chips}<//>
+    <${ErrorLine} />
   </div>`;
 }
 
 // The sources behind one side of a proposed edge, as links to check before deciding.
 // Runs paused before this field existed have no list, so render nothing.
-function edgeEvidence(name, uris) {
-  if (!uris || !uris.length) return "";
-  const links = uris
-    .map((u) => `<li style="overflow-wrap:anywhere"><a href="${escapeHtml(u)}" target="_blank" rel="noopener" title="${escapeHtml(u)}">${escapeHtml(shortUri(u))}</a></li>`)
-    .join("");
-  return `<div class="edge-meta" style="margin-top:6px">Sources for <b>${escapeHtml(name)}</b>:
-    <ul style="margin:2px 0 0; padding-left:18px">${links}</ul></div>`;
-}
-
-function renderPlaceholder(title, note) {
-  return `<div class="canvas-narrow">
-    <h1>${title}</h1>
-    <p class="lede">${note}</p>
+function EdgeEvidence({ name, uris }) {
+  if (!uris?.length) return null;
+  return html`<div class="edge-meta">Sources for <b>${name}</b>:
+    <ul>${uris.map((u) => html`<li key=${u}><a href=${u} target="_blank" rel="noopener" title=${u}>${shortUri(u)}</a></li>`)}</ul>
   </div>`;
 }
 
-function renderBrief() {
-  const b = state.snap && state.snap.brief;
-  if (!b) {
-    return renderPlaceholder(
-      "Brief",
-      "The brief appears once the run resolves sign-off and drafting finishes.",
-    );
+function SignOff() {
+  const { snap: s, signoffDraft: decided, busy } = get();
+  const undoable = s.status === "completed" && Object.keys(s.decisions || {}).length > 0;
+  if (s.status !== "paused" && !undoable) {
+    return html`<${Placeholder} title="Sign-off" note="No cross-domain edges were proposed for this run, so nothing needed a decision." />`;
   }
-  const claims = b.claims
-    .map(
-      (c, i) => `
-    <div class="claim-card">
-      <div class="claim-head">
-        <span class="claim-num">${i + 1}.</span>
-        <span class="claim-statement">${escapeHtml(c.statement)}</span>
-        <span class="conf-chip" title="Confidence — how much we trust this, not a calibrated probability">${c.confidence}</span>
+  if (undoable) {
+    // pending is empty once the run resumes — resolve names from the brief's
+    // gated edges (which carry the display names and the resolved status)
+    const gated = Object.fromEntries((s.brief ? s.brief.gated_edges : []).map((g) => [g.id, g]));
+    const undo = async () => {
+      try {
+        const snap = await api(`/api/runs/${get().runId}/signoff/undo`, { method: "POST" });
+        set({ snap, signoffDraft: {}, view: "sign-off", error: null });
+        toast("Sign-off reopened: the brief will be redrafted after you decide again.");
+      } catch (err) {
+        fail(err);
+      }
+    };
+    return html`<div class="canvas-narrow">
+      <h1>Sign-off</h1>
+      <p class="lede">Your decision is recorded but stays editable until you export.
+      Undoing re-runs the downstream (draft → brief) and parks the run back here.</p>
+      ${Object.entries(s.decisions).map(([id, approved]) => {
+        const known = (s.pending || []).find((e) => e.id === id) || gated[id];
+        return html`<${Panel} key=${id} class=${`edge-card decided ${approved ? "approved" : "rejected"}`}>
+          <div class="edge-head">${known ? html`${known.left_entity || known.left} <span class="approx">≈</span> ${known.right_entity || known.right}` : id}</div>
+          <${Chip} tone=${approved ? "ok" : "danger"}>${approved ? "✓ approved — asserted as real" : "✕ rejected — dropped"}<//>
+        <//>`;
+      })}
+      <${ErrorLine} />
+      <div class="row"><${Button} onClick=${undo}>Undo sign-off & re-decide<//></div>
+    </div>`;
+  }
+
+  const all = s.pending.every((e) => e.id in decided);
+  const decide = (id, approved) => set({ signoffDraft: { ...decided, [id]: approved } });
+  const confirm = async () => {
+    set({ busy: true, error: null });
+    try {
+      const snap = await api(`/api/runs/${get().runId}/signoff`, { method: "POST", body: { decisions: decided } });
+      set({ snap, signoffDraft: {}, view: currentStage(snap), busy: false });
+      toast("Sign-off recorded. The brief is drafted.");
+    } catch (err) {
+      set({ busy: false });
+      fail(err);
+    }
+  };
+  return html`<div class="canvas-narrow">
+    <h1>Sign-off</h1>
+    <p class="lede">The run is <b>paused</b> until you decide. Approving asserts a
+    cross-domain equivalence edge as real; rejecting drops it and keeps the categories separate.</p>
+    <p class="review-count">◉ Review ${plural(s.pending.length, "proposed cross-domain edge")}</p>
+    ${s.pending.map((e) => html`<${Panel} key=${e.id} class="edge-card">
+      <div class="edge-head">${e.left} <span class="approx">≈</span> ${e.right}</div>
+      <div class="edge-meta">confidence ${e.confidence} · ${e.left_category} ⇄ ${e.right_category}</div>
+      <${EdgeEvidence} name=${e.left} uris=${e.left_sources} />
+      <${EdgeEvidence} name=${e.right} uris=${e.right_sources} />
+      <div class="edge-actions">
+        <${Button} variant=${decided[e.id] === true ? "primary" : null} aria-pressed=${decided[e.id] === true ? "true" : "false"}
+          onClick=${() => decide(e.id, true)}>✓ Approve<//>
+        <${Button} variant=${decided[e.id] === false ? "danger" : null} aria-pressed=${decided[e.id] === false ? "true" : "false"}
+          onClick=${() => decide(e.id, false)}>✕ Reject<//>
+        ${e.id in decided
+          ? html`<${Chip} tone=${decided[e.id] ? "ok" : "danger"}>your call: ${decided[e.id] ? "real" : "dropped"} — reversible until export<//>`
+          : null}
       </div>
-      <div class="claim-valid">valid ${escapeHtml(c.temporal_validity.valid_from.slice(0, 10))}
-        → ${escapeHtml(c.temporal_validity.valid_until.slice(0, 10))}</div>
-      <details><summary>▸ reasoning</summary><p>${escapeHtml(c.reasoning)}</p></details>
-      <details><summary>▸ sources (${c.sources.length})</summary>
-        <ul>${c.sources
-          .map(
-            (src) => `<li><a href="${escapeHtml(src.uri)}" target="_blank" rel="noopener">${escapeHtml(shortUri(src.uri))}</a>
-            <span class="hint">(${escapeHtml(shortType(src.source_type))}, credibility ${src.credibility})</span></li>`,
-          )
-          .join("")}</ul>
-      </details>
-    </div>`,
-    )
-    .join("");
-  const flags = b.flags.length
-    ? b.flags
-        .map(
-          (f) => `
-    <div class="flag-card">
-      <span class="reason-chip ${f.reason === "conflict" ? "conflict" : "low"}">${f.reason}</span>
-      <span>${escapeHtml(f.statement)}</span>
-      <span class="hint">confidence ${f.confidence} · <a href="${escapeHtml(f.source_uri)}" target="_blank" rel="noopener">source</a></span>
-    </div>`,
-        )
-        .join("")
-    : `<div class="hint" style="margin:6px 0">None.</div>`;
-  const gated = b.gated_edges.length
-    ? b.gated_edges
-        .map(
-          (g) => `
-    <div class="gated-row">
-      <span class="gated-edge">⛓ ${escapeHtml(g.left_entity)} ≈ ${escapeHtml(g.right_entity)}</span>
-      <span class="hint">confidence ${g.confidence}</span>
-      <span class="status ${g.status}">${g.status}</span>
-      <button class="ghost" data-goto="sign-off">review</button>
-    </div>`,
-        )
-        .join("")
-    : `<div class="hint" style="margin:6px 0">No cross-domain edges were proposed.</div>`;
-  const exports = ["brief.md", "brief.json", "brief.pptx", "graph.ttl", "usage.json"]
-    .map((name) => `<a class="export-link" href="/api/runs/${state.runId}/exports/${name}" download>${name}</a>`)
-    .join(" ");
-  return `
-  ${tabsHtml("brief")}
-  <div class="canvas-narrow">
-    <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap">
-      <h1>Forecast brief — ${escapeHtml(b.category)}</h1>
-      <span class="hint">as of ${escapeHtml(b.as_of)}</span>
+    <//>`)}
+    <${ErrorLine} />
+    <div class="row">
+      <${Button} variant="primary" onClick=${confirm} disabled=${!all} busy=${busy} busyLabel="Resuming the run…">Confirm sign-off →<//>
+      ${all ? null : html`<span class="hint">Decide every proposed edge to resume the run.</span>`}
     </div>
-    <p class="lede">${b.claims.length} claim${b.claims.length === 1 ? "" : "s"}, ${b.flags.length} flagged.
-    Exports: ${exports}</p>
+  </div>`;
+}
+
+function Brief() {
+  const { snap, runId } = get();
+  const b = snap?.brief;
+  if (!b) return html`<${Placeholder} title="Brief" note="The brief appears once the run resolves sign-off and drafting finishes." />`;
+  return html`<${ReviewTabs} active="brief" />
+  <div class="canvas-narrow">
+    <div class="brief-head">
+      <h1>Forecast brief — ${b.category}</h1>
+      <span class="hint">as of ${b.as_of}</span>
+    </div>
+    <p class="lede">${plural(b.claims.length, "claim")}, ${b.flags.length} flagged.</p>
+    <div class="exports"><span class="hint">Export</span>
+      ${["brief.md", "brief.json", "brief.pptx", "graph.ttl", "usage.json"].map(
+        (name) => html`<${Button} key=${name} class="export-link" href=${`/api/runs/${runId}/exports/${name}`} download>${name}<//>`,
+      )}
+    </div>
 
     <h2>Trends</h2>
-    ${claims || `<div class="hint">No confident trends.</div>`}
+    ${b.claims.length
+      ? b.claims.map((c, i) => html`<${Panel} key=${i} class="claim-card">
+          <div class="claim-head">
+            <span class="claim-num">${i + 1}.</span>
+            <span class="claim-statement">${c.statement}</span>
+            <${Chip} class="conf-chip" title="Confidence — how much we trust this, not a calibrated probability">${c.confidence}<//>
+          </div>
+          <div class="claim-valid">valid ${c.temporal_validity.valid_from.slice(0, 10)} → ${c.temporal_validity.valid_until.slice(0, 10)}</div>
+          <details><summary>reasoning</summary><p>${c.reasoning}</p></details>
+          <details><summary>sources (${c.sources.length})</summary>
+            <ul>${c.sources.map((src) => html`<li key=${src.uri}><a href=${src.uri} target="_blank" rel="noopener">${shortUri(src.uri)}</a>
+              <span class="hint"> (${shortType(src.source_type)}, credibility ${src.credibility})</span></li>`)}</ul>
+          </details>
+        <//>`)
+      : html`<${Panel}><${EmptyState} compact title="No confident trends." /><//>`}
 
     <h2>⚠ Flagged signals</h2>
-    <p class="hint" style="margin-top:0">Surfaced, never averaged away — they stay in the graph but are not claims.</p>
-    ${flags}
+    <p class="hint">Surfaced, never averaged away — they stay in the graph but are not claims.</p>
+    ${b.flags.length
+      ? b.flags.map((f, i) => html`<${Panel} key=${i} row class=${`flag-card ${f.reason === "conflict" ? "conflict" : "low"}`}>
+          <${Chip} tone=${f.reason === "conflict" ? "danger" : "warn"}>${f.reason}<//>
+          <span class="flag-text">${f.statement}</span>
+          <span class="hint">confidence ${f.confidence} · <a href=${f.source_uri} target="_blank" rel="noopener">source</a></span>
+        <//>`)
+      : html`<${Panel}><${EmptyState} compact title="None flagged." /><//>`}
 
     <h2>⛓ Gated cross-domain edges</h2>
-    ${gated}
+    ${b.gated_edges.length
+      ? b.gated_edges.map((g) => html`<${Panel} key=${g.id} row class="gated-row">
+          <span class="gated-edge">⛓ ${g.left_entity} ≈ ${g.right_entity}</span>
+          <span class="hint">confidence ${g.confidence}</span>
+          <${StatusChip} status=${g.status} />
+          <span class="spacer"></span>
+          <${Button} variant="ghost" onClick=${() => showStage("sign-off")}>Review<//>
+        <//>`)
+      : html`<${Panel}><${EmptyState} compact title="No cross-domain edges were proposed." /><//>`}
   </div>`;
 }
 
-function tabsHtml(active) {
-  return `<div class="tabs">${[["brief", "Brief"], ["graph", "Graph"], ["metrics", "Metrics"]]
-    .map(
-      ([key, label]) =>
-        `<button class="tab ${key === active ? "active" : ""}" data-tab="${key}">${label}</button>`,
-    )
-    .join("")}</div>`;
-}
-
-function reviewPlaceholder(tab, note) {
-  return `${tabsHtml(tab)}${renderPlaceholder(tab === "graph" ? "Graph" : "Metrics", note)}`;
-}
-
-function graphViewHash() {
-  const v = state.graphView;
-  if (!v || !v.zoom) return "";
-  return `#zoom=${v.zoom.toFixed(3)}${v.focus ? `&focus=${encodeURIComponent(v.focus)}` : ""}`;
-}
-
-function futuresToggle() {
+function GraphView() {
+  const { snap, runId, futures: f, futuresLayer, graphView } = get();
+  if (!snap || snap.status !== "completed") {
+    return html`<${ReviewTabs} active="graph" /><${Placeholder} title="Graph" note="The graph explorer appears once the run completes." />`;
+  }
   /* The futures layer adds this run's explorations to the graph; say what it adds,
      and say so plainly when there is nothing to add yet. */
-  const f = state.futures;
   const none = f && f.projections === 0;
-  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
-  const what = !f ? "" : none
-    ? `<span class="hint">No explorations on this run yet. <a href="/futures?run=${state.runId}">Start one in Futures →</a></span>`
-    : `<span class="hint">adds ${plural(f.projections, "projection")} from ${plural(f.explorations, "exploration")}</span>`;
-  return `<div class="futures-toggle-row">
-    <label class="futures-toggle ${none ? "disabled" : ""}" title="Projections from this run's explorations, beside the evidence they grow from. Never part of the brief.">
-      <input type="checkbox" id="toggle-futures" ${state.futuresLayer && !none ? "checked" : ""} ${none ? "disabled" : ""}> Show futures layer
-    </label>
-    ${what}
-  </div>`;
+  const toggle = (on) => {
+    // Keep the viewer's zoom and centre across the reload the toggle causes.
+    let view = null;
+    try { view = document.querySelector(".graph-frame")?.contentWindow?.graphView?.() || null; } catch { view = null; }
+    set({ futuresLayer: on, graphView: view });
+  };
+  const hash = graphView?.zoom ? `#zoom=${graphView.zoom.toFixed(3)}${graphView.focus ? `&focus=${encodeURIComponent(graphView.focus)}` : ""}` : "";
+  return html`<${ReviewTabs} active="graph" />
+    <div class="futures-toggle-row">
+      <${Toggle} class="futures-toggle" label="Show futures layer" checked=${futuresLayer && !none} disabled=${!!none} onChange=${toggle}
+        title="Projections from this run's explorations, beside the evidence they grow from. Never part of the brief." />
+      ${!f ? null : none
+        ? html`<span class="hint">No explorations on this run yet. <a href=${`/futures?run=${runId}`}>Start one in Futures →</a></span>`
+        : html`<span class="hint">adds ${plural(f.projections, "projection")} from ${plural(f.explorations, "exploration")}</span>`}
+    </div>
+    <iframe class="graph-frame" src=${`/runs/${runId}/graph.html${futuresLayer && !none ? "?futures_layer=true" : ""}${hash}`}
+      title="Graph explorer — search, layout, click-to-trace"></iframe>`;
 }
 
-function renderGraph() {
-  if (!state.snap || state.snap.status !== "completed") {
-    return reviewPlaceholder("graph", "The graph explorer appears once the run completes.");
+function Metrics() {
+  const m = get().metrics;
+  if (!m) {
+    return html`<${ReviewTabs} active="metrics" />
+      <div class="canvas-narrow"><h1>Metrics</h1><${Panel} row><span class="spinner"></span> Loading metrics…<//></div>`;
   }
-  return `
-  ${tabsHtml("graph")}
-  ${futuresToggle()}
-  <iframe class="graph-frame" src="/runs/${state.runId}/graph.html${state.futuresLayer ? "?futures_layer=true" : ""}${graphViewHash()}"
-    title="Graph explorer — search, layout, click-to-trace"></iframe>`;
-}
-
-function renderMetrics() {
-  if (!state.metrics) {
-    return reviewPlaceholder("metrics", "Loading metrics…");
-  }
-  const m = state.metrics;
   const usage = m.usage || { total_tokens: 0, input_tokens: 0, output_tokens: 0, calls: [] };
-  const calls = (usage.calls || [])
-    .map(
-      (c) => `<tr><td>${escapeHtml(c.model)}</td><td>${c.input_tokens}</td><td>${c.output_tokens}</td><td>${c.total_tokens}</td></tr>`,
-    )
-    .join("");
-  const stageRows = Object.entries(m.stages || {})
-    .filter(([name]) => RUN_STAGES.includes(name))
-    .map(([name, st]) => `<tr><td>${name}</td><td>${st.tokens} tok</td><td>${fmtDuration(st.latency_ms)}</td></tr>`)
-    .join("");
-
-  let evalHtml;
+  const calls = usage.calls || [];
+  const stages = Object.entries(m.stages || {}).filter(([name]) => RUN_STAGES.includes(name));
   const ev = m.eval;
-  if (!ev) {
-    evalHtml = `<div class="hint">Eval scores appear once the run is finalized.</div>`;
-  } else if (ev.scores == null) {
-    evalHtml = `<div class="hint">${escapeHtml(ev.reason)}</div>`;
-  } else {
-    const below = new Set(ev.below_threshold || []);
-    const scores = Object.entries(ev.scores)
-      .map(
-        ([metric, score]) =>
-          `<span class="score-chip ${below.has(metric) ? "low" : "ok"}">${metric} ${score}${below.has(metric) ? " ⚠" : ""}</span>`,
-      )
-      .join("");
-    evalHtml = `<div>${scores}</div>
-      <p class="hint">Scored against the golden case “${escapeHtml(ev.case)}” ${escapeHtml(ev.scored_at || "at finalize")}
-      — the pipeline's correctness before your sign-off decisions. Below-threshold metrics are the regression gate.</p>`;
-  }
-
+  const below = new Set(ev?.below_threshold || []);
   const acc = m.accuracy;
-  let accHtml;
-  if (!acc) {
-    accHtml = `<div class="hint">Appears once the run is finalized.</div>`;
-  } else if (acc.accuracy == null) {
-    accHtml = `<div class="hint">${acc.trends_total} trends recorded, ${acc.checked} checked — accuracy is
-      lagging telemetry: it fills in as each trend is marked materialized later. Reported, never gating.</div>`;
-  } else {
-    accHtml = `<div class="metric-big">${Math.round(acc.accuracy * 100)}%</div>
-      <div class="hint">${acc.materialized} of ${acc.checked} checked trends materialized (${acc.trends_total} recorded).</div>`;
-  }
-
-  return `
-  ${tabsHtml("metrics")}
+  return html`<${ReviewTabs} active="metrics" />
   <div class="canvas-narrow">
     <h1>Metrics</h1>
     <p class="lede">Cost and latency are live-run measurements; eval scores gate regressions;
     prediction accuracy is soft, lagging telemetry.</p>
 
-    <h2>Cost &amp; latency</h2>
-    <div class="card">
+    <h2>Cost & latency</h2>
+    <${Panel}>
       <div class="metric-big">${usage.total_tokens} <small>tokens</small></div>
-      <div class="hint">${usage.input_tokens} in / ${usage.output_tokens} out across ${(usage.calls || []).length} model calls</div>
-      ${calls ? `<table style="margin-top:10px"><thead><tr><th>Model</th><th>In</th><th>Out</th><th>Total</th></tr></thead><tbody>${calls}</tbody></table>` : ""}
-      ${stageRows ? `<table style="margin-top:14px"><thead><tr><th>Stage</th><th>Tokens</th><th>Latency</th></tr></thead><tbody>${stageRows}</tbody></table>` : ""}
-    </div>
+      <div class="hint">${usage.input_tokens} in / ${usage.output_tokens} out across ${plural(calls.length, "model call")}</div>
+      ${calls.length
+        ? html`<table><thead><tr><th>Model</th><th>In</th><th>Out</th><th>Total</th></tr></thead>
+            <tbody>${calls.map((c, i) => html`<tr key=${i} class="static"><td>${c.model}</td><td class="num">${c.input_tokens}</td><td class="num">${c.output_tokens}</td><td class="num">${c.total_tokens}</td></tr>`)}</tbody></table>`
+        : null}
+      ${stages.length
+        ? html`<table><thead><tr><th>Stage</th><th>Tokens</th><th>Latency</th></tr></thead>
+            <tbody>${stages.map(([name, st]) => html`<tr key=${name} class="static"><td>${name}</td><td class="num">${st.tokens} tok</td><td class="num">${fmtDuration(st.latency_ms)}</td></tr>`)}</tbody></table>`
+        : null}
+    <//>
 
     <h2>Eval scores</h2>
-    <div class="card">${evalHtml}</div>
+    <${Panel}>
+      ${!ev
+        ? html`<${EmptyState} compact title="Eval scores appear once the run is finalized." />`
+        : ev.scores == null
+          ? html`<div class="hint">${ev.reason}</div>`
+          : html`<div class="chips">${Object.entries(ev.scores).map(([metric, score]) => html`<${Chip} key=${metric}
+                tone=${below.has(metric) ? "danger" : "ok"} class="score-chip">${metric} ${score}${below.has(metric) ? " ⚠" : ""}<//>`)}</div>
+              <p class="hint">Scored against the golden case “${ev.case}” ${ev.scored_at || "at finalize"}
+              — the pipeline's correctness before your sign-off decisions. Below-threshold metrics are the regression gate.</p>`}
+    <//>
 
     <h2>Prediction accuracy</h2>
-    <div class="card">${accHtml}</div>
+    <${Panel}>
+      ${!acc
+        ? html`<${EmptyState} compact title="Appears once the run is finalized." />`
+        : acc.accuracy == null
+          ? html`<div class="hint">${acc.trends_total} trends recorded, ${acc.checked} checked — accuracy is lagging
+              telemetry: it fills in as each trend is marked materialized later. Reported, never gating.</div>`
+          : html`<div class="metric-big">${Math.round(acc.accuracy * 100)}%</div>
+              <div class="hint">${acc.materialized} of ${acc.checked} checked trends materialized (${acc.trends_total} recorded).</div>`}
+    <//>
   </div>`;
 }
 
-const VIEWS = {
-  home: renderHome,
-  ask: renderAsk,
-  sources: renderSources,
-  run: renderRun,
-  "sign-off": renderSignOff,
-  brief: renderBrief,
-  graph: renderGraph,
-  metrics: renderMetrics,
-};
+const VIEWS = { home: Home, ask: Ask, sources: Sources, run: Run, "sign-off": SignOff, brief: Brief, graph: GraphView, metrics: Metrics };
 
-function render() {
-  document.getElementById("btn-runs").hidden = state.view === "home";
-  const badge = document.getElementById("mode-badge");
-  if (state.snap) {
-    badge.hidden = state.snap.mode !== "fixture";
-    badge.textContent = "fixture mode";
-  } else {
-    badge.hidden = true;
-  }
+/* --- shell ----------------------------------------------------------------- */
+
+function TopBar() {
+  const { snap, view } = get();
   // Futures mode opens once extraction has run (the run paused at the gate or finished)
-  const futures = document.getElementById("btn-futures");
-  futures.hidden = !state.snap || !["paused", "completed"].includes(state.snap.status);
-  if (state.snap) futures.href = `/futures?run=${encodeURIComponent(state.snap.id)}`;
-  document.getElementById("canvas").innerHTML = (VIEWS[state.view] || renderHome)();
-  bind();
-  renderRail();
+  const futuresOpen = snap && ["paused", "completed"].includes(snap.status);
+  return html`<header id="topbar">
+    <span class="brand">Cultural Signal Graph</span>
+    ${snap?.mode === "fixture"
+      ? html`<${Chip} tone="warn" title="Fixture stages run on recorded outputs — no model, no network">fixture mode<//>`
+      : null}
+    ${futuresOpen
+      ? html`<${Button} class="futures-link" href=${`/futures?run=${encodeURIComponent(snap.id)}`}
+          title="Explore speculative futures from this run's evidence">Futures →<//>`
+      : null}
+    <span class="spacer"></span>
+    <${Button} class="theme-toggle" data-theme-toggle aria-label="Switch light / dark theme" />
+    ${view !== "home" ? html`<${Button} variant="ghost" onClick=${goHome}>← Runs<//>` : null}
+  </header>`;
 }
 
-function bind() {
-  document.getElementById("canvas").querySelectorAll("tr[data-run]").forEach((tr) => {
-    tr.addEventListener("click", () => openRun(tr.dataset.run));
-  });
-  const on = (id, event, handler) => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener(event, handler);
-  };
-
-  on("btn-new-run", "click", () => {
-    state.view = "ask";
-    state.error = null;
-    render();
-  });
-  on("btn-submit-ask", "click", submitAsk);
-  on("ask-question", "keydown", (e) => {
-    if (e.key === "Enter") submitAsk();
-  });
-  on("btn-add-source", "click", addSource);
-  on("btn-reset-sources", "click", async () => {
-    try {
-      state.snap = await api(`/api/runs/${state.runId}/sources/reset`, { method: "POST" });
-      render();
-    } catch (err) {
-      state.error = String(err.message || err);
-      render();
-    }
-  });
-  on("btn-start-run", "click", startRun);
-  document.querySelectorAll("button[data-remove]").forEach((btn) => {
-    btn.addEventListener("click", () => removeSource(Number(btn.dataset.remove)));
-  });
-  document.querySelectorAll("button[data-decide]").forEach((btn) => {
-    btn.addEventListener("click", () => decide(btn.dataset.decide, btn.dataset.value === "true"));
-  });
-  on("btn-confirm-signoff", "click", confirmSignoff);
-  on("toggle-futures", "change", (e) => {
-    // Keep the viewer's zoom and centre across the reload the toggle causes.
-    try {
-      state.graphView = document.querySelector(".graph-frame")?.contentWindow?.graphView?.() || null;
-    } catch { state.graphView = null; }
-    state.futuresLayer = e.target.checked;
-    render();
-  });
-  on("btn-undo-signoff", "click", undoSignoff);
-  document.querySelectorAll("[data-tab]").forEach((btn) => {
-    btn.addEventListener("click", () => showStage(btn.dataset.tab));
-  });
-  document.querySelectorAll("[data-goto]").forEach((btn) => {
-    btn.addEventListener("click", () => showStage(btn.dataset.goto));
-  });
+function App() {
+  const View = VIEWS[get().view] || Home;
+  return html`<${TopBar} />
+    <div id="layout">
+      <${Rail} />
+      <main id="canvas"><${View} key=${`${get().view}:${get().runId}`} /></main>
+    </div>
+    <${Toasts} />`;
 }
 
-/* --- actions ------------------------------------------------------------ */
-
-async function submitAsk() {
-  const body = {
-    category: val("ask-category") || "tech",
-    question: val("ask-question"),
-    window_start: val("ask-start") || "2026-01-01",
-    window_end: val("ask-end") || "2026-06-30",
-    market: val("ask-market") || null,
-  };
-  if (!body.question.trim()) {
-    state.error = "Enter a question for the forecast.";
-    render();
-    return;
-  }
-  try {
-    state.snap = await api("/api/runs", { method: "POST", body });
-    state.runId = state.snap.id;
-    state.view = "sources";
-    state.error = null;
-  } catch (err) {
-    state.error = String(err.message || err);
-  }
-  render();
-}
-
-async function addSource() {
-  const uri = val("add-uri").trim();
-  const text = val("add-text").trim();
-  if (!uri || !text) return;
-  const sources = state.snap.sources.concat([
-    {
-      uri,
-      text,
-      source_type: "https://cultural-signal-graph.dev/ontology#Source",
-      credibility: 0.6,
-      category: state.snap.ask.category,
-      topics: [],
-    },
-  ]);
-  await putSources(sources);
-}
-
-async function removeSource(index) {
-  const sources = state.snap.sources.filter((_, i) => i !== index);
-  await putSources(sources);
-}
-
-async function putSources(sources) {
-  try {
-    state.snap = await api(`/api/runs/${state.runId}/sources`, {
-      method: "PUT",
-      body: { sources },
-    });
-    state.error = null;
-  } catch (err) {
-    state.error = String(err.message || err);
-  }
-  render();
-}
-
-async function startRun() {
-  state.view = "run";
-  state.busy = true;
-  state.error = null;
-  state.signoffDraft = {};
-  render();
-  try {
-    state.snap = await api(`/api/runs/${state.runId}/start`, { method: "POST" });
-    state.busy = false;
-    state.view = currentStage(state.snap);
-  } catch (err) {
-    state.busy = false;
-    state.error = String(err.message || err);
-  }
-  render();
-}
-
-async function openRun(runId) {
-  state.snap = await api(`/api/runs/${runId}`);
-  state.runId = runId;
-  state.signoffDraft = {};
-  state.metrics = null;
-  state.futures = null;
-  state.graphView = null;
-  state.view = currentStage(state.snap);
-  render();
-  if (state.view === "metrics") fetchMetrics();
-  if (state.view === "graph") fetchFutures();
-}
-
-/* --- sign-off ------------------------------------------------------------ */
-
-function decide(edgeId, approved) {
-  state.signoffDraft = { ...state.signoffDraft, [edgeId]: approved };
-  render();
-}
-
-async function confirmSignoff() {
-  state.busy = true;
-  state.error = null;
-  render();
-  try {
-    state.snap = await api(`/api/runs/${state.runId}/signoff`, {
-      method: "POST",
-      body: { decisions: state.signoffDraft },
-    });
-    state.signoffDraft = {};
-    state.view = currentStage(state.snap);
-  } catch (err) {
-    state.error = String(err.message || err);
-  }
-  state.busy = false;
-  render();
-}
-
-async function undoSignoff() {
-  try {
-    state.snap = await api(`/api/runs/${state.runId}/signoff/undo`, { method: "POST" });
-    state.signoffDraft = {};
-    state.view = "sign-off";
-    state.error = null;
-  } catch (err) {
-    state.error = String(err.message || err);
-  }
-  render();
-}
-
-function currentStage(snap) {
-  if (snap.status === "created") return "sources"; // not started: review sources, then run
-  const states = railStates(snap);
-  const action = RAIL_STAGES.find((s) => states[s.key] === "action");
-  if (action) return action.key;
-  const firstOpen = RAIL_STAGES.find((s) => states[s.key] === "active");
-  return firstOpen ? firstOpen.key : "brief";
-}
-
-async function goHome() {
-  state.runs = await api("/api/runs");
-  state.view = "home";
-  state.snap = null;
-  state.runId = null;
-  state.error = null;
-  render();
-}
-
-document.getElementById("btn-runs").addEventListener("click", goHome);
+render(html`<${App} />`, document.getElementById("app"));
 goHome().then(() => {
   // deep link from Futures mode back to its run
   const linked = new URLSearchParams(location.search).get("run");
   if (linked) openRun(linked);
 });
-
-/* --- helpers ------------------------------------------------------------ */
-
-function val(id) {
-  const el = document.getElementById(id);
-  return el ? el.value : "";
-}
-
-function fmtDuration(ms) {
-  if (ms == null) return "";
-  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
-}
-
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text ?? "";
-  return div.innerHTML;
-}

@@ -10,7 +10,7 @@ import { TagEditor } from "./lenses.js";
 import { PromoteAction } from "./promote.js";
 import { GroundSection, STANCE_MARK } from "./ground.js";
 import { TAG_HINTS } from "./hints.js";
-import { Chip, Drawer } from "./ui.js";
+import { Chip, Drawer } from "../ui.js";
 
 const html = htm.bind(h);
 const opCache = {};
