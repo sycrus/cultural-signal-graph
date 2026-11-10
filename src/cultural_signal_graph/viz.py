@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from pathlib import Path
 
 from rdflib.namespace import RDF, RDFS
@@ -35,10 +36,15 @@ def _read_theme() -> tuple[str, str]:
     """The design tokens and the theme switcher (#46), inlined for the same reason:
     the graph's colors come from tokens.css, light or dark, like the rest of the app."""
     tokens = (_STATIC_DIR / "tokens.css").read_text(encoding="utf-8")
-    font = _STATIC_DIR / "vendor" / "fonts" / "KodeMono.woff2"
-    font_uri = "data:font/woff2;base64," + base64.b64encode(font.read_bytes()).decode("ascii")
-    tokens = tokens.replace("/static/vendor/fonts/KodeMono.woff2", font_uri)
+    fonts = _STATIC_DIR / "vendor" / "fonts"
+
+    def embed(m: re.Match) -> str:
+        data = base64.b64encode((fonts / m.group(1)).read_bytes()).decode("ascii")
+        return "data:font/woff2;base64," + data
+
+    tokens = re.sub(r"/static/vendor/fonts/([\w.-]+\.woff2)", embed, tokens)
     return tokens, (_STATIC_DIR / "theme.js").read_text(encoding="utf-8")
+
 
 _ONTOLOGY_NAMESPACES = (CSG_NS, TECH_NS, GAMING_NS)
 
@@ -155,7 +161,7 @@ function graphStyle() {
   return [
     { selector: 'node', style: {
       'label': 'data(label)', 'font-size': 9, 'text-valign': 'bottom', 'text-halign': 'center',
-      'text-wrap': 'ellipsis', 'text-max-width': '90px', 'color': tok('--ink')
+      'text-wrap': 'ellipsis', 'text-max-width': '90px', 'color': tok('--ink'), 'font-family': tok('--font-sans')
     }},
     { selector: 'node[kind = "entity"]', style: { 'background-color': tok('--graph-entity'), 'shape': 'ellipse', 'width': 56, 'height': 56 } },
     { selector: 'node[kind = "signal"]', style: { 'background-color': tok('--graph-signal'), 'shape': 'round-rectangle' } },

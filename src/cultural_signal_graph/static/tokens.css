@@ -7,9 +7,41 @@
    the viewer's choice or the system setting, which turns on the phosphor console.
    Change a value here and it changes everywhere. */
 
+/* Barlow (SIL OFL 1.1, vendor/fonts/Barlow-OFL.txt): the reading face in both
+   themes, a compact, slightly squared grotesk that sits under Kode Mono. Latin subset. */
+@font-face {
+  font-family: "Barlow";
+  src: url("/static/vendor/fonts/Barlow-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("/static/vendor/fonts/Barlow-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("/static/vendor/fonts/Barlow-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("/static/vendor/fonts/Barlow-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Kode Mono (SIL OFL 1.1, vendor/fonts/KodeMono-OFL.txt): an angular monospace,
    the phosphor screen's display and data font. Variable weight, Latin subset.
-   viz.py swaps this url for a data: URI so the exported graph.html stays offline. */
+   viz.py swaps every vendored font url for a data: URI so the exported
+   graph.html stays offline. */
 @font-face {
   font-family: "Kode Mono";
   src: url("/static/vendor/fonts/KodeMono.woff2") format("woff2");
@@ -20,7 +52,7 @@
 
 :root {
   /* --- type ------------------------------------------------------------------- */
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
   --text-xs: 11px;
   --text-sm: 12px;

@@ -45,8 +45,12 @@ def test_graph_page_inlines_tokens_and_reads_them():
     assert "data:font/woff2;base64," in page and "/static/vendor/fonts/" not in page  # font embedded too
 
 
-def test_vendored_font_is_served_and_licensed():
+def test_vendored_fonts_are_served_and_licensed():
     fonts = STATIC / "vendor" / "fonts"
-    assert (fonts / "KodeMono.woff2").read_bytes()[:4] == b"wOF2"
-    assert "Open Font License" in (fonts / "KodeMono-OFL.txt").read_text(encoding="utf-8")
-    assert "/static/vendor/fonts/KodeMono.woff2" in (STATIC / "tokens.css").read_text(encoding="utf-8")
+    tokens = (STATIC / "tokens.css").read_text(encoding="utf-8")
+    referenced = re.findall(r"/static/vendor/fonts/([\w.-]+\.woff2)", tokens)
+    assert {"KodeMono.woff2", "Barlow-400.woff2", "Barlow-700.woff2"} <= set(referenced)
+    for name in referenced:
+        assert (fonts / name).read_bytes()[:4] == b"wOF2", name
+    for family in ["KodeMono", "Barlow"]:
+        assert "Open Font License" in (fonts / f"{family}-OFL.txt").read_text(encoding="utf-8")
