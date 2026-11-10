@@ -10,6 +10,7 @@ import { TagEditor } from "./lenses.js";
 import { PromoteAction } from "./promote.js";
 import { GroundSection, STANCE_MARK } from "./ground.js";
 import { TAG_HINTS } from "./hints.js";
+import { Chip, Drawer } from "./ui.js";
 
 const html = htm.bind(h);
 const opCache = {};
@@ -18,7 +19,7 @@ function GroundsLine({ a, onSelect }) {
   /* Accepted from a Ground this search: which projection it grounds, and its stance. */
   const t = S.projectionsById.value[a.grounds];
   return html`<div class="human-root ${a.stance === "support" ? "assumption" : ""}">
-    <span class=${`stance ${a.stance}`}>${STANCE_MARK[a.stance]} ${a.stance}</span> ${a.stance === "support" ? "Supports" : "Contradicts"}
+    <${Chip} tone=${a.stance === "support" ? "ok" : "danger"}>${STANCE_MARK[a.stance]} ${a.stance}<//> ${a.stance === "support" ? "Supports" : "Contradicts"}
     ${" "}<a href="#" onClick=${(ev) => { ev.preventDefault(); onSelect(a.grounds); }}>${t ? t.statement : a.grounds}</a>
   </div>`;
 }
@@ -56,9 +57,8 @@ export function DetailPanel({ id, onSelect, onClose, actions = null }) {
   if (!a && !p) return null;
   const children = (S.snap.value.projections || []).filter((q) => q.parents.includes(id) || q.anchors.includes(id));
   if (a) {
-    return html`<aside class="detail-panel">
-      <button class="ghost close" onClick=${onClose}>✕</button>
-      <div class=${`panel-kind ${a.kind}`}>${a.scope === "futures" ? "futures-scoped reference" : a.scope === "promoted" ? "promoted reference" : `evidence · ${a.kind}`}${a.flag ? ` · ${a.flag}` : ""}${a.status ? ` · ${a.status === "proposed" ? "pending sign-off" : a.status}` : ""}</div>
+    const kind = `${a.scope === "futures" ? "futures-scoped reference" : a.scope === "promoted" ? "promoted reference" : `evidence · ${a.kind}`}${a.flag ? ` · ${a.flag}` : ""}${a.status ? ` · ${a.status === "proposed" ? "pending sign-off" : a.status}` : ""}`;
+    return html`<${Drawer} kind=${kind} kindClass=${a.kind} onClose=${onClose}>
       ${a.status === "rejected" ? html`<div class="human-root">Rejected at the sign-off gate: everything resting on it is stale.</div>` : null}
       ${a.pending ? html`<div class="hint">Proposed cross-domain edge, not yet signed off. If it is rejected, what grows from it goes stale.</div>` : null}
       <h3>${a.text}</h3>
@@ -70,18 +70,16 @@ export function DetailPanel({ id, onSelect, onClose, actions = null }) {
       <${TagEditor} p=${a} anchorsOnly=${true} />
       ${children.length ? html`<h4>Grows into</h4><ul class="refs">${children.map((c) => html`<${Ref} key=${c.id} id=${c.id} onSelect=${onSelect} />`)}</ul>` : null}
       ${actions}
-    </aside>`;
+    <//>`;
   }
-  return html`<aside class="detail-panel">
-    <button class="ghost close" onClick=${onClose}>✕</button>
-    <div class="panel-kind projection">projection · order ${p.order} · ${p.origin}</div>
+  return html`<${Drawer} kind=${`projection · order ${p.order} · ${p.origin}`} kindClass="projection" onClose=${onClose}>
     <h3>${p.statement}</h3>
     <div class="proj-tags">
-      <span class="tag">${p.window[0] === p.window[1] ? p.window[0] : `${p.window[0]}–${p.window[1]}`}</span>
-      ${p.baseline ? html`<span class="tag baseline" title=${TAG_HINTS.baseline}>baseline</span>` : null}
-      ${p.discontinuity ? html`<span class="tag discontinuity" title=${TAG_HINTS.discontinuity}>discontinuity</span>` : null}
-      ${p.timing_conflict ? html`<span class="tag warn" title=${TAG_HINTS["timing conflict"]}>timing conflict</span>` : null}
-      ${p.stale ? html`<span class="tag warn" title=${TAG_HINTS.stale}>stale</span>` : null}
+      <${Chip} class="proj-window-chip">${p.window[0] === p.window[1] ? p.window[0] : `${p.window[0]}–${p.window[1]}`}<//>
+      ${p.baseline ? html`<${Chip} tone="neutral" title=${TAG_HINTS.baseline}>baseline<//>` : null}
+      ${p.discontinuity ? html`<${Chip} tone="danger" title=${TAG_HINTS.discontinuity}>discontinuity<//>` : null}
+      ${p.timing_conflict ? html`<${Chip} tone="warn" title=${TAG_HINTS["timing conflict"]}>timing conflict<//>` : null}
+      ${p.stale ? html`<${Chip} tone="warn" title=${TAG_HINTS.stale}>stale<//>` : null}
     </div>
     ${p.timing_conflict ? html`<div class="hint">Starts before something it grows from — the dates are off, the content still stands.</div>` : null}
     ${p.stale ? html`<div class="hint">Something it grows from changed after it was generated.</div>` : null}
@@ -101,5 +99,5 @@ export function DetailPanel({ id, onSelect, onClose, actions = null }) {
     <h4>Provenance</h4>
     <${Provenance} seq=${p.op} />
     ${p.edited_op != null && p.edited_op !== p.op ? html`<h4>Last edit</h4><${Provenance} seq=${p.edited_op} />` : null}
-  </aside>`;
+  <//>`;
 }

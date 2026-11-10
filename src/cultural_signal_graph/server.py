@@ -39,6 +39,11 @@ class NoCacheStaticFiles(StaticFiles):
         response.headers["Cache-Control"] = "no-cache"
         return response
 
+
+# The two app pages get the same: a cached page would keep loading last
+# version's stylesheets and modules after an update.
+_NO_CACHE = {"Cache-Control": "no-cache"}
+
 # The exportable, versionable outputs of a run: the batch-path artifacts plus the
 # discovery search trail. An allowlist, so run_id/name can't traverse out of runs/.
 EXPORT_FILES = (
@@ -189,7 +194,7 @@ def create_app(
 
     @app.get("/")
     def index() -> FileResponse:
-        return FileResponse(_STATIC_DIR / "index.html")
+        return FileResponse(_STATIC_DIR / "index.html", headers=_NO_CACHE)
 
     @app.get("/api/runs")
     def list_runs() -> list[dict]:
@@ -260,7 +265,7 @@ def create_app(
 
     @app.get("/futures")
     def futures_page() -> FileResponse:
-        return FileResponse(_STATIC_DIR / "futures.html")
+        return FileResponse(_STATIC_DIR / "futures.html", headers=_NO_CACHE)
 
     @app.get("/api/runs/{run_id}/futures/anchors")
     def futures_anchors(run_id: str) -> list[dict]:

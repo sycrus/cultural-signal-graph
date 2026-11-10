@@ -6,6 +6,7 @@ import { h } from "preact";
 import { useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
+import { Button } from "./ui.js";
 
 const html = htm.bind(h);
 
@@ -23,8 +24,8 @@ export function PromoteAction({ a }) {
     return html`<div class="action-form">
       <div>Promoted. New forecast run <b>${run}</b> has this reference as a source; it is ready to run.</div>
       <div class="row right">
-        <a class="btn" href=${`/?run=${run}`}>Open the new run →</a>
-        <a class="btn" href=${`/futures?run=${run}&x=${done.exploration.exploration.id}`}>Open the carried exploration →</a>
+        <${Button} href=${`/?run=${run}`}>Open the new run →<//>
+        <${Button} href=${`/futures?run=${run}&x=${done.exploration.exploration.id}`}>Open the carried exploration →<//>
       </div>
     </div>`;
   }
@@ -34,11 +35,12 @@ export function PromoteAction({ a }) {
         the original sources plus this one. This run and its explorations stay untouched; the exploration is copied
         to the new run, where a branch grows from this reference.</div>
       <div class="row right">
-        <button class="ghost" onClick=${() => setConfirming(false)}>Cancel</button>
-        <button class="primary" disabled=${S.busy.value} onClick=${async () => { await S.promoteReference(a.id); setConfirming(false); }}>Promote → new run</button>
+        <${Button} variant="ghost" onClick=${() => setConfirming(false)}>Cancel<//>
+        <${Button} variant="primary" busy=${S.busy.value} busyLabel="Promoting…"
+          onClick=${async () => { await S.promoteReference(a.id); setConfirming(false); }}>Promote → new run<//>
       </div>
     </div>`;
   }
-  return html`<div class="actions"><button onClick=${() => setConfirming(true)}
-    title="Make this reference forecast evidence — in a new run">↗ Promote to forecast</button></div>`;
+  return html`<div class="actions"><${Button} onClick=${() => setConfirming(true)}
+    title="Make this reference forecast evidence — in a new run">↗ Promote to forecast<//></div>`;
 }

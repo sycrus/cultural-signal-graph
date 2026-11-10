@@ -6,6 +6,17 @@ import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
 import { GroundButton } from "./ground.js";
+import { Button, Chip, toast } from "./ui.js";
+
+/* Undo and redo say what they did, with the way back. */
+async function undo() {
+  await S.undo();
+  if (!S.error.value) toast("Undone.", { action: { label: "Redo", run: redo } });
+}
+async function redo() {
+  await S.redo();
+  if (!S.error.value) toast("Redone.", { action: { label: "Undo", run: undo } });
+}
 
 const html = htm.bind(h);
 
@@ -46,8 +57,8 @@ export function ProjectionActions({ p, extra = null }) {
       </div>
       <div class="hint">A new statement marks what grew from it stale; a new window only flags timing.</div>
       <div class="row right">
-        <button class="ghost" onClick=${() => setMode(null)}>Cancel</button>
-        <button class="primary" onClick=${save} disabled=${busy}>Save</button>
+        <${Button} variant="ghost" onClick=${() => setMode(null)}>Cancel<//>
+        <${Button} variant="primary" onClick=${save} disabled=${busy}>Save<//>
       </div>
     </div>`;
   }
@@ -58,9 +69,9 @@ export function ProjectionActions({ p, extra = null }) {
       <input value=${hint} onInput=${(e) => setHint(e.target.value)} placeholder="the EU bans always-on cameras" />
       <div class="hint">Grows a sibling branch from here, ${depthLeft} order${depthLeft === 1 ? "" : "s"} deep. The original stays.</div>
       <div class="row right">
-        <button class="ghost" onClick=${() => setMode(null)}>Cancel</button>
-        <button class="primary" disabled=${busy}
-          onClick=${() => { S.forkProjection(p.id, hint); setHint(""); setMode(null); }}>⑂ Fork</button>
+        <${Button} variant="ghost" onClick=${() => setMode(null)}>Cancel<//>
+        <${Button} variant="primary" disabled=${busy}
+          onClick=${() => { S.forkProjection(p.id, hint); setHint(""); setMode(null); }}>⑂ Fork<//>
       </div>
     </div>`;
   }
@@ -68,23 +79,26 @@ export function ProjectionActions({ p, extra = null }) {
     return html`<div class="action-form danger">
       <div>Delete this projection? What grew from it stays, marked stale. Undo brings it back.</div>
       <div class="row right">
-        <button class="ghost" onClick=${() => setMode(null)}>Cancel</button>
-        <button class="danger-active" onClick=${() => S.deleteProjection(p.id)} disabled=${busy}>Delete</button>
+        <${Button} variant="ghost" onClick=${() => setMode(null)}>Cancel<//>
+        <${Button} variant="danger" disabled=${busy} onClick=${async () => {
+          await S.deleteProjection(p.id);
+          if (!S.error.value) toast("Projection deleted. What grew from it is marked stale.", { action: { label: "Undo", run: undo } });
+        }}>Delete<//>
       </div>
     </div>`;
   }
   return html`<div class="actions">
-    <button onClick=${() => setMode("edit")} disabled=${busy}>✎ Edit</button>
-    <button onClick=${() => setMode("fork")} disabled=${busy || p.order >= S.snap.value.exploration.orders}
-      title=${p.order >= S.snap.value.exploration.orders ? "At the depth limit" : "Explore an alternative from here"}>⑂ Fork</button>
+    <${Button} onClick=${() => setMode("edit")} disabled=${busy}>✎ Edit<//>
+    <${Button} onClick=${() => setMode("fork")} disabled=${busy || p.order >= S.snap.value.exploration.orders}
+      title=${p.order >= S.snap.value.exploration.orders ? "At the depth limit" : "Explore an alternative from here"}>⑂ Fork<//>
     <${GroundButton} p=${p} />
     ${extra}
-    <button onClick=${() => { S.adding.value = { kind: "assumption", parent_id: p.id }; }} disabled=${busy}
-      title="Add your own assumption or wild card growing from this one">+ After this</button>
-    <button class="ghost" onClick=${() => setMode("delete")} disabled=${busy}>Delete</button>
+    <${Button} onClick=${() => { S.adding.value = { kind: "assumption", parent_id: p.id }; }} disabled=${busy}
+      title="Add your own assumption or wild card growing from this one">+ After this<//>
+    <${Button} variant="ghost" onClick=${() => setMode("delete")} disabled=${busy}>Delete<//>
     ${staleBelow
-      ? html`<button class="primary" onClick=${() => S.regenerateDownstream(p.id)} disabled=${busy}
-          title="Replace the stale projections below this one with a fresh branch">↻ Regenerate downstream</button>`
+      ? html`<${Button} variant="primary" onClick=${() => S.regenerateDownstream(p.id)} disabled=${busy}
+          title="Replace the stale projections below this one with a fresh branch">↻ Regenerate downstream<//>`
       : null}
   </div>`;
 }
@@ -98,10 +112,10 @@ export function HistoryBar() {
       const k = e.key.toLowerCase();
       if (k === "z" && !e.shiftKey && S.snap.value?.can_undo) {
         e.preventDefault();
-        S.undo();
+        undo();
       } else if ((k === "y" || (k === "z" && e.shiftKey)) && S.snap.value?.can_redo) {
         e.preventDefault();
-        S.redo();
+        redo();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -109,8 +123,8 @@ export function HistoryBar() {
   }, []);
   const stale = s.projections.filter((p) => p.stale).length;
   return html`<span class="history">
-    ${stale ? html`<span class="stale-mark" title="Projections whose upstream changed after they were generated">${stale} stale</span>` : null}
-    <button class="ghost" onClick=${S.undo} disabled=${!s.can_undo || busy} title="Undo (Ctrl+Z)">↶ Undo</button>
-    <button class="ghost" onClick=${S.redo} disabled=${!s.can_redo || busy} title="Redo (Ctrl+Shift+Z) — replays the log, no model call">↷ Redo</button>
+    ${stale ? html`<${Chip} tone="danger" title="Projections whose upstream changed after they were generated">${stale} stale<//>` : null}
+    <${Button} variant="ghost" onClick=${undo} disabled=${!s.can_undo || busy} title="Undo (Ctrl+Z)">↶ Undo<//>
+    <${Button} variant="ghost" onClick=${redo} disabled=${!s.can_redo || busy} title="Redo (Ctrl+Shift+Z) — replays the log, no model call">↷ Redo<//>
   </span>`;
 }

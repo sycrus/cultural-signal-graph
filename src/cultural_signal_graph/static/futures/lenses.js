@@ -13,6 +13,7 @@ import { Cone, CONE_CLASSES } from "./cone.js";
 import { Matrix, MATRIX_VALUES } from "./matrix.js";
 import { Horizons, HORIZON_VALUES } from "./horizons.js";
 import { Pestle, PESTLE_VALUES } from "./pestle.js";
+import { Chip, Panel, Tabs, Toggle } from "./ui.js";
 
 const html = htm.bind(h);
 
@@ -65,23 +66,17 @@ const outOfCone = (p) => p.tags?.cone?.value === "preposterous";
 /* Lenses with time on x can stretch the axis past the container and pan. */
 const SPREADS = [1, 1.5, 2, 3];
 function SpreadPicker() {
-  return html`<span class="spread-pick" title="Stretch the time axis — pan left and right when spread past Fit">
-    ${SPREADS.map(
-      (sv) => html`<button key=${sv} class=${S.spread.value === sv ? "on" : ""}
-        onClick=${() => (S.spread.value = sv)}>${sv === 1 ? "Fit" : `${sv}×`}</button>`,
-    )}
-  </span>`;
+  return html`<${Tabs} size="sm" label="Stretch the time axis" value=${S.spread.value}
+    onChange=${(sv) => (S.spread.value = sv)}
+    items=${SPREADS.map((sv) => ({ key: sv, label: sv === 1 ? "Fit" : `${sv}×`,
+      hint: sv === 1 ? "Fit the whole horizon" : `Stretch the time axis ${sv}× — pan left and right` }))} />`;
 }
 
 export function LensTabs() {
   const timeLens = ["scroll", "cone", "horizons", "pestle"].includes(S.lens.value);
   return html`<div class="lens-bar">
-    <div class="lens-tabs" role="tablist">
-      ${LENSES.map(
-        (l) => html`<button key=${l.key} role="tab" title=${l.hint}
-          class=${S.lens.value === l.key ? "on" : ""} onClick=${() => S.setLens(l.key)}>${l.label}</button>`,
-      )}
-    </div>
+    <${Tabs} label="Lens" value=${S.lens.value} onChange=${S.setLens}
+      items=${LENSES.map((l) => ({ key: l.key, label: l.label, hint: l.hint }))} />
     ${timeLens ? html`<span class="spacer"></span><${SpreadPicker} />` : null}
   </div>`;
 }
@@ -95,7 +90,7 @@ export function LensView({ snap, selectedId, onSelect }) {
   }, [lens.key, untagged, S.generating.value]);
   const View = lens.view;
   return html`
-    ${untagged && S.busy.value ? html`<div class="card"><span class="spinner"></span> Organizing ${untagged} projection${untagged === 1 ? "" : "s"} with the ${lens.label}…</div>` : null}
+    ${untagged && S.busy.value ? html`<${Panel} row><span class="spinner"></span> Organizing ${untagged} projection${untagged === 1 ? "" : "s"} with the ${lens.label}…<//>` : null}
     <${View} snap=${snap} selectedId=${selectedId} onSelect=${onSelect}
       dimmed=${lens.key === "cone" ? () => false : outOfCone}
       onRetag=${(p, tag) => S.setTag(p.id, lens.key, tag)} />`;
@@ -115,16 +110,17 @@ export function TagEditor({ p, anchorsOnly = false }) {
           ${!tag ? html`<option value="">untagged</option>` : null}
           ${l.values.map((v) => html`<option key=${v} value=${v}>${v}</option>`)}
         </select>
-        ${l.multi && tag ? html`<span class="tag-multi">${l.values.filter((v) => v !== tag.value).map((v) => html`<label key=${v} class="tag-extra">
-            <input type="checkbox" checked=${(tag[l.multi] || []).includes(v)} disabled=${S.busy.value}
-              onChange=${(e) => {
+        ${l.multi && tag ? html`<span class="tag-multi" title="Also touches">${l.values.filter((v) => v !== tag.value).map((v) => {
+            const on = (tag[l.multi] || []).includes(v);
+            return html`<${Chip} key=${v} on=${on} disabled=${S.busy.value} title=${on ? `Also ${v} — click to remove` : `Mark as also ${v}`}
+              onClick=${() => {
                 const cur = new Set(tag[l.multi] || []);
-                e.target.checked ? cur.add(v) : cur.delete(v);
+                on ? cur.delete(v) : cur.add(v);
                 S.setTag(p.id, l.key, { value: tag.value, extras: { [l.multi]: [...cur] } });
-              }} /> ${v}</label>`)}</span>` : null}
-        ${(l.extras || []).map((x) => html`<label key=${x.key} class="tag-extra">
-          <input type="checkbox" checked=${!!tag?.[x.key]} disabled=${!tag || S.busy.value}
-            onChange=${(e) => S.setTag(p.id, l.key, { value: tag.value, extras: { [x.key]: e.target.checked } })} /> ${x.label}</label>`)}
+              }}>${v}<//>`;
+          })}</span>` : null}
+        ${(l.extras || []).map((x) => html`<${Toggle} key=${x.key} label=${x.label} checked=${!!tag?.[x.key]} disabled=${!tag || S.busy.value}
+          onChange=${(on) => S.setTag(p.id, l.key, { value: tag.value, extras: { [x.key]: on } })} />`)}
         ${tag ? html`<span class="hint">${tag.source === "human"
           ? `set by you${tag.model_value && tag.model_value !== tag.value ? ` · model said ${tag.model_value}` : ""}`
           : tag.fixed ? "by construction" : "model"}</span>` : null}

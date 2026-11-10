@@ -45,6 +45,15 @@ def test_static_modules_revalidate_no_cache(client):
     assert res.headers["cache-control"] == "no-cache"
 
 
+def test_app_pages_revalidate_no_cache(client):
+    """A cached page would keep linking last version's stylesheets (#46: a new
+    ui.css went unloaded until a hard reload)."""
+    for path in ["/", "/futures"]:
+        res = client.get(path)
+        assert res.status_code == 200, path
+        assert res.headers["cache-control"] == "no-cache", path
+
+
 def test_runs_api_round_trip(client):
     res = client.post(
         "/api/runs",

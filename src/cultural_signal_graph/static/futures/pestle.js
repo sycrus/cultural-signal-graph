@@ -7,6 +7,7 @@ import { h } from "preact";
 import htm from "htm";
 import * as S from "./store.js";
 import { Scroll } from "./scroll.js";
+import { Button, Chip } from "./ui.js";
 
 const html = htm.bind(h);
 
@@ -28,8 +29,8 @@ export function Coverage({ items, onGap = null, label = "projections" }) {
     ${PESTLE_VALUES.map((v) => html`<span key=${v} class=${`pc ${count[v] ? "" : "gap"}`}
       title=${`${count[v]} ${label} with ${v} as primary; ${touch[v]} more touch it`}>
       <b>${PESTLE_LETTER[v]}</b> ${v} <span class="n">${count[v]}${touch[v] ? `+${touch[v]}` : ""}</span>
-      ${!count[v] && onGap ? html`<button class="ghost" onClick=${() => onGap(v)} disabled=${S.busy.value || S.generating.value}
-          title=${`Seed a branch that follows the ${v} dimension`}>seed?</button>` : null}
+      ${!count[v] && onGap ? html`<${Button} variant="ghost" onClick=${() => onGap(v)} disabled=${S.busy.value || S.generating.value}
+          title=${`Seed a branch that follows the ${v} dimension`}>seed?<//>` : null}
     </span>`)}
     ${gaps.length ? html`<span class="hint">No ${gaps.join(", ")} ${label}.</span>` : null}
   </div>`;
@@ -37,7 +38,7 @@ export function Coverage({ items, onGap = null, label = "projections" }) {
 
 export function Pestle({ snap, selectedId, onSelect, onRetag, dimmed }) {
   const chips = (p) =>
-    (p.tags.pestle?.secondary || []).map((s) => html`<span key=${s} class="pestle-chip" title=${`also ${s}`}>${PESTLE_LETTER[s]}</span>`);
+    (p.tags.pestle?.secondary || []).map((s) => html`<${Chip} key=${s} tone="neutral" size="sm" title=${`also ${s}`}>${PESTLE_LETTER[s]}<//>`);
   return html`<div>
     <${Coverage} items=${snap.projections} onGap=${S.seedDimension} />
     <${Scroll} snap=${snap} selectedId=${selectedId} onSelect=${onSelect} dimmed=${dimmed}
