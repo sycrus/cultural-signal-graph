@@ -115,10 +115,7 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
     <div class="legend-futures" style="display:none"><span class="line grows"></span>projection grows from</div>
   </div>
 </div>
-<details id="usage" class="floating">
-  <summary>Usage</summary>
-  __USAGE__
-</details>
+__USAGE__
 <div id="detail" class="floating"></div>
 <script>
 const data = __DATA__;
@@ -476,7 +473,8 @@ def render_html(elements: dict, usage: dict | None = None, notes_url: str | None
     tokens_css, theme_js = _read_theme()
     html = _HTML_TEMPLATE.replace("__TOKENS_CSS__", tokens_css).replace("__THEME_JS__", theme_js)
     html = html.replace("__DATA__", json.dumps(elements))
-    html = html.replace("__USAGE__", _usage_html(usage) if usage else "")
+    # the token-usage box is a trace view: only in the exported file, not in the app
+    html = html.replace("__USAGE__", f'<details id="usage" class="floating"><summary>Usage</summary>{_usage_html(usage)}</details>' if usage else "")
     html = html.replace("__NOTES_URL__", notes_url or "")
     return html.replace("__CYTOSCAPE__", _read_cytoscape())
 

@@ -192,11 +192,6 @@ function validity(tv) {
 }
 const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
 
-function fmtDuration(ms) {
-  if (ms == null) return "";
-  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
-}
-
 const ErrorLine = () => (get().error ? html`<div class="error">${get().error}</div>` : null);
 
 // Run and edge statuses as chips: the same tone means the same thing everywhere.
@@ -490,7 +485,7 @@ function StageChip({ name, st }) {
   const done = st?.status === "done";
   const paused = st?.status === "paused";
   return html`<${Chip} tone=${done ? "ok" : paused ? "warn" : "neutral"} class="stage-chip">
-    ${name} ${done ? "✓" : paused ? "…" : "·"}${done ? html` <small>${st.tokens} tok · ${fmtDuration(st.latency_ms)}</small>` : null}<//>`;
+    ${name} ${done ? "✓" : paused ? "…" : "·"}<//>`;
 }
 
 function Run() {
@@ -498,7 +493,7 @@ function Run() {
   const chips = RUN_STAGES.map((name) => html`<${StageChip} key=${name} name=${name} st=${s.stages[name]} />`);
   return html`<div class="canvas-narrow">
     <h1>Run</h1>
-    <p class="lede">${busy ? "Extracting signals and proposing cross-domain edges…" : "Per-stage tokens and latency, recorded at each stage boundary."}</p>
+    <p class="lede">${busy ? "Extracting signals and proposing cross-domain edges…" : "Where each stage of the pipeline stands."}</p>
     <${Panel} row class="stage-chips">${busy ? html`<span class="spinner"></span>` : null}${chips}<//>
     <${ErrorLine} />
   </div>`;
@@ -601,7 +596,7 @@ function Brief() {
     </div>
     <p class="lede">${plural(b.claims.length, "claim")}, ${b.flags.length} flagged.</p>
     <div class="exports"><span class="hint">Export</span>
-      ${["brief.md", "brief.json", "brief.pptx", "graph.ttl", "usage.json"].map(
+      ${["brief.md", "brief.json", "brief.pptx", "graph.ttl"].map(
         (name) => html`<${Button} key=${name} class="export-link" href=${`/api/runs/${runId}/exports/${name}`} download>${name}<//>`,
       )}
     </div>
@@ -678,31 +673,14 @@ function Metrics() {
   if (!m) {
     return html`<div class="canvas-narrow"><${ReviewTabs} active="metrics" /><h1>Metrics</h1><${Panel} row><span class="spinner"></span> Loading metrics…<//></div>`;
   }
-  const usage = m.usage || { total_tokens: 0, input_tokens: 0, output_tokens: 0, calls: [] };
-  const calls = usage.calls || [];
-  const stages = Object.entries(m.stages || {}).filter(([name]) => RUN_STAGES.includes(name));
   const ev = m.eval;
   const below = new Set(ev?.below_threshold || []);
   const acc = m.accuracy;
   return html`<div class="canvas-narrow">
     <${ReviewTabs} active="metrics" />
     <h1>Metrics</h1>
-    <p class="lede">Cost and latency are live-run measurements; eval scores gate regressions;
-    prediction accuracy is soft, lagging telemetry.</p>
-
-    <h2>Cost & latency</h2>
-    <${Panel}>
-      <div class="metric-big">${usage.total_tokens} <small>tokens</small></div>
-      <div class="hint">${usage.input_tokens} in / ${usage.output_tokens} out across ${plural(calls.length, "model call")}</div>
-      ${calls.length
-        ? html`<table><thead><tr><th>Model</th><th>In</th><th>Out</th><th>Total</th></tr></thead>
-            <tbody>${calls.map((c, i) => html`<tr key=${i} class="static"><td>${c.model}</td><td class="num">${c.input_tokens}</td><td class="num">${c.output_tokens}</td><td class="num">${c.total_tokens}</td></tr>`)}</tbody></table>`
-        : null}
-      ${stages.length
-        ? html`<table><thead><tr><th>Stage</th><th>Tokens</th><th>Latency</th></tr></thead>
-            <tbody>${stages.map(([name, st]) => html`<tr key=${name} class="static"><td>${name}</td><td class="num">${st.tokens} tok</td><td class="num">${fmtDuration(st.latency_ms)}</td></tr>`)}</tbody></table>`
-        : null}
-    <//>
+    <p class="lede">How far to trust this run: eval scores gate regressions; prediction accuracy
+    is soft, lagging telemetry.</p>
 
     <h2>Eval scores</h2>
     <${Panel}>
