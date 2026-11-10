@@ -23,11 +23,42 @@ export const anchorsById = computed(() =>
   Object.fromEntries((snap.value?.anchors || anchors.value).map((a) => [a.id, a])),
 );
 
+/* --- who is acting (Workshop B, #52): a name plus a role, remembered per browser.
+   Every write carries it, so each op in the log records who made it — or, for a
+   model op, who asked for it. --- */
+
+const remembered = (key) => {
+  try { return localStorage.getItem(key) || ""; } catch { return ""; }
+};
+export const author = signal(remembered("csg-author") || "strategist");
+export const role = signal(remembered("csg-role"));
+export function setIdentity(name, r) {
+  author.value = (name || "").trim() || "strategist";
+  role.value = (r || "").trim();
+  try {
+    localStorage.setItem("csg-author", author.value);
+    localStorage.setItem("csg-role", role.value);
+  } catch { /* private window: keep it for this page only */ }
+}
+export const who = () => ({ author: author.value, role: role.value || null });
+
+/* Writes carry `who` in the query (routes with no body: generate, classify, seed…)
+   and in a JSON object body (routes with one). */
+export function withWho(path) {
+  const url = new URL(path, location.origin);
+  const w = who();
+  url.searchParams.set("author", w.author);
+  if (w.role) url.searchParams.set("role", w.role);
+  return url.pathname + url.search;
+}
+
 export async function api(path, opts = {}) {
-  const res = await fetch(path, {
+  const write = opts.method && opts.method !== "GET";
+  const body = write && opts.body && !Array.isArray(opts.body) ? { ...who(), ...opts.body } : opts.body;
+  const res = await fetch(write ? withWho(path) : path, {
     headers: { "Content-Type": "application/json" },
     ...opts,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
+    body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
@@ -102,7 +133,7 @@ async function streamGeneration(expId) {
   stopping.value = false;
   error.value = null;
   try {
-    const res = await fetch(`${base()}/explorations/${expId}/generate/stream`, { method: "POST" });
+    const res = await fetch(withWho(`${base()}/explorations/${expId}/generate/stream`), { method: "POST" });
     if (!res.ok) {
       const detail = await res.json().catch(() => ({}));
       throw new Error(detail.detail || `${res.status} ${res.statusText}`);
@@ -164,8 +195,6 @@ export async function fetchOp(seq) {
 
 /* --- edits & history: every action is an op; undo/redo move the log cursor --- */
 
-export const author = signal(localStorage.getItem("csg-author") || "strategist");
-
 async function mutate(path, opts = {}) {
   const expId = snap.value.exploration.id;
   await guarded(async () => {
@@ -174,22 +203,22 @@ async function mutate(path, opts = {}) {
 }
 
 export const editProjection = (pid, changes) =>
-  mutate(`/projections/${pid}`, { method: "PATCH", body: { ...changes, author: author.value } });
+  mutate(`/projections/${pid}`, { method: "PATCH", body: { ...changes } });
 export const deleteProjection = (pid) => {
   if (selectedId.value === pid) selectedId.value = null;
-  return mutate(`/projections/${pid}?author=${encodeURIComponent(author.value)}`, { method: "DELETE" });
+  return mutate(`/projections/${pid}`, { method: "DELETE" });
 };
 export const regenerateDownstream = (pid) =>
-  mutate(`/projections/${pid}/regenerate`, { method: "POST", body: { author: author.value } });
+  mutate(`/projections/${pid}/regenerate`, { method: "POST", body: {} });
 export const undo = () => mutate("/undo", { method: "POST" });
 export const redo = () => mutate("/redo", { method: "POST" });
 export const forkProjection = (pid, hint) =>
-  mutate(`/projections/${pid}/fork`, { method: "POST", body: { hint: hint || null, author: author.value } });
+  mutate(`/projections/${pid}/fork`, { method: "POST", body: { hint: hint || null } });
 
 export const adding = signal(null); // {kind, parent_id} while the Add drawer is open
 
 export const addReference = (url, excerpt, extra = {}) =>
-  mutate("/references", { method: "POST", body: { url, excerpt, author: author.value, ...extra } });
+  mutate("/references", { method: "POST", body: { url, excerpt, ...extra } });
 
 /* --- Ground this: the one agent; its proposals need the strategist's accept --- */
 
@@ -198,13 +227,13 @@ export const groundingPid = signal(null); // the projection a Ground this search
 export async function groundProjection(pid) {
   groundingPid.value = pid;
   try {
-    await mutate(`/projections/${pid}/ground`, { method: "POST", body: { author: author.value } });
+    await mutate(`/projections/${pid}/ground`, { method: "POST", body: {} });
   } finally {
     groundingPid.value = null;
   }
 }
 export const addProjection = (body) =>
-  mutate("/projections", { method: "POST", body: { ...body, author: author.value } });
+  mutate("/projections", { method: "POST", body: { ...body } });
 
 /* --- lenses: a per-viewer convenience, so remembered in this browser only --- */
 
@@ -231,12 +260,12 @@ export const classifyLens = (lensKey) => mutate(`/lenses/${lensKey}/classify`, {
 export const setTag = (pid, lensKey, tag) =>
   mutate(`/projections/${pid}/tags/${lensKey}`, {
     method: "PUT",
-    body: { value: tag.value, extras: tag.extras || {}, author: author.value },
+    body: { value: tag.value, extras: tag.extras || {} },
   });
 
 export async function importExploration(text) {
   await guarded(async () => {
-    const created = await api(`${base()}/explorations/import`, { method: "POST", body: { log: text, author: author.value } });
+    const created = await api(`${base()}/explorations/import`, { method: "POST", body: { log: text } });
     explorations.value = await api(`${base()}/explorations`);
     await openExploration(created.exploration.id);
   });
@@ -244,7 +273,7 @@ export async function importExploration(text) {
 
 /* --- the Matrix --- */
 export const proposeAxes = () => mutate("/lenses/matrix/axes/propose", { method: "POST" });
-export const setAxes = (axes) => mutate("/lenses/matrix/axes", { method: "PUT", body: { axes, author: author.value } });
+export const setAxes = (axes) => mutate("/lenses/matrix/axes", { method: "PUT", body: { axes } });
 export const seedQuadrant = (q) => mutate(`/lenses/matrix/quadrants/${q}/seed`, { method: "POST" });
 export const writeNarrative = (q) => mutate(`/lenses/matrix/quadrants/${q}/narrative`, { method: "POST" });
 
@@ -268,7 +297,7 @@ export async function promoteReference(refId) {
   await guarded(async () => {
     promoted.value = await api(`${base()}/explorations/${snap.value.exploration.id}/references/${refId}/promote`, {
       method: "POST",
-      body: { author: author.value },
+      body: {},
     });
   });
 }

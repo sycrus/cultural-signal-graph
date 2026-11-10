@@ -330,3 +330,14 @@ a.btn { display: inline-block; padding: 5px 10px; border-radius: 8px; border: 1p
 .ground-proposal-head a { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ground-proposal blockquote { margin: 6px 0 2px; font-size: 12.5px; }
 .ground-proposal .row.right { display: flex; justify-content: flex-end; margin-top: 4px; }
+
+/* who is acting (Workshop B, #52) */
+.identity { position: relative; margin-right: 8px; font-size: 13px; }
+.identity summary { list-style: none; cursor: pointer; padding: 3px 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); }
+.identity summary::-webkit-details-marker { display: none; }
+.identity summary.unset { border-style: dashed; color: var(--futures); }
+.identity-form { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 260px; display: grid; gap: 8px;
+  padding: 12px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
+.identity-form label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.identity-form input { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; }
+.identity-form button { justify-self: end; }

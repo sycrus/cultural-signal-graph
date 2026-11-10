@@ -43,7 +43,7 @@ function Provenance({ seq }) {
   const input = op.input?.prompt || (op.input ? JSON.stringify(op.input, null, 2) : "—");
   return html`<div class="provenance">
     <div class="hint">${op.op} · ${op.model || "human"}${op.temperature != null ? ` · temp ${op.temperature}` : ""}
-      · ${op.author} · ${op.at.replace("T", " ").slice(0, 16)}</div>
+      · ${op.author || "unknown author"}${op.author_role ? ` (${op.author_role})` : ""} · ${op.at ? op.at.replace("T", " ").slice(0, 16) : "time unknown"}</div>
     ${op.warnings?.length ? html`<div class="warn-line">⚠ ${op.warnings.join("; ")}</div>` : null}
     ${op.model ? html`<details><summary>Model input</summary><pre>${input}</pre></details>
       <details><summary>Raw output</summary><pre>${op.output}</pre></details>` : null}
