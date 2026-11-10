@@ -708,9 +708,7 @@ class ExplorationStore:
             **ops[0],
             "exploration": {**ops[0]["exploration"], "id": exp_id, "run_id": run_id, "imported_from": ops[0]["exploration"]["id"]},
         }
-        log = OperationLog(self._dir(run_id, exp_id))
-        log.dir.mkdir(parents=True, exist_ok=True)
-        (log.dir / "log.jsonl").write_text("".join(json.dumps(o, ensure_ascii=False) + "\n" for o in ops), encoding="utf-8")
+        OperationLog(self._dir(run_id, exp_id)).import_ops(ops)
         return self.snapshot(run_id, exp_id)
 
     def futures_trig(self, run_id: str, evidence=None) -> str:
