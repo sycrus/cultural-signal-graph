@@ -337,9 +337,9 @@ a.btn { display: inline-block; padding: 5px 10px; border-radius: var(--radius-md
 
 /* --- Phosphor treatment (#46): see app.css. Hue says evidence vs futures; glow,
    brightness and line style carry the rest. ---------------------------------------- */
-.axis-label, .band-label, .panel-kind, .detail-panel h4, .cone-label, .wheel-ring-label, .h-label, .minimap-label, .lens-tabs button, .mode-switch a, .mode-switch span { font-family: var(--font-display); font-size-adjust: var(--font-display-adjust); font-synthesis-weight: none; letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.axis-label, .band-label, .panel-kind, .detail-panel h4, .cone-label, .wheel-ring-label, .h-label, .minimap-label, .lens-tabs button, .mode-switch a, .mode-switch span { font-family: var(--font-display); letter-spacing: var(--tracking-label); text-transform: uppercase; }
 .axis-label, .panel-kind, .cone-label, .h-label { text-shadow: var(--glow-text); }
-.years, .proj-window, .order-badge, .tick span, .rolled-count, .pc .n, .h-year { font-family: var(--font-data); font-size-adjust: var(--font-display-adjust); font-synthesis-weight: none; font-variant-numeric: tabular-nums; }
+.years, .proj-window, .order-badge, .tick span, .rolled-count, .pc .n, .h-year { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 .years, .proj-window, .order-badge { text-shadow: var(--glow-text); }
 .mode-switch .active, .lens-tabs button.on, .spread-pick button.on, .seg button.on, .chip.on { text-shadow: var(--glow-text); }
 .lens-tabs button.on, .spread-pick button.on { box-shadow: var(--shadow-futures); text-shadow: none; }

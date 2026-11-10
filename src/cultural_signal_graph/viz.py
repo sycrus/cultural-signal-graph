@@ -35,9 +35,9 @@ def _read_theme() -> tuple[str, str]:
     """The design tokens and the theme switcher (#46), inlined for the same reason:
     the graph's colors come from tokens.css, light or dark, like the rest of the app."""
     tokens = (_STATIC_DIR / "tokens.css").read_text(encoding="utf-8")
-    font = _STATIC_DIR / "vendor" / "fonts" / "VT323-Regular.woff2"
+    font = _STATIC_DIR / "vendor" / "fonts" / "KodeMono.woff2"
     font_uri = "data:font/woff2;base64," + base64.b64encode(font.read_bytes()).decode("ascii")
-    tokens = tokens.replace("/static/vendor/fonts/VT323-Regular.woff2", font_uri)
+    tokens = tokens.replace("/static/vendor/fonts/KodeMono.woff2", font_uri)
     return tokens, (_STATIC_DIR / "theme.js").read_text(encoding="utf-8")
 
 _ONTOLOGY_NAMESPACES = (CSG_NS, TECH_NS, GAMING_NS)

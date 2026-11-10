@@ -290,11 +290,11 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
 
 /* --- Phosphor treatment (#46): light that comes from the screen. Every value is a
    token, and the glow tokens are `none` in daylight, so this only lights up dark. -- */
-#topbar .brand { text-transform: uppercase; letter-spacing: var(--tracking-label); font-family: var(--font-display); font-size-adjust: var(--font-display-adjust); font-synthesis-weight: none; color: var(--accent); text-shadow: var(--glow-text-strong); }
-h1, h2 { font-family: var(--font-display); font-size-adjust: var(--font-display-adjust); font-synthesis-weight: none; text-shadow: var(--glow-text-soft); }
-th, .status, .stage-chip small, .edge-verdict, .reason-chip, .score-chip { font-family: var(--font-display); font-size-adjust: var(--font-display-adjust); font-synthesis-weight: none; letter-spacing: var(--tracking-label); }
+#topbar .brand { text-transform: uppercase; letter-spacing: var(--tracking-label); font-family: var(--font-display); color: var(--accent); text-shadow: var(--glow-text-strong); }
+h1, h2 { font-family: var(--font-display); text-shadow: var(--glow-text-soft); }
+th, .status, .stage-chip small, .edge-verdict, .reason-chip, .score-chip { font-family: var(--font-display); letter-spacing: var(--tracking-label); }
 th { text-transform: uppercase; }
-.metric-big, .conf-chip { font-family: var(--font-data); font-size-adjust: var(--font-display-adjust); font-synthesis-weight: none; color: var(--accent); text-shadow: var(--glow-text-strong); }
+.metric-big, .conf-chip { font-family: var(--font-data); color: var(--accent); text-shadow: var(--glow-text-strong); }
 .rail-item.current, .rail-item.active { text-shadow: var(--glow-text); }
 .rail-item.current .dot { box-shadow: 0 0 0 3px var(--accent-ring), var(--glow-text); }
 button.primary { box-shadow: 0 0 14px color-mix(in srgb, var(--accent) calc(var(--glow-on, 0) * 45%), transparent); }
