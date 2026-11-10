@@ -6,7 +6,8 @@ import { h, render } from "preact";
 import { useState } from "preact/hooks";
 import { signal } from "@preact/signals";
 import htm from "htm";
-import { Button, Chip, EmptyState, Panel, Tabs, Toasts, Toggle, toast } from "./ui.js";
+import { Button, Chip, EmptyState, List, ListRow, PageHead, Panel, Tabs, Toasts, Toggle, toast } from "./ui.js";
+import { Fingerprint } from "./shape_glyph.js"; // not "fingerprint.js": privacy blockers block that name
 import { AppBar, Crumbs } from "./shell.js";
 
 const html = htm.bind(h);
@@ -195,7 +196,7 @@ function Placeholder({ title, note }) {
 }
 
 const REVIEW_TABS = [{ key: "brief", label: "Brief" }, { key: "graph", label: "Graph" }];
-const ReviewTabs = ({ active }) => html`<${Tabs} class="review-tabs" label="Review" value=${active} onChange=${showStage} items=${REVIEW_TABS} />`;
+const ReviewTabs = ({ active }) => html`<${Tabs} variant="line" class="review-tabs" label="Review" value=${active} onChange=${showStage} items=${REVIEW_TABS} />`;
 
 /* --- rail ---------------------------------------------------------------- */
 
@@ -219,33 +220,40 @@ function Rail() {
 
 /* --- canvas views ---------------------------------------------------------- */
 
+const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+// A run's outcome in one line, for its row in the runs list.
+function runOutcome(r) {
+  const sm = r.summary || {};
+  const fut = sm.futures?.explorations
+    ? html` <span class="futures">· ◇ ${plural(sm.futures.explorations, "exploration")} · ${plural(sm.futures.projections, "projection")}</span>`
+    : null;
+  if (r.status === "completed") {
+    const signed = sm.decisions ? ` · ${plural(sm.decisions, "link")} signed off` : "";
+    return html`${plural(sm.claims ?? 0, "claim")} · ${sm.flags ?? 0} flagged${signed}${fut}`;
+  }
+  if (r.status === "paused") return html`Waiting for your sign-off: ${plural(sm.pending, "proposed link")}${fut}`;
+  if (r.status === "running") return "Running…";
+  return `Not started · ${plural(sm.sources ?? 0, "source")} ready`;
+}
+
 function Home() {
   const { runs } = get();
-  return html`<div class="canvas-narrow">
-    <h1>Forecast runs</h1>
-    <p class="lede">Start a forecast by entering an ask — or reopen a past run to
-    read its brief and graph.</p>
-    <${Panel} row>
-      <${Button} variant="primary" onClick=${() => set({ view: "ask", error: null })}>New run<//>
-      <span class="hint">Category, question, window, market.</span>
-    <//>
-    <h2>Past runs</h2>
-    <${Panel} flush>
-      ${runs.length
-        ? html`<table>
-            <thead><tr><th>Run</th><th>Ask</th><th>Status</th><th>Created</th></tr></thead>
-            <tbody>${runs.map((r) => html`<tr key=${r.id} class="row-link" tabindex="0"
-                onClick=${() => openRun(r.id)} onKeyDown=${(e) => e.key === "Enter" && openRun(r.id)}>
-                <td>${r.id}</td>
-                <td>${r.ask.category} — ${r.ask.question}</td>
-                <td><${StatusChip} status=${r.status} /></td>
-                <td>${r.created_at.replace("T", " ").slice(0, 16)}</td>
-              </tr>`)}</tbody>
-          </table>`
-        : html`<${EmptyState} title="No runs yet"
-            action=${html`<${Button} variant="primary" onClick=${() => set({ view: "ask", error: null })}>New run<//>`}>
-            A run answers one ask: it discovers sources, extracts signals and drafts a brief you sign off.<//>`}
-    <//>
+  const newRun = () => set({ view: "ask", error: null });
+  return html`<div class="page-list">
+    <${PageHead} title="Forecast runs" lede="Start a forecast from an ask, or reopen a run to read its brief and graph."
+      actions=${html`<${Button} variant="primary" onClick=${newRun}>New run<//>`} />
+    ${runs.length
+      ? html`<${List} label="Forecast runs">
+          ${runs.map((r) => html`<${ListRow} key=${r.id} href=${`/?run=${encodeURIComponent(r.id)}`} onOpen=${() => openRun(r.id)}
+            fingerprint=${html`<${Fingerprint} shape=${r.summary?.shape} stages=${r.summary?.stages} />`}
+            title=${r.ask.question}
+            scope=${`${r.ask.category}${r.ask.market ? ` · ${r.ask.market}` : ""}`}
+            outcome=${runOutcome(r)}
+            side=${html`<${StatusChip} status=${r.status} /><span>${dateFmt.format(new Date(r.created_at))}</span>`} />`)}
+        <//>`
+      : html`<${Panel}><${EmptyState} title="No runs yet" action=${html`<${Button} variant="primary" onClick=${newRun}>New run<//>`}>
+          A run answers one ask: it discovers sources, extracts signals and drafts a brief you sign off.<//><//>`}
   </div>`;
 }
 
@@ -655,16 +663,12 @@ function Brief() {
   }
   return html`<div class="canvas-narrow">
     <${ReviewTabs} active="brief" />
-    <div class="brief-head">
-      <h1>Forecast brief — ${b.category}</h1>
-      <span class="hint">as of ${b.as_of}</span>
-    </div>
-    <p class="lede">${plural(b.claims.length, "claim")}, ${b.flags.length} flagged.</p>
-    <div class="exports"><span class="hint">Export</span>
-      ${["brief.md", "brief.json", "brief.pptx", "graph.ttl"].map(
-        (name) => html`<${Button} key=${name} class="export-link" href=${`/api/runs/${runId}/exports/${name}`} download>${name}<//>`,
-      )}
-    </div>
+    <${PageHead} title="Brief"
+      lede=${`${plural(b.claims.length, "claim")}, ${b.flags.length} flagged · ${b.category} · as of ${b.as_of}`}
+      actions=${html`<div class="exports"><span class="hint">Export</span>
+        ${["brief.md", "brief.json", "brief.pptx", "graph.ttl"].map(
+          (name) => html`<${Button} key=${name} class="export-link" href=${`/api/runs/${runId}/exports/${name}`} download>${name}<//>`,
+        )}</div>`} />
 
     <h2>Trends</h2>
     ${b.claims.length
@@ -722,7 +726,9 @@ function GraphView() {
     set({ futuresLayer: on, graphView: view });
   };
   const hash = graphView?.zoom ? `#zoom=${graphView.zoom.toFixed(3)}${graphView.focus ? `&focus=${encodeURIComponent(graphView.focus)}` : ""}` : "";
-  return html`<${ReviewTabs} active="graph" />
+  return html`<div class="canvas-narrow">
+    <${ReviewTabs} active="graph" />
+    <${PageHead} title="Graph" lede="The run's evidence: sources, the signals drawn from them, and the entities they're about." />
     <div class="futures-toggle-row">
       <${Toggle} class="futures-toggle" label="Show futures layer" checked=${futuresLayer && !none} disabled=${!!none} onChange=${toggle}
         title="Projections from this run's explorations, beside the evidence they grow from. Never part of the brief." />
@@ -730,8 +736,11 @@ function GraphView() {
         ? html`<span class="hint">No explorations on this run yet. <a href=${`/futures?run=${runId}`}>Start one in Futures →</a></span>`
         : html`<span class="hint">adds ${plural(f.projections, "projection")} from ${plural(f.explorations, "exploration")}</span>`}
     </div>
-    <iframe class="graph-frame" src=${`/runs/${runId}/graph.html${futuresLayer && !none ? "?futures_layer=true" : ""}${hash}`}
-      title="Graph explorer — search, layout, click-to-trace"></iframe>`;
+    </div>
+    <div class="graph-wrap">
+      <iframe class="graph-frame" src=${`/runs/${runId}/graph.html${futuresLayer && !none ? "?futures_layer=true" : ""}${hash}`}
+        title="Graph explorer — search, layout, click-to-trace"></iframe>
+    </div>`;
 }
 
 const VIEWS = { home: Home, ask: Ask, sources: Sources, run: Run, "sign-off": SignOff, brief: Brief, graph: GraphView };

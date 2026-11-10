@@ -234,3 +234,44 @@ export function EmptyState({ title, children = null, action = null, mark = "◇"
     ${action ? html`<div class="ui-empty-action">${action}</div>` : null}
   </div>`;
 }
+
+/* --- PageHead --------------------------------------------------------------------
+   The top of a page (the design hierarchy's level 1): title, one line of lede, and
+   the page's actions on the right of the title row. */
+export function PageHead({ title, lede = null, actions = null, class: cls }) {
+  return html`<header class=${cx("page-head", cls)}>
+    <div class="page-head-text">
+      <h1>${title}</h1>
+      ${lede ? html`<p class="lede">${lede}</p>` : null}
+    </div>
+    ${actions ? html`<div class="page-head-actions">${actions}</div>` : null}
+  </header>`;
+}
+
+/* --- List / ListRow --------------------------------------------------------------
+   The list pages' row (runs, explorations): a fingerprint, the title you scan, a
+   quiet scope line and outcome line, and status / date on the right. The title is
+   the row's link and stretches over the whole row (so ⌘-click and middle-click work);
+   row actions sit above it. onOpen handles a plain click in-app. */
+export function List({ label, children }) {
+  return html`<${Panel} flush class="list"><ol class="list-rows" aria-label=${label}>${children}</ol><//>`;
+}
+
+export function ListRow({ href, onOpen = null, fingerprint = null, title, scope = null, outcome = null, side = null, actions = null }) {
+  const open = onOpen
+    ? (ev) => {
+        if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button) return; // a new tab: let the link work
+        ev.preventDefault();
+        onOpen();
+      }
+    : undefined;
+  return html`<li class="list-row">
+    ${fingerprint ? html`<div class="list-row-fp" aria-hidden="true">${fingerprint}</div>` : null}
+    <div class="list-row-main">
+      <a class="list-row-title" href=${href} onClick=${open}>${title}</a>
+      ${scope ? html`<div class="list-row-scope">${scope}</div>` : null}
+      ${outcome ? html`<div class="list-row-outcome">${outcome}</div>` : null}
+    </div>
+    ${side || actions ? html`<div class="list-row-side">${side}${actions ? html`<div class="list-row-actions">${actions}</div>` : null}</div>` : null}
+  </li>`;
+}

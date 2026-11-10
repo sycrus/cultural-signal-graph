@@ -238,3 +238,20 @@ def test_a_stage_that_raises_is_failed_not_done(tmp_path):
     assert snap["stages"]["extract"]["status"] == "done"
     assert snap["stages"]["align"]["status"] == "failed"
     assert "model timed out" in snap["stages"]["align"]["error"]
+
+
+def test_runs_list_carries_each_runs_summary_and_shape(tmp_path):
+    """The runs list shows each run's outcome and its graph's shape (no text): the
+    counts come from the brief and decisions, the shape from the final graph."""
+    store = _store(tmp_path)
+    created = _create(store)
+    finished = _create(store)
+    store.start(finished["id"])
+    store.signoff(finished["id"], {EDGE_ID: True})
+    by_id = {r["id"]: r["summary"] for r in store.list()}
+    done = by_id[finished["id"]]
+    assert done["claims"] > 0 and done["decisions"] == 1 and done["approved"] == 1
+    assert {n["kind"] for n in done["shape"]["nodes"]} >= {"signal", "entity", "source"}
+    assert all(set(n) <= {"id", "kind", "flagged"} for n in done["shape"]["nodes"])  # shape only, no text
+    fresh = by_id[created["id"]]
+    assert "shape" not in fresh and fresh["sources"] > 0 and fresh["stages"]["extract"] == "pending"

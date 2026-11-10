@@ -53,6 +53,21 @@ load_dotenv()
 # The stepper's stages, in rail order. "sign-off" is the gate that pauses the run.
 STAGES = ("ask", "sources", "extract", "align", "sign-off", "draft", "brief")
 
+
+def graph_shape(elements: dict) -> dict:
+    """A graph reduced to its shape: node kinds (flagged signals marked) and links,
+    no labels or text. What a list fingerprint draws."""
+    return {
+        "nodes": [
+            {"id": n["data"]["id"], "kind": n["data"]["kind"], **({"flagged": True} if n["data"].get("flagged") == "true" else {})}
+            for n in elements["nodes"]
+        ],
+        "edges": [
+            {"source": e["data"]["source"], "target": e["data"]["target"], "kind": e["data"]["kind"]}
+            for e in elements["edges"]
+        ],
+    }
+
 StateFns = tuple  # (extract_fn, align_fn, draft_fn)
 
 
@@ -377,7 +392,8 @@ class RunStore:
     # --- reads ---------------------------------------------------------------
 
     def list(self) -> list[dict]:
-        """All runs, newest first (the reopen list)."""
+        """All runs, newest first (the reopen list), each with what the runs list
+        shows about it: its outcome in counts, its stages, and its graph's shape."""
         runs = [self._load(run_id) for run_id in self._run_ids()]
         runs.sort(key=lambda r: r["created_at"], reverse=True)
         return [
@@ -387,9 +403,32 @@ class RunStore:
                 "mode": r["mode"],
                 "status": r["status"],
                 "ask": r["ask"],
+                "summary": self._summary(r),
             }
             for r in runs
         ]
+
+    def _summary(self, run: dict) -> dict:
+        """Outcome counts, stage statuses, and the graph's shape (node kinds and links,
+        no text) for the runs list's fingerprint. The shape exists once the run has
+        a final graph."""
+        out = {
+            "sources": len(run["sources"]),
+            "pending": len(run["pending"]),
+            "decisions": len(run["decisions"]),
+            "approved": sum(1 for v in run["decisions"].values() if v),
+            "stages": {name: st.get("status", "pending") for name, st in run["stages"].items()},
+        }
+        brief_path = self._dir(run["id"]) / "brief.json"
+        if brief_path.exists():
+            brief = json.loads(brief_path.read_text(encoding="utf-8"))
+            out["claims"] = len(brief.get("claims", []))
+            out["flags"] = len(brief.get("flags", []))
+        state_path = self._dir(run["id"]) / "state-final.json"
+        if state_path.exists():
+            elements = build_cyto_elements(forecast_run_from_state(json.loads(state_path.read_text(encoding="utf-8"))))
+            out["shape"] = graph_shape(elements)
+        return out
 
     def snapshot(self, run_id: str) -> dict:
         """Everything the stepper needs to render a run."""

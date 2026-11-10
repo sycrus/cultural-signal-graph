@@ -60,9 +60,24 @@ function Identity() {
 
 /* --- the bar ------------------------------------------------------------------- */
 
+/* --- logotype ----------------------------------------------------------------------
+   A signal trace (a pulse on a flat line: a signal picked out of the noise) and the
+   name in lowercase Kode Mono. Chosen from three in a prototype (branch
+   prototype/app-bar, logotype C). */
+function Logo() {
+  return html`<span class="logo" aria-hidden="true">
+    <svg viewBox="0 0 28 14" class="logo-trace"><polyline points="0,7 6,7 9,2 13,12 17,4 20,7 28,7" /></svg>
+    <span class="logo-word">cultural signal graph</span>
+  </span>`;
+}
+
 /* mode: "forecast" | "futures" — the page you are on.
    run: the open run's snapshot or summary ({ id, status, ask, mode }), or null.
-   skipTo: id of the main content, for the skip link. */
+   skipTo: id of the main content, for the skip link.
+   Three zones: the logotype (home) on the left; the open run's question at the top
+   centre — it's what the page is about; on the right, the Forecast | Futures switch
+   (kept apart from the logotype, in plain sentence case so it can't read as part of
+   the name), then who you are and the theme. */
 export function AppBar({ mode, run = null, skipTo }) {
   const runId = run?.id || null;
   // Futures grows from extracted evidence: it opens once the run has paused at
@@ -76,18 +91,24 @@ export function AppBar({ mode, run = null, skipTo }) {
   }, [mode]);
   return html`<header id="topbar" class="app-bar">
     <a class="skip-link" href=${`#${skipTo}`}>Skip to content</a>
-    <a class="brand" href="/" title="All forecast runs">Cultural Signal Graph</a>
-    <nav class="ui-tabs solid mode-switch" aria-label="Mode">
-      <a href=${forecastHref} class=${mode === "forecast" ? "on" : ""} aria-current=${mode === "forecast" ? "page" : undefined}>Forecast</a>
-      ${futuresReady
-        ? html`<a href=${futuresHref} class=${mode === "futures" ? "on" : ""} aria-current=${mode === "futures" ? "page" : undefined}>Futures</a>`
-        : html`<span class="disabled" aria-disabled="true" title=${why}>Futures</span>`}
-    </nav>
-    ${run?.ask ? html`<span class="bar-context" title=${run.ask.question}>${run.ask.question}</span>` : null}
-    <span class="spacer"></span>
-    ${run?.mode === "fixture" ? html`<${Chip} tone="warn" title="Recorded outputs — no model, no network">fixture mode<//>` : null}
-    <${Identity} />
-    <${ThemeSwitch} />
+    <div class="bar-left">
+      <a class="brand" href="/" title="Cultural Signal Graph — all forecast runs" aria-label="Cultural Signal Graph — all forecast runs"><${Logo} /></a>
+      ${run?.mode === "fixture" ? html`<${Chip} tone="warn" title="Recorded outputs — no model, no network">fixture mode<//>` : null}
+    </div>
+    <div class="bar-center">
+      ${run?.ask ? html`<span class="bar-title" title=${run.ask.question}>${run.ask.question}</span>` : null}
+    </div>
+    <div class="bar-right">
+      <nav class="mode-switch" aria-label="Mode">
+        <a href=${forecastHref} class=${mode === "forecast" ? "on" : ""} aria-current=${mode === "forecast" ? "page" : undefined}>Forecast</a>
+        ${futuresReady
+          ? html`<a href=${futuresHref} class=${mode === "futures" ? "on" : ""} aria-current=${mode === "futures" ? "page" : undefined}>Futures</a>`
+          : html`<span class="disabled" aria-disabled="true" title=${why}>Futures</span>`}
+      </nav>
+      <span class="bar-divider" aria-hidden="true"></span>
+      <${Identity} />
+      <${ThemeSwitch} />
+    </div>
   </header>`;
 }
 

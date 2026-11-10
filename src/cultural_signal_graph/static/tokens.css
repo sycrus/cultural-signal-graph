@@ -57,6 +57,7 @@
   /* --- type ------------------------------------------------------------------- */
   --font-sans: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  --text-mark: 9.5px; /* marks inside cards only (tiny chips, badges) */
   --text-xs: 11px;
   --text-sm: 12px;
   --text-base: 14px;
