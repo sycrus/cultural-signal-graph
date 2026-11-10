@@ -8,7 +8,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import { lineage } from "./layout.js";
 import { nodeTitle } from "./hints.js";
-import { Toggle } from "./ui.js";
+import { Toggle } from "../ui.js";
 
 const html = htm.bind(h);
 const TAU = Math.PI * 2;

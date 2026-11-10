@@ -6,7 +6,7 @@ import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
 import { GroundButton } from "./ground.js";
-import { Button, Chip, toast } from "./ui.js";
+import { Button, Chip, toast } from "../ui.js";
 
 /* Undo and redo say what they did, with the way back. */
 async function undo() {

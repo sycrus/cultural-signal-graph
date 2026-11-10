@@ -9,7 +9,7 @@ import { useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
 import { marksText } from "./hints.js";
-import { Button, Chip, EmptyState, Panel, Toggle } from "./ui.js";
+import { Button, Chip, EmptyState, Panel, Toggle } from "../ui.js";
 
 const html = htm.bind(h);
 

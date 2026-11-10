@@ -103,6 +103,48 @@ export function Horizons({ snap, selectedId, onSelect, onRetag }) {
   for (let yr = e.start_year; yr <= e.start_year + e.horizon; yr += e.horizon > 12 ? 2 : 1) years.push(yr);
   const selected = items.find((it) => it.id === selectedId);
 
+  /* Labels go where they collide least: each curve's label tries spots along its
+     curve (preferring its usual one) and takes the one with the fewest nodes under
+     it; the selected node's label tries spots around the node and avoids both the
+     curve labels and other nodes. Text widths are estimates (no layout pass). */
+  const dots = Object.values(pos);
+  const hits = (box) => dots.filter(([x, y]) => x > box.x1 - 7 && x < box.x2 + 7 && y > box.y1 - 7 && y < box.y2 + 7).length;
+  const overlaps = (a, b) => a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2;
+  const inside = (box) => box.x1 >= 4 && box.x2 <= stageW - 4 && box.y1 >= 2 && box.y2 <= pad.t + H + 4;
+  const HOME = { H1: 0.02, H2: 0.42, H3: 0.8 };
+  const curveLabels = Object.fromEntries(Object.entries(CURVE).map(([c, f]) => {
+    const w = LABEL[c].length * 8.2;
+    const at = (t) => {
+      const x = X(t);
+      const y = Y(f(Math.min(1, t + w / 2 / W))) - 10;
+      return { x, y, box: { x1: x, x2: x + w, y1: y - 12, y2: y + 3 } };
+    };
+    let best = null;
+    for (let t = 0.02; t <= 0.98; t += 0.04) {
+      const spot = at(t);
+      if (!inside(spot.box)) continue;
+      const score = hits(spot.box) * 10 + Math.abs(t - HOME[c]);
+      if (!best || score < best.score) best = { ...spot, score };
+    }
+    return [c, best || at(HOME[c])];
+  }));
+  let selectedLabel = null;
+  if (selected) {
+    const [sx, sy] = pos[selected.id];
+    const text = `${selected.text.slice(0, 70)}${selected.text.length > 70 ? "…" : ""}`;
+    const w = text.length * 6.4;
+    const blocked = Object.values(curveLabels).map((l) => l.box);
+    const spots = [[10, -10, "start"], [-10, -10, "end"], [10, 20, "start"], [-10, 20, "end"], [10, -26, "start"], [-10, -26, "end"], [10, 36, "start"], [-10, 36, "end"]]
+      .map(([dx, dy, anchor]) => {
+        const x = sx + dx;
+        const y = sy + dy;
+        const box = anchor === "start" ? { x1: x, x2: x + w, y1: y - 12, y2: y + 3 } : { x1: x - w, x2: x, y1: y - 12, y2: y + 3 };
+        return { x, y, anchor, box };
+      });
+    const score = (sp) => (inside(sp.box) ? 0 : 1000) + blocked.filter((b) => overlaps(b, sp.box)).length * 100 + hits(sp.box);
+    selectedLabel = { text, ...spots.reduce((a, b) => (score(b) < score(a) ? b : a)) };
+  }
+
   return html`<div class="horizons" ref=${ref}>
     <svg width=${stageW} height=${height}>
       ${years.map((yr) => html`<g key=${yr}><line x1=${X(tOf(yr))} x2=${X(tOf(yr))} y1=${pad.t} y2=${pad.t + H} class="h-grid" />
@@ -110,7 +152,7 @@ export function Horizons({ snap, selectedId, onSelect, onRetag }) {
       <text x=${pad.l - 10} y=${pad.t + 8} text-anchor="end" class="h-axis">prevalence</text>
       ${Object.entries(CURVE).map(([c, f]) => html`<g key=${c}>
         <path d=${curvePath(f)} class=${`h-curve ${c}`} />
-        <text x=${X(c === "H1" ? 0.02 : c === "H2" ? 0.42 : 0.86)} y=${Y(f(c === "H1" ? 0.02 : c === "H2" ? 0.5 : 0.86)) - 10} class=${`h-label ${c}`}>${LABEL[c]}</text>
+        <text x=${curveLabels[c].x} y=${curveLabels[c].y} class=${`h-label ${c}`}>${LABEL[c]}</text>
       </g>`)}
       ${items.map((it) => {
         const [x, y] = pos[it.id];
@@ -121,8 +163,8 @@ export function Horizons({ snap, selectedId, onSelect, onRetag }) {
           <title>${marksText(it) ? marksText(it) + "\n" : ""}${it.text}${v ? ` — ${v}${it.tag.source === "human" ? " (set by you)" : ""}` : " — untagged"}${it.anchor ? " · evidence" : ""}</title>
         </g>`;
       })}
-      ${selected ? html`<text x=${Math.min(pos[selected.id][0] + 10, stageW - 10)} y=${pos[selected.id][1] - 10}
-        text-anchor=${pos[selected.id][0] > stageW * 0.7 ? "end" : "start"} class="h-selected-label">${selected.text.slice(0, 70)}${selected.text.length > 70 ? "…" : ""}</text>` : null}
+      ${selectedLabel ? html`<text x=${selectedLabel.x} y=${selectedLabel.y} text-anchor=${selectedLabel.anchor}
+        class="h-selected-label">${selectedLabel.text}</text>` : null}
     </svg>
     <div class="h-legend hint">■ evidence (anchors, at the present) · ● projections at their time window · hollow on H2 = H2− (captured by H1), filled = H2+ (bridging to H3) · drag onto another curve to re-tag</div>
   </div>`;

@@ -1,6 +1,6 @@
-/* The futures design system's components (#46). Every button, chip, panel, tab set,
-   range roller, node card, drawer, toast, switch and empty state in futures mode is
-   one of these, styled from tokens only (ui.css, tokens.css), so light and dark,
+/* The design system's components (#46). Every button, chip, panel, tab set, range
+   roller, node card, drawer, toast, switch and empty state in the app (the forecast
+   stepper and futures mode) is one of these, styled from tokens only (ui.css, tokens.css), so light and dark,
    phosphor and LCD, apply everywhere at once.
 
    Motion follows the handscroll: drawers and toasts slide in, the roller slides the

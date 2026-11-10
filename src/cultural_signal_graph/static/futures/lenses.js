@@ -13,7 +13,7 @@ import { Cone, CONE_CLASSES } from "./cone.js";
 import { Matrix, MATRIX_VALUES } from "./matrix.js";
 import { Horizons, HORIZON_VALUES } from "./horizons.js";
 import { Pestle, PESTLE_VALUES } from "./pestle.js";
-import { Chip, Panel, Tabs, Toggle } from "./ui.js";
+import { Chip, Panel, Tabs, Toggle } from "../ui.js";
 
 const html = htm.bind(h);
 

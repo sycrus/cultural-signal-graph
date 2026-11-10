@@ -10,7 +10,7 @@ import { DetailPanel } from "./panel.js";
 import { HistoryBar, ProjectionActions } from "./actions.js";
 import { AddPanel } from "./add.js";
 import { Coverage } from "./pestle.js";
-import { Button, Chip, EmptyState, Panel, Toasts, toast } from "./ui.js";
+import { Button, Chip, EmptyState, Panel, Toasts, toast } from "../ui.js";
 
 const html = htm.bind(h);
 
