@@ -58,7 +58,7 @@ body {
   background: var(--card);
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--card);
 }
 .rail-item.done { color: var(--ink); }
@@ -75,19 +75,19 @@ body {
 .rail-item.here { color: var(--ink); font-weight: 600; border-color: var(--accent); background: var(--accent-soft); }
 .rail-item.done.btn:not(:disabled):hover, .rail-item.active.btn:not(:disabled):hover { border-color: var(--accent-ring); background: var(--hover); }
 
-#canvas { flex: 1; overflow: auto; padding: 22px; }
+#canvas { flex: 1; overflow: auto; padding: 24px; }
 .canvas-narrow { max-width: 720px; margin: 0 auto; }
 
-h1 { font-size: 18px; margin: 0 0 6px; }
-h2 { font-size: 15px; margin: 18px 0 8px; }
-.lede { color: var(--muted); margin: 0 0 18px; }
+h1 { font-size: var(--text-lg); margin: 0 0 4px; }
+h2 { font-size: var(--text-md); margin: 24px 0 8px; }
+.lede { color: var(--muted); margin: 0 0 16px; }
 
 .card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 button {
@@ -113,11 +113,11 @@ input, select {
   background: var(--card);
   color: var(--ink);
 }
-.hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.hint { color: var(--muted); font-size: var(--text-sm); margin-top: 4px; }
 
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 600; font-size: 12px; }
+th { color: var(--muted); font-weight: 600; font-size: var(--text-sm); }
 td { font-variant-numeric: tabular-nums; }
 tbody tr.row-link { cursor: pointer; }
 tbody tr.row-link:hover, tbody tr.row-link:focus-visible { background: var(--hover); outline: none; }
@@ -158,38 +158,37 @@ details[open] > summary { margin-bottom: 10px; }
 
 /* Sign-off review cards */
 .review-count { font-weight: 600; margin: 14px 0 10px; }
-.edge-card { padding: 14px 16px; margin-bottom: 10px; max-width: 560px; }
+.edge-card { padding: 16px; margin-bottom: 12px; max-width: 560px; }
 .edge-card.decided { border-left: 4px solid var(--border); display: grid; gap: 8px; justify-items: start; }
 .edge-card.decided.approved { border-left-color: var(--ok); }
 .edge-card.decided.rejected { border-left-color: var(--danger); }
 .edge-meta ul { margin: 2px 0 0; padding-left: 18px; }
 .edge-meta li { overflow-wrap: anywhere; }
-.edge-head { font-size: 15px; font-weight: 600; }
+.edge-head { font-size: var(--text-md); font-weight: 600; }
 .edge-head .approx { color: var(--muted); padding: 0 2px; }
-.edge-meta { color: var(--muted); font-size: 12px; margin: 4px 0 10px; }
+.edge-meta { color: var(--muted); font-size: var(--text-sm); margin: 4px 0 10px; }
 .edge-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 button.danger-active { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
 
 
 /* Brief */
-.claim-card, .flag-card, .gated-row { padding: 12px 16px; margin-bottom: 10px; }
+.claim-card, .flag-card, .gated-row { padding: 16px; margin-bottom: 12px; }
 .flag-card { border-left: 4px solid var(--danger); background: var(--danger-wash); }
 .flag-card.low { border-left-color: var(--warn); background: var(--warn-wash); }
 .flag-text { flex: 1; min-width: 200px; }
 .claim-head .conf-chip { flex: none; font-family: var(--font-data); font-size: var(--text-sm); font-weight: 600; text-shadow: var(--glow-text); }
 .claim-head { display: flex; gap: 8px; align-items: baseline; }
 .claim-num { color: var(--muted); }
-.claim-statement { font-size: 15px; font-weight: 600; flex: 1; }
-.claim-valid { color: var(--muted); font-size: 12px; margin: 4px 0 6px 22px; }
+.claim-statement { font-size: var(--text-md); font-weight: 600; flex: 1; }
+.claim-valid { color: var(--muted); font-size: var(--text-sm); margin: 4px 0 6px 22px; }
 .claim-card details { margin: 4px 0 0 22px; }
-.claim-card summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; font-weight: 500; }
+.claim-card summary { cursor: pointer; color: var(--accent-ink); font-size: var(--text-sm); font-weight: 500; }
 .claim-card p { margin: 6px 0; }
 .claim-card ul { margin: 6px 0; padding-left: 18px; }
 .gated-edge { font-weight: 550; }
 
 /* Brief header and exports */
-.brief-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.exports { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -8px 0 18px; }
+.exports { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
 .exports .hint { margin: 0 4px 0 0; }
 .exports .export-link { font-family: var(--font-data); font-size: var(--text-xs); padding: 3px 8px; }
 .review-tabs { margin-bottom: 16px; }
@@ -202,16 +201,16 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
 .flow-step:last-child::before, .flow-step:last-child::after { display: none; }
 .flow-step.done::before { background: var(--ok-line); }
 .flow-step.done::after { border-top-color: var(--ok-line); }
-.flow-mark { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700;
+.flow-mark { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: var(--text-sm); font-weight: 700;
   border: 2px solid var(--border); background: var(--card); color: var(--muted); }
 .flow-step.done .flow-mark { background: var(--ok); border-color: var(--ok); color: var(--card); }
 .flow-step.action .flow-mark { background: var(--warn-soft); border-color: var(--warn); color: var(--warn-ink); box-shadow: 0 0 0 3px var(--warn-soft); }
 .flow-step.failed .flow-mark { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
 .flow-step.running .flow-mark { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .flow-body { padding-top: 3px; min-width: 0; }
-.flow-name { font-family: var(--font-display); font-size: 14px; color: var(--ink); }
+.flow-name { font-family: var(--font-display); font-size: var(--text-base); color: var(--ink); }
 .flow-step.pending .flow-name { color: var(--muted); }
-.flow-msg { font-size: 13px; color: var(--ink-soft); margin-top: 2px; overflow-wrap: anywhere; }
+.flow-msg { font-size: var(--text-sm); color: var(--ink-soft); margin-top: 2px; overflow-wrap: anywhere; }
 .flow-step.pending .flow-msg { color: var(--muted); }
 .flow-step.failed .flow-msg { color: var(--danger-ink); }
 .flow-step.action .flow-msg { color: var(--warn-ink); }

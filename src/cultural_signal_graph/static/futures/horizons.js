@@ -149,7 +149,7 @@ export function Horizons({ snap, selectedId, onSelect, onRetag }) {
     <svg width=${stageW} height=${height}>
       ${years.map((yr) => html`<g key=${yr}><line x1=${X(tOf(yr))} x2=${X(tOf(yr))} y1=${pad.t} y2=${pad.t + H} class="h-grid" />
         <text x=${X(tOf(yr))} y=${height - 14} text-anchor="middle" class="h-year">${yr}</text></g>`)}
-      <text x=${pad.l - 10} y=${pad.t + 8} text-anchor="end" class="h-axis">prevalence</text>
+      <text x="8" y=${pad.t - 10} class="h-axis">prevalence</text>
       ${Object.entries(CURVE).map(([c, f]) => html`<g key=${c}>
         <path d=${curvePath(f)} class=${`h-curve ${c}`} />
         <text x=${curveLabels[c].x} y=${curveLabels[c].y} class=${`h-label ${c}`}>${LABEL[c]}</text>

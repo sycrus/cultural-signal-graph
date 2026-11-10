@@ -663,16 +663,12 @@ function Brief() {
   }
   return html`<div class="canvas-narrow">
     <${ReviewTabs} active="brief" />
-    <div class="brief-head">
-      <h1>Forecast brief — ${b.category}</h1>
-      <span class="hint">as of ${b.as_of}</span>
-    </div>
-    <p class="lede">${plural(b.claims.length, "claim")}, ${b.flags.length} flagged.</p>
-    <div class="exports"><span class="hint">Export</span>
-      ${["brief.md", "brief.json", "brief.pptx", "graph.ttl"].map(
-        (name) => html`<${Button} key=${name} class="export-link" href=${`/api/runs/${runId}/exports/${name}`} download>${name}<//>`,
-      )}
-    </div>
+    <${PageHead} title="Brief"
+      lede=${`${plural(b.claims.length, "claim")}, ${b.flags.length} flagged · ${b.category} · as of ${b.as_of}`}
+      actions=${html`<div class="exports"><span class="hint">Export</span>
+        ${["brief.md", "brief.json", "brief.pptx", "graph.ttl"].map(
+          (name) => html`<${Button} key=${name} class="export-link" href=${`/api/runs/${runId}/exports/${name}`} download>${name}<//>`,
+        )}</div>`} />
 
     <h2>Trends</h2>
     ${b.claims.length
@@ -731,6 +727,7 @@ function GraphView() {
   };
   const hash = graphView?.zoom ? `#zoom=${graphView.zoom.toFixed(3)}${graphView.focus ? `&focus=${encodeURIComponent(graphView.focus)}` : ""}` : "";
   return html`<${ReviewTabs} active="graph" />
+    <${PageHead} title="Graph" lede="The run's evidence: sources, the signals drawn from them, and the entities they're about." />
     <div class="futures-toggle-row">
       <${Toggle} class="futures-toggle" label="Show futures layer" checked=${futuresLayer && !none} disabled=${!!none} onChange=${toggle}
         title="Projections from this run's explorations, beside the evidence they grow from. Never part of the brief." />

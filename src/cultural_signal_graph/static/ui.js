@@ -238,8 +238,8 @@ export function EmptyState({ title, children = null, action = null, mark = "◇"
 /* --- PageHead --------------------------------------------------------------------
    The top of a page (the design hierarchy's level 1): title, one line of lede, and
    the page's actions on the right of the title row. */
-export function PageHead({ title, lede = null, actions = null }) {
-  return html`<header class="page-head">
+export function PageHead({ title, lede = null, actions = null, class: cls }) {
+  return html`<header class=${cx("page-head", cls)}>
     <div class="page-head-text">
       <h1>${title}</h1>
       ${lede ? html`<p class="lede">${lede}</p>` : null}

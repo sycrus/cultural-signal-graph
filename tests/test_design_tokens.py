@@ -54,3 +54,10 @@ def test_vendored_fonts_are_served_and_licensed():
         assert (fonts / name).read_bytes()[:4] == b"wOF2", name
     for family in ["KodeMono", "Barlow"]:
         assert "Open Font License" in (fonts / f"{family}-OFL.txt").read_text(encoding="utf-8")
+
+
+def test_font_sizes_come_from_the_type_scale():
+    """docs/design/hierarchy.md: every font size is a --text-* token, never pixels."""
+    for name in ["app.css", "futures/futures.css", "ui.css"]:
+        css = (STATIC / name).read_text(encoding="utf-8")
+        assert not re.findall(r"font-size:\s*[0-9.]+px", css), name

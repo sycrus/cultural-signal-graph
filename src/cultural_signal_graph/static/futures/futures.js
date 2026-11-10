@@ -171,20 +171,18 @@ function ExplorationView() {
   };
   return html`<div class=${`exploration ${S.selectedId.value || S.adding.value ? "panel-open" : ""}`}>
     <${Crumbs} items=${[{ label: "Explorations", href: `/futures?run=${S.runId.value}`, onClick: () => { S.selectedId.value = null; S.adding.value = null; S.showList(); } }]} />
-    <div class="exp-head">
-      <h1>${e.goal}</h1>
-      <span class="hint">${e.start_year} → ${e.start_year + e.horizon} · ${e.orders} orders · ${s.anchors.length} anchors · ${s.projections.length} projections</span>
-      <span class="spacer"></span>
-      <${Button} onClick=${() => { S.selectedId.value = null; S.adding.value = { kind: "assumption" }; }}
-        disabled=${S.generating.value} title="Add your own assumption, wild card or reference">+ Add<//>
-      <${HistoryBar} />
-      <details class="export-menu">
-        <summary>Export</summary>
-        <div>${["exploration.md", "exploration.json", "log.jsonl", "exploration.trig"].map(
-          (n) => html`<a key=${n} href=${`/api/runs/${S.runId.value}/explorations/${e.id}/exports/${n}`} download>${n}</a>`,
-        )}</div>
-      </details>
-    </div>
+    <${PageHead} class="exp-head" title=${e.goal}
+      lede=${`${e.start_year} → ${e.start_year + e.horizon} · ${e.orders} orders · ${s.anchors.length} anchors · ${s.projections.length} projections`}
+      actions=${html`
+        <${Button} onClick=${() => { S.selectedId.value = null; S.adding.value = { kind: "assumption" }; }}
+          disabled=${S.generating.value} title="Add your own assumption, wild card or reference">+ Add<//>
+        <${HistoryBar} />
+        <details class="export-menu">
+          <summary class="btn">Export</summary>
+          <div>${["exploration.md", "exploration.json", "log.jsonl", "exploration.trig"].map(
+            (n) => html`<a key=${n} href=${`/api/runs/${S.runId.value}/explorations/${e.id}/exports/${n}`} download>${n}</a>`,
+          )}</div>
+        </details>`} />
     <${ErrorLine} />
     ${S.generating.value
       ? html`<${Panel} row class="gen-bar">
