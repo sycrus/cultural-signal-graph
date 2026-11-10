@@ -18,8 +18,21 @@
   function apply() {
     var t = resolved(pref());
     document.documentElement.setAttribute("data-theme", t);
-    document.documentElement.setAttribute("data-theme-pref", pref()); // labels the switch
+    document.documentElement.setAttribute("data-theme-pref", pref());
     window.dispatchEvent(new CustomEvent("csg-theme", { detail: t }));
+    paintChrome();
+  }
+  // The browser's own chrome (mobile address bar, PWA title bar) matches the page.
+  function paintChrome() {
+    var bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+    if (!bg) return; // stylesheet not applied yet: DOMContentLoaded tries again
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = "theme-color";
+      document.head.appendChild(meta);
+    }
+    meta.content = bg;
   }
   function set(p) {
     try {
@@ -34,10 +47,7 @@
 
   if (mq && mq.addEventListener) mq.addEventListener("change", apply);
   window.addEventListener("storage", function (e) { if (e.key === KEY || e.key === null) apply(); });
-  document.addEventListener("click", function (e) {
-    var b = e.target.closest && e.target.closest("[data-theme-toggle]");
-    if (b) cycle();
-  });
+  document.addEventListener("DOMContentLoaded", paintChrome);
 
   window.csgTheme = {
     pref: pref,

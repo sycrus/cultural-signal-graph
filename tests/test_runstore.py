@@ -209,3 +209,32 @@ def test_notes_are_an_append_only_overlay(tmp_path):
         store.add_note(run_id, target_id=entity, text="   ")
     with pytest.raises(ValueError):
         store.add_note(run_id, target_id="no-such-node", text="ghost note")
+
+
+def test_stages_record_what_they_produced(tmp_path):
+    """The Run step says what each stage did: signals and entities extracted,
+    cross-domain links proposed."""
+    store = _store(tmp_path)
+    run = _create(store)
+    snap = store.start(run["id"])
+    stages = snap["stages"]
+    assert stages["extract"]["status"] == "done"
+    assert stages["extract"]["counts"]["signals"] > 0 and stages["extract"]["counts"]["entities"] > 0
+    assert stages["align"]["counts"]["edges"] == len(snap["pending"])
+
+
+def test_a_stage_that_raises_is_failed_not_done(tmp_path):
+    """A green tick must mean the stage finished: a stage that raised is recorded as
+    failed, with why, and the run stays retryable."""
+    def broken_align(_extraction):
+        raise RuntimeError("model timed out")
+
+    store = _store(tmp_path, align=broken_align)
+    run = _create(store)
+    with pytest.raises(RuntimeError):
+        store.start(run["id"])
+    snap = store.snapshot(run["id"])
+    assert snap["status"] == "created"
+    assert snap["stages"]["extract"]["status"] == "done"
+    assert snap["stages"]["align"]["status"] == "failed"
+    assert "model timed out" in snap["stages"]["align"]["error"]

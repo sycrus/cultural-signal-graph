@@ -23,24 +23,10 @@ export const anchorsById = computed(() =>
   Object.fromEntries((snap.value?.anchors || anchors.value).map((a) => [a.id, a])),
 );
 
-/* --- who is acting (Workshop B, #52): a name plus a role, remembered per browser.
-   Every write carries it, so each op in the log records who made it — or, for a
-   model op, who asked for it. --- */
+/* --- who is acting (Workshop B, #52): shared with the stepper via identity.js --- */
 
-const remembered = (key) => {
-  try { return localStorage.getItem(key) || ""; } catch { return ""; }
-};
-export const author = signal(remembered("csg-author") || "strategist");
-export const role = signal(remembered("csg-role"));
-export function setIdentity(name, r) {
-  author.value = (name || "").trim() || "strategist";
-  role.value = (r || "").trim();
-  try {
-    localStorage.setItem("csg-author", author.value);
-    localStorage.setItem("csg-role", role.value);
-  } catch { /* private window: keep it for this page only */ }
-}
-export const who = () => ({ author: author.value, role: role.value || null });
+import { author, role, setIdentity, who } from "../identity.js";
+export { author, role, setIdentity, who };
 
 /* Writes carry `who` in the query (routes with no body: generate, classify, seed…)
    and in a JSON object body (routes with one). */

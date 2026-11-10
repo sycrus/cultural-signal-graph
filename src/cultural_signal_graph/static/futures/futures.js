@@ -10,57 +10,12 @@ import { DetailPanel } from "./panel.js";
 import { HistoryBar, ProjectionActions } from "./actions.js";
 import { AddPanel } from "./add.js";
 import { Coverage } from "./pestle.js";
-import { Button, Chip, EmptyState, Panel, Toasts, toast } from "../ui.js";
+import { Button, Chip, EmptyState, Panel, Toasts } from "../ui.js";
+import { AppBar, Crumbs } from "../shell.js";
 
 const html = htm.bind(h);
 
 const KIND_LABEL = { claim: "claim", signal: "signal", flagged: "flagged", edge: "cross-domain edge", reference: "reference" };
-
-function Identity() {
-  /* Who is acting (Workshop B, #52): every change is recorded under this name + role,
-     and model calls record who asked for them. Remembered in this browser. */
-  const named = S.author.value !== "strategist";
-  const save = (ev) => {
-    ev.preventDefault();
-    const f = ev.currentTarget;
-    S.setIdentity(f.elements.name.value, f.elements.role.value);
-    f.closest("details").open = false;
-    toast(S.author.value === "strategist"
-      ? "Name cleared: changes are recorded as “strategist”."
-      : `Your changes are now recorded as ${S.author.value}${S.role.value ? ` (${S.role.value})` : ""}.`);
-  };
-  return html`<details class="identity">
-    <summary class=${named ? "" : "unset"} title="Every change you make is recorded under this name">
-      ${named ? `You: ${S.author.value}${S.role.value ? ` · ${S.role.value}` : ""}` : "Set your name"}
-    </summary>
-    <form class="identity-form" onSubmit=${save}>
-      <label>Name <input name="name" value=${named ? S.author.value : ""} placeholder="Your name" /></label>
-      <label>Role <input name="role" value=${S.role.value} placeholder="e.g. Strategist, Designer" /></label>
-      <div class="hint">Every change you make is recorded under this name, so teammates can see who wrote what.</div>
-      <${Button} type="submit" variant="primary">Save<//>
-    </form>
-  </details>`;
-}
-
-function TopBar() {
-  const r = S.run.value;
-  return html`<header id="topbar">
-    <span class="brand">Cultural Signal Graph</span>
-    <span class="mode-switch">
-      <a href=${S.runId.value ? `/?run=${S.runId.value}` : "/"}>Forecast</a>
-      <span class="active">Futures</span>
-    </span>
-    ${S.snap.value?.mode === "fixture" || r?.mode === "fixture"
-      ? html`<${Chip} tone="warn" title="Recorded outputs — no model, no network">fixture mode<//>`
-      : null}
-    <span class="spacer"></span>
-    <${Button} class="theme-toggle" data-theme-toggle aria-label="Switch light / dark theme" />
-    <${Identity} />
-    ${S.view.value !== "list" && S.runId.value
-      ? html`<${Button} variant="ghost" onClick=${S.showList}>← Explorations<//>`
-      : null}
-  </header>`;
-}
 
 function ErrorLine() {
   return S.error.value ? html`<div class="error">${S.error.value}</div>` : null;
@@ -72,7 +27,7 @@ function ExplorationList() {
   return html`<div class="canvas-narrow">
     <h1>Futures</h1>
     <p class="lede">
-      Speculative futures grown from ${r ? html`the evidence of “${r.ask.question}”` : "this run"}.
+      ${r ? `Speculative futures grown from the evidence of “${r.ask.question}”. ` : "Speculative futures, grown from a forecast run's evidence. "}
       Projections carry no probability — only where they came from.
     </p>
     ${S.runId.value
@@ -180,12 +135,13 @@ function NewExploration() {
     });
   };
   return html`<div class="canvas-narrow">
+    <${Crumbs} items=${[{ label: "Explorations", href: `/futures?run=${S.runId.value}`, onClick: S.showList }]} />
     <h1>New exploration</h1>
     <p class="lede">The goal steers the generator; the anchors are the evidence it grows from.</p>
     <${Panel}>
       <label for="goal">Goal</label>
-      <input id="goal" value=${goal} onInput=${(e) => setGoal(e.target.value)}
-        placeholder="the direction of AR/VR wearables" />
+      <input id="goal" name="goal" autocomplete="off" value=${goal} onInput=${(e) => setGoal(e.target.value)}
+        placeholder="e.g. the direction of AR/VR wearables…" />
 
       <div class="label-row">
         <label>Initial state — ${picked.size} anchor${picked.size === 1 ? "" : "s"}</label>
@@ -202,19 +158,19 @@ function NewExploration() {
       <div style="display:flex; gap:16px">
         <div style="flex:1">
           <label for="horizon">Horizon (years)</label>
-          <input id="horizon" type="number" min="1" max="50" value=${horizon} onInput=${(e) => setHorizon(e.target.value)} />
+          <input id="horizon" name="horizon" autocomplete="off" inputmode="numeric" type="number" min="1" max="50" value=${horizon} onInput=${(e) => setHorizon(e.target.value)} />
           <div class="hint">The time limit.</div>
         </div>
         <div style="flex:1">
           <label for="orders">Orders</label>
-          <input id="orders" type="number" min="1" max="8" value=${orders} onInput=${(e) => setOrders(e.target.value)} />
+          <input id="orders" name="orders" autocomplete="off" inputmode="numeric" type="number" min="1" max="8" value=${orders} onInput=${(e) => setOrders(e.target.value)} />
           <div class="hint">Causal depth — not time.</div>
         </div>
       </div>
       <${ErrorLine} />
       <div style="margin-top:16px; text-align:right">
         <${Button} variant="primary" onClick=${submit} disabled=${picked.size === 0} busy=${S.busy.value} busyLabel="Generating…">
-          Generate →<//>
+          Generate<//>
       </div>
     <//>
   </div>`;
@@ -229,6 +185,7 @@ function ExplorationView() {
     S.selectedId.value = S.selectedId.value === id ? null : id;
   };
   return html`<div class=${`exploration ${S.selectedId.value || S.adding.value ? "panel-open" : ""}`}>
+    <${Crumbs} items=${[{ label: "Explorations", href: `/futures?run=${S.runId.value}`, onClick: () => { S.selectedId.value = null; S.adding.value = null; S.showList(); } }]} />
     <div class="exp-head">
       <h1>${e.goal}</h1>
       <span class="hint">${e.start_year} → ${e.start_year + e.horizon} · ${e.orders} orders · ${s.anchors.length} anchors · ${s.projections.length} projections</span>
@@ -254,7 +211,7 @@ function ExplorationView() {
       : s.can_continue
         ? html`<${Panel} row class="gen-bar">
             <${Button} variant="primary" onClick=${S.continueGeneration}>
-              ${s.orders_generated ? `Continue from order ${s.orders_generated + 1} →` : "Generate →"}<//>
+              ${s.orders_generated ? `Continue from order ${s.orders_generated + 1}` : "Generate"}<//>
             <span class="hint">${s.orders_generated} of ${e.orders} orders generated${s.stopped_at ? " — stopped" : ""}.</span>
           <//>`
         : null}
@@ -277,8 +234,8 @@ function ExplorationView() {
 
 function App() {
   const v = S.view.value;
-  return html`<${TopBar} />
-    <main id="futures-canvas">
+  return html`<${AppBar} mode="futures" run=${S.run.value ? { ...S.run.value, mode: S.snap.value?.mode || S.run.value.mode } : null} skipTo="futures-canvas" />
+    <main id="futures-canvas" tabindex="-1">
       ${v === "new" ? html`<${NewExploration} />` : v === "exploration" ? html`<${ExplorationView} />` : html`<${ExplorationList} />`}
     </main>
     <${Toasts} />`;

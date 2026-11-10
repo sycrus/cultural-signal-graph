@@ -459,11 +459,8 @@ def create_app(
                 "nodes": elements["nodes"] + layer["nodes"],
                 "edges": elements["edges"] + [e for e in layer["edges"] if e["data"]["source"] in ids and e["data"]["target"] in ids],
             }
-        usage_path = store.artifact_path(run_id, "usage.json")
-        usage = json.loads(usage_path.read_text(encoding="utf-8")) if usage_path.is_file() else None
-        return HTMLResponse(
-            render_html(elements, usage, notes_url=f"/api/runs/{run_id}/notes"), headers=_NO_CACHE
-        )
+        # token usage is a trace concern, not shown while reading the graph
+        return HTMLResponse(render_html(elements, None, notes_url=f"/api/runs/{run_id}/notes"), headers=_NO_CACHE)
 
     return app
 

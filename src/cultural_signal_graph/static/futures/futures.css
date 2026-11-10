@@ -4,9 +4,6 @@
 #futures-canvas { flex: 1; overflow: auto; padding: 24px; }
 .canvas-wide { max-width: 1100px; margin: 0 auto; }
 
-.mode-switch { display: inline-flex; gap: 2px; margin-left: 8px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 2px; }
-.mode-switch a, .mode-switch span { padding: 3px 10px; border-radius: var(--radius-sm); text-decoration: none; color: var(--muted); }
-.mode-switch .active { background: var(--futures-soft); color: var(--futures); font-weight: 600; }
 
 .anchor-list { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; max-height: 280px; overflow: auto; }
 .anchor-row { display: flex; align-items: baseline; gap: 8px; font-weight: 400; margin: 0; padding: 4px 6px; border-radius: var(--radius-sm); }
@@ -297,24 +294,13 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 .ground-proposal blockquote { margin: 6px 0 2px; font-size: 12.5px; }
 .ground-proposal .row.right { display: flex; justify-content: flex-end; margin-top: 4px; }
 
-/* who is acting (Workshop B, #52) */
-.identity { position: relative; margin-right: 8px; font-size: 13px; }
-.identity summary { list-style: none; cursor: pointer; padding: 3px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--muted); }
-.identity summary::-webkit-details-marker { display: none; }
-.identity summary.unset { border-style: dashed; color: var(--futures); }
-.identity-form { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 260px; display: grid; gap: 8px;
-  padding: 12px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
-.identity-form label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
-.identity-form input { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
-.identity-form button { justify-self: end; }
 
 /* --- Phosphor treatment (#46): see app.css. Hue says evidence vs futures; glow,
    brightness and line style carry the rest. ---------------------------------------- */
-.axis-label, .band-label, .panel-kind, .detail-panel h4, .cone-label, .wheel-ring-label, .h-label, .minimap-label, .mode-switch a, .mode-switch span { font-family: var(--font-display); letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.axis-label, .band-label, .panel-kind, .detail-panel h4, .cone-label, .wheel-ring-label, .h-label, .minimap-label { font-family: var(--font-display); letter-spacing: var(--tracking-label); text-transform: uppercase; }
 .axis-label, .panel-kind, .cone-label, .h-label { text-shadow: var(--glow-text); }
 .years, .proj-window, .order-badge, .tick span, .rolled-count, .pc .n, .h-year { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 .years, .proj-window, .order-badge { text-shadow: var(--glow-text); }
-.mode-switch .active { text-shadow: var(--glow-text); }
 .anchor-card { box-shadow: var(--glow-evidence); border: 1px solid var(--evidence-line); }
 .anchor-card.flagged { border-color: var(--warn-line); }
 .proj-node:hover { box-shadow: var(--shadow-futures); }

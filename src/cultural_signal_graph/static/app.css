@@ -13,18 +13,15 @@ body {
   flex-direction: column;
 }
 
-#topbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-}
-#topbar .brand { font-weight: 650; font-size: 15px; }
-#topbar .spacer { flex: 1; }
+/* The top bar is the shared shell: see ui.css (.app-bar). */
 
 #app { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+/* the breadcrumb lines up with the page it sits on */
+/* Every step of a run shares one left edge beside the rail (breadcrumb, tabs, content),
+   so moving between steps or between Brief and Graph never shifts the page. The runs
+   list, with no rail, stays centred. */
+#layout:not(.no-rail) #canvas .canvas-narrow { margin-left: 0; }
+#canvas:focus, #futures-canvas:focus { outline: none; }
 #layout { flex: 1; display: flex; min-height: 0; }
 
 #rail {
@@ -70,16 +67,12 @@ body {
 .rail-item.action { color: var(--ink); border-color: var(--warn); }
 .rail-item.action .dot { background: var(--warn); border-color: var(--warn); }
 .rail-item.action .dot::after { content: "\2691"; }
-.rail-item.active {
-  color: var(--ink);
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  cursor: pointer;
-}
+/* reachable steps read as normal text; only the step on screen is highlighted */
+.rail-item.active { color: var(--ink); cursor: pointer; }
 .rail-item.active .dot { border-color: var(--accent); }
 .rail-item.current .dot { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .rail-item.blocked .dot::after { content: ""; }
-.rail-item.here { color: var(--ink); font-weight: 600; }
+.rail-item.here { color: var(--ink); font-weight: 600; border-color: var(--accent); background: var(--accent-soft); }
 .rail-item.done.btn:not(:disabled):hover, .rail-item.active.btn:not(:disabled):hover { border-color: var(--accent-ring); background: var(--hover); }
 
 #canvas { flex: 1; overflow: auto; padding: 22px; }
@@ -124,7 +117,8 @@ input, select {
 
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 550; font-size: 12px; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+td { font-variant-numeric: tabular-nums; }
 tbody tr.row-link { cursor: pointer; }
 tbody tr.row-link:hover, tbody tr.row-link:focus-visible { background: var(--hover); outline: none; }
 td.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
@@ -199,8 +193,30 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
 .exports .hint { margin: 0 4px 0 0; }
 .exports .export-link { font-family: var(--font-data); font-size: var(--text-xs); padding: 3px 8px; }
 .review-tabs { margin-bottom: 16px; }
-.stage-chips .stage-chip { font-size: var(--text-sm); padding: 4px 10px; }
-.stage-chip small { opacity: .8; font-family: var(--font-data); }
+/* Run step: the pipeline as a directed column — node, connector, node */
+.flow { list-style: none; margin: 0; padding: 0; }
+.flow-step { position: relative; display: grid; grid-template-columns: 28px 1fr; column-gap: 14px; padding-bottom: 20px; }
+.flow-step:last-child { padding-bottom: 0; }
+.flow-step::before { content: ""; position: absolute; left: 13px; top: 30px; bottom: 4px; width: 2px; background: var(--border); }
+.flow-step::after { content: ""; position: absolute; left: 9px; bottom: 2px; border: 5px solid transparent; border-top-color: var(--border); border-bottom: 0; }
+.flow-step:last-child::before, .flow-step:last-child::after { display: none; }
+.flow-step.done::before { background: var(--ok-line); }
+.flow-step.done::after { border-top-color: var(--ok-line); }
+.flow-mark { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700;
+  border: 2px solid var(--border); background: var(--card); color: var(--muted); }
+.flow-step.done .flow-mark { background: var(--ok); border-color: var(--ok); color: var(--card); }
+.flow-step.action .flow-mark { background: var(--warn-soft); border-color: var(--warn); color: var(--warn-ink); box-shadow: 0 0 0 3px var(--warn-soft); }
+.flow-step.failed .flow-mark { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+.flow-step.running .flow-mark { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.flow-body { padding-top: 3px; min-width: 0; }
+.flow-name { font-family: var(--font-display); font-size: 14px; color: var(--ink); }
+.flow-step.pending .flow-name { color: var(--muted); }
+.flow-msg { font-size: 13px; color: var(--ink-soft); margin-top: 2px; overflow-wrap: anywhere; }
+.flow-step.pending .flow-msg { color: var(--muted); }
+.flow-step.failed .flow-msg { color: var(--danger-ink); }
+.flow-step.action .flow-msg { color: var(--warn-ink); }
+.flow-msg a { margin-left: 6px; font-weight: 600; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .status-chip { font-family: var(--font-display); letter-spacing: var(--tracking-label); }
 
@@ -213,9 +229,6 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
   background: var(--card);
 }
 
-/* Metrics */
-.metric-big { font-size: 26px; font-weight: 650; }
-.metric-big small { font-size: 13px; font-weight: 400; color: var(--muted); }
 
 a.btn.futures-link { margin-left: 8px; padding: 3px 10px; border-color: var(--futures-line); color: var(--futures-ink); background: var(--futures-soft); font-weight: 600; }
 
@@ -228,11 +241,7 @@ a.btn.futures-link { margin-left: 8px; padding: 3px 10px; border-color: var(--fu
 
 /* --- Phosphor treatment (#46): light that comes from the screen. Every value is a
    token, and the glow tokens are `none` in daylight, so this only lights up dark. -- */
-#topbar .brand { text-transform: uppercase; letter-spacing: var(--tracking-label); font-family: var(--font-display); color: var(--accent); text-shadow: var(--glow-text-strong); }
 h1, h2 { font-family: var(--font-display); text-shadow: var(--glow-text-soft); }
-th { font-family: var(--font-display); letter-spacing: var(--tracking-label); }
-th { text-transform: uppercase; }
-.metric-big { font-family: var(--font-data); color: var(--accent); text-shadow: var(--glow-text-strong); }
-.rail-item.current, .rail-item.active { text-shadow: var(--glow-text); }
+.rail-item.here { text-shadow: var(--glow-text); }
 .rail-item.current .dot { box-shadow: 0 0 0 3px var(--accent-ring), var(--glow-text); }
 button.primary { box-shadow: 0 0 14px color-mix(in srgb, var(--accent) calc(var(--glow-on, 0) * 45%), transparent); }

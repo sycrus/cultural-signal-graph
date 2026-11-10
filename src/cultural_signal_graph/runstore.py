@@ -56,6 +56,18 @@ STAGES = ("ask", "sources", "extract", "align", "sign-off", "draft", "brief")
 StateFns = tuple  # (extract_fn, align_fn, draft_fn)
 
 
+def _stage_counts(name: str, result) -> dict:
+    """What a pipeline stage produced, for the Run step's per-stage messages."""
+    if name == "extract":
+        return {"entities": len(result.entities), "signals": len(result.signals)}
+    if name == "align":
+        return {"edges": len(result)}
+    try:
+        return {"items": len(result)}
+    except TypeError:
+        return {}
+
+
 def fixture_stage_fns() -> StateFns:
     """Fixture-backed stages: the recorded golden outputs, no model, no network.
 
@@ -175,6 +187,8 @@ class RunStore:
         """Run extract → align; pause at the sign-off gate (or finish if no edges)."""
         run = self._require(run_id, "created")
         run["status"] = "running"
+        for name in ("extract", "align", "sign-off", "draft", "brief"):  # a retry starts these fresh
+            run["stages"][name] = {"status": "pending"}
         self._save(run)
         try:
             graph = build_forecast_graph(
@@ -390,7 +404,7 @@ class RunStore:
             "status": run["status"],
             "ask": run["ask"],
             "sources": run["sources"],
-            "stages": run["stages"],
+            "stages": self._stages_with_counts(run),
             "pending": run["pending"],
             "decisions": run["decisions"],
             "brief": json.loads(brief_path.read_text(encoding="utf-8"))
@@ -448,6 +462,26 @@ class RunStore:
 
     # --- internals -----------------------------------------------------------
 
+    def _stages_with_counts(self, run: dict) -> dict:
+        """The run's stages, each with what it produced. Stages record their counts as
+        they finish; runs from before that get them from the saved pipeline state."""
+        stages = {name: dict(st) for name, st in run["stages"].items()}
+        missing = [n for n in ("extract", "align") if stages.get(n, {}).get("status") == "done" and "counts" not in stages[n]]
+        if missing:
+            for fname in ("state-final.json", "state-pause.json"):
+                path = self._dir(run["id"]) / fname
+                if path.exists():
+                    values = json.loads(path.read_text(encoding="utf-8"))
+                    if "extraction" in values:
+                        stages["extract"].setdefault("counts", {
+                            "entities": len(values["extraction"].get("entities", [])),
+                            "signals": len(values["extraction"].get("signals", [])),
+                        })
+                    if "edges" in values and "align" in stages:
+                        stages["align"].setdefault("counts", {"edges": len(values["edges"])})
+                    break
+        return stages
+
     def _timed_fns(self, run: dict) -> StateFns:
         """Stage fns wrapped to record per-stage tokens (from the usage log the OTel
         model-call spans feed) + latency into the run record."""
@@ -456,16 +490,24 @@ class RunStore:
             def wrapper(*args):
                 before = len(get_usage())
                 started = time.perf_counter()
-                try:
-                    return fn(*args)
-                finally:
+
+                def record(**fields):
                     usage = get_usage()[before:]
                     run["stages"][name] = {
-                        "status": "done",
+                        **fields,
                         "tokens": sum(u.total_tokens for u in usage),
                         "latency_ms": round((time.perf_counter() - started) * 1000, 1),
                     }
                     run["usage_calls"].extend(asdict(u) for u in usage)
+
+                try:
+                    result = fn(*args)
+                except Exception as exc:
+                    # a stage that raised is not done: say so, and why
+                    record(status="failed", error=f"{type(exc).__name__}: {exc}"[:300])
+                    raise
+                record(status="done", counts=_stage_counts(name, result))
+                return result
 
             return wrapper
 

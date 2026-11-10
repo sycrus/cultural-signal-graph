@@ -7,6 +7,7 @@ import { useState } from "preact/hooks";
 import { signal } from "@preact/signals";
 import htm from "htm";
 import { Button, Chip, EmptyState, Panel, Tabs, Toasts, Toggle, toast } from "./ui.js";
+import { AppBar, Crumbs } from "./shell.js";
 
 const html = htm.bind(h);
 
@@ -17,10 +18,8 @@ const RAIL_STAGES = [
   { key: "sign-off", label: "Sign-off" },
   { key: "brief", label: "Brief" },
   { key: "graph", label: "Graph" },
-  { key: "metrics", label: "Metrics" },
 ];
 
-const RUN_STAGES = ["extract", "align", "sign-off", "draft", "brief"];
 
 /* --- state: one signal; set() merges, every view re-renders from it --------- */
 
@@ -32,13 +31,48 @@ const state = signal({
   busy: false,
   error: null,
   signoffDraft: {}, // edge id -> true(approve) | false(reject), before confirming
-  metrics: null, // the /metrics report for the open run
   futures: null, // {explorations, projections} on the open run, for the Graph tab's futures layer
   futuresLayer: false, // Graph tab: show exploration projections (hidden by default)
   graphView: null, // {zoom, focus} carried across the futures-layer reload
 });
 const get = () => state.value;
-const set = (patch) => (state.value = { ...state.value, ...patch });
+const set = (patch) => {
+  state.value = { ...state.value, ...patch };
+  syncUrl();
+};
+
+/* The address reflects what is on screen: / (runs), /?new (a new ask), or
+   /?run=<id>&step=<step>. Moving around pushes history, so Back and refresh work
+   and any step can be linked; popstate routes back from the address. */
+let routing = false; // true while applying the address, so it is not pushed again
+function urlFor({ view, runId }) {
+  if (runId && view !== "home") return `/?run=${encodeURIComponent(runId)}&step=${encodeURIComponent(view)}`;
+  return view === "ask" ? "/?new" : "/";
+}
+function syncUrl() {
+  if (routing) return;
+  const url = urlFor(get());
+  if (url !== location.pathname + location.search) history.pushState(null, "", url);
+}
+async function route() {
+  const q = new URLSearchParams(location.search);
+  routing = true;
+  try {
+    if (q.get("run")) {
+      if (q.get("run") !== get().runId) await openRun(q.get("run"), q.get("step"));
+      else if (q.get("step")) showStage(q.get("step"));
+    } else if (q.has("new")) {
+      set({ view: "ask", snap: null, runId: null, error: null });
+    } else {
+      await goHome();
+    }
+  } finally {
+    routing = false;
+  }
+  // settle the address (a bare ?run=, or a step the run cannot show yet)
+  history.replaceState(null, "", urlFor(get()));
+}
+window.addEventListener("popstate", route);
 const fail = (err) => set({ error: String(err.message || err) });
 
 async function api(path, opts = {}) {
@@ -76,7 +110,6 @@ function railStates(snap) {
           : "blocked",
     brief: snap.status === "completed" ? "done" : done("draft") ? "active" : "blocked",
     graph: snap.status === "completed" ? "active" : "blocked",
-    metrics: snap.status === "completed" ? "active" : "blocked",
   };
 }
 
@@ -90,9 +123,11 @@ function currentStage(snap) {
 }
 
 function showStage(key) {
-  if (!get().snap) return;
+  const snap = get().snap;
+  if (!snap) return;
+  const st = railStates(snap)[key];
+  if (st !== "done" && st !== "active" && st !== "action") key = currentStage(snap); // not reachable yet
   set({ view: key, error: null });
-  if (key === "metrics" && !get().metrics) fetchMetrics();
   if (key === "graph" && !get().futures) fetchFutures();
 }
 
@@ -103,17 +138,13 @@ async function fetchFutures() {
   set({ futures: { explorations: list.length, projections: list.reduce((n, e) => n + (e.projections || 0), 0) } });
 }
 
-async function fetchMetrics() {
-  const runId = get().runId;
-  const metrics = await api(`/api/runs/${runId}/metrics`).catch(() => null);
-  if (get().runId === runId) set({ metrics });
-}
 
-async function openRun(runId) {
+async function openRun(runId, step = null) {
   try {
     const snap = await api(`/api/runs/${runId}`);
-    set({ snap, runId, signoffDraft: {}, metrics: null, futures: null, graphView: null, error: null, view: currentStage(snap) });
-    if (get().view === "metrics") fetchMetrics();
+    const st = step && railStates(snap)[step];
+    const view = st === "done" || st === "active" || st === "action" ? step : currentStage(snap);
+    set({ snap, runId, signoffDraft: {}, futures: null, graphView: null, error: null, view });
     if (get().view === "graph") fetchFutures();
   } catch (err) {
     fail(err);
@@ -140,12 +171,15 @@ function shortUri(uri) {
   }
 }
 const shortType = (sourceType) => sourceType.split("#").pop();
-const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
-
-function fmtDuration(ms) {
-  if (ms == null) return "";
-  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
+// A claim's validity window; either end may be open (null) in the brief.
+function validity(tv) {
+  const day = (d) => (d ? String(d).slice(0, 10) : null);
+  const from = day(tv?.valid_from);
+  const until = day(tv?.valid_until);
+  if (!from && !until) return "no stated window";
+  return `valid ${from || "…"} → ${until || "open"}`;
 }
+const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
 
 const ErrorLine = () => (get().error ? html`<div class="error">${get().error}</div>` : null);
 
@@ -160,13 +194,14 @@ function Placeholder({ title, note }) {
   </div>`;
 }
 
-const REVIEW_TABS = [{ key: "brief", label: "Brief" }, { key: "graph", label: "Graph" }, { key: "metrics", label: "Metrics" }];
+const REVIEW_TABS = [{ key: "brief", label: "Brief" }, { key: "graph", label: "Graph" }];
 const ReviewTabs = ({ active }) => html`<${Tabs} class="review-tabs" label="Review" value=${active} onChange=${showStage} items=${REVIEW_TABS} />`;
 
 /* --- rail ---------------------------------------------------------------- */
 
 function Rail() {
   const { snap, view } = get();
+  if (view === "home") return null; // the runs list has no run to step through
   const states = railStates(snap);
   const firstOpen = RAIL_STAGES.find((s) => states[s.key] !== "done");
   return html`<nav id="rail" aria-label="Pipeline stages">
@@ -174,8 +209,8 @@ function Rail() {
       const cls = states[stage.key];
       const current = cls === "action" || (stage.key === firstOpen?.key);
       const open = cls === "active" || cls === "done";
-      return html`<${Button} key=${stage.key} class=${`rail-item ${cls} ${current ? "current" : ""} ${snap && view === stage.key ? "here" : ""}`}
-        disabled=${!open} aria-current=${snap && view === stage.key ? "step" : undefined}
+      return html`<${Button} key=${stage.key} class=${`rail-item ${cls} ${current ? "current" : ""} ${view === stage.key ? "here" : ""}`}
+        disabled=${!open} aria-current=${view === stage.key ? "step" : undefined}
         onClick=${open ? () => showStage(stage.key) : undefined}>
         <span class="dot" aria-hidden="true"></span>${stage.label}<//>`;
     })}
@@ -189,7 +224,7 @@ function Home() {
   return html`<div class="canvas-narrow">
     <h1>Forecast runs</h1>
     <p class="lede">Start a forecast by entering an ask — or reopen a past run to
-    audit its brief, graph, and metrics.</p>
+    read its brief and graph.</p>
     <${Panel} row>
       <${Button} variant="primary" onClick=${() => set({ view: "ask", error: null })}>New run<//>
       <span class="hint">Category, question, window, market.</span>
@@ -245,7 +280,7 @@ function Ask() {
         category: form.category || "tech", question: form.question,
         window_start: form.start || "2026-01-01", window_end: form.end || "2026-06-30", market: form.market || null,
       } });
-      set({ snap, runId: snap.id, view: "sources", error: null, signoffDraft: {}, metrics: null, futures: null });
+      set({ snap, runId: snap.id, view: "sources", error: null, signoffDraft: {}, futures: null });
     } catch (err) {
       fail(err);
     }
@@ -257,28 +292,28 @@ function Ask() {
     and selects the sub-ontology to reason over.</p>
     <${Panel}>
       <label for="ask-category">Category</label>
-      <input id="ask-category" list="categories" ...${field("category")} />
+      <input id="ask-category" name="category" autocomplete="off" list="categories" ...${field("category")} />
       <datalist id="categories"><option value="tech"></option><option value="gaming"></option></datalist>
       <div class="hint">An unfamiliar category is backfilled from the live web.</div>
 
       <label for="ask-question">Question</label>
-      <input id="ask-question" placeholder="AI wearables adoption" ...${field("question")}
+      <input id="ask-question" name="question" autocomplete="off" placeholder="e.g. AI wearables adoption…" ...${field("question")}
         onKeyDown=${(e) => e.key === "Enter" && submit()} />
 
       <label>Window</label>
       <div class="row">
-        <input id="ask-start" type="date" aria-label="Window start" ...${field("start")} />
+        <input id="ask-start" name="window_start" type="date" aria-label="Window start" ...${field("start")} />
         <span>→</span>
-        <input id="ask-end" type="date" aria-label="Window end" ...${field("end")} />
+        <input id="ask-end" name="window_end" type="date" aria-label="Window end" ...${field("end")} />
       </div>
 
       <label for="ask-market">Market <span class="optional">(optional)</span></label>
-      <input id="ask-market" list="markets" placeholder="e.g. SEA, Japan, LATAM — or type any market" ...${field("market")} />
+      <input id="ask-market" name="market" autocomplete="off" list="markets" placeholder="e.g. SEA, Japan, LATAM — or any market…" ...${field("market")} />
       <datalist id="markets">${MARKETS.map((m) => html`<option key=${m} value=${m}></option>`)}</datalist>
 
       <${ErrorLine} />
       <div class="row right">
-        <${Button} variant="primary" onClick=${submit} busy=${busy} busyLabel="Discovering sources…">Run →<//>
+        <${Button} variant="primary" onClick=${submit} busy=${busy} busyLabel="Discovering sources…">Discover sources<//>
       </div>
     <//>
   </div>`;
@@ -412,8 +447,8 @@ function Sources() {
         : html`<${EmptyState} compact title="No sources">${editable ? "Add one below, or reset to what discovery found." : null}<//>`}
       ${editable
         ? html`<div class="row add-source">
-            <input placeholder="https://… (source URI)" aria-label="Source URI" value=${uri} onInput=${(e) => setUri(e.target.value)} />
-            <input placeholder="What it says" aria-label="What it says" value=${text} onInput=${(e) => setText(e.target.value)}
+            <input name="uri" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="e.g. https://example.com/report…" aria-label="Source URI" value=${uri} onInput=${(e) => setUri(e.target.value)} />
+            <input name="text" autocomplete="off" placeholder="e.g. the claim or quote it supports…" aria-label="What it says" value=${text} onInput=${(e) => setText(e.target.value)}
               onKeyDown=${(e) => e.key === "Enter" && add()} />
             <${Button} onClick=${add}>+ Add<//>
           </div>`
@@ -429,26 +464,99 @@ function Sources() {
     ${editable
       ? html`<div class="row spread">
           <${Button} onClick=${reset}>Reset to discovered<//>
-          <${Button} variant="primary" onClick=${start} disabled=${s.sources.length === 0} busy=${starting} busyLabel="Starting…">Start run →<//>
+          <${Button} variant="primary" onClick=${start} disabled=${s.sources.length === 0} busy=${starting} busyLabel="Starting…">Start run<//>
         </div>`
       : null}
   </div>`;
 }
 
-function StageChip({ name, st }) {
-  const done = st?.status === "done";
-  const paused = st?.status === "paused";
-  return html`<${Chip} tone=${done ? "ok" : paused ? "warn" : "neutral"} class="stage-chip">
-    ${name} ${done ? "✓" : paused ? "…" : "·"}${done ? html` <small>${st.tokens} tok · ${fmtDuration(st.latency_ms)}</small>` : null}<//>`;
+/* The Run step: the pipeline as one column, each stage a node joined to the next,
+   with a line beside it saying what that stage did (or is waiting for). A tick
+   means the stage finished; a stage that raised shows as failed, with why. */
+const FLOW = [
+  { key: "ask", label: "Ask" },
+  { key: "sources", label: "Sources" },
+  { key: "extract", label: "Extract signals" },
+  { key: "align", label: "Propose links" },
+  { key: "sign-off", label: "Sign-off" },
+  { key: "draft", label: "Draft" },
+  { key: "brief", label: "Brief" },
+];
+const MARK = { done: "✓", failed: "!", action: "…", pending: "", running: "" };
+
+function stageMessage(key, st, s) {
+  const counts = st?.counts || {};
+  const status = st?.status;
+  if (status === "failed") return html`Failed: ${st.error || "the stage raised an error"}. Fix the cause, then start the run again from Sources.`;
+  switch (key) {
+    case "ask": {
+      const a = s.ask;
+      return html`“${a.question}” — ${a.category}${a.market ? `, ${a.market}` : ""}, ${a.window.start} → ${a.window.end}`;
+    }
+    case "sources": {
+      const d = s.discovery;
+      return html`${plural(s.sources.length, "source")}${d ? ` from ${plural(d.queries.length, "web search", "web searches")}` : ""}${s.status === "created" ? ", editable until you start the run" : ""}.`;
+    }
+    case "extract":
+      if (status !== "done") return "Reads the sources for signals: claims about entities, each with a confidence.";
+      return counts.signals != null ? `${plural(counts.signals, "signal")} about ${plural(counts.entities, "entity", "entities")}.` : "Signals extracted from the sources.";
+    case "align":
+      if (status !== "done") return "Looks for the same thing named differently across categories.";
+      if (counts.edges == null) return "Cross-domain links proposed.";
+      return counts.edges ? `${plural(counts.edges, "cross-domain link")} proposed for your sign-off.` : "No cross-domain links proposed, so there is nothing to sign off.";
+    case "sign-off": {
+      if (status === "paused") {
+        return html`Waiting for you: ${plural(s.pending.length, "proposed link")} to approve or reject.
+          <a href="#" onClick=${(e) => { e.preventDefault(); showStage("sign-off"); }}>Review</a>`;
+      }
+      if (status !== "done") return "You approve or reject each proposed link before the brief is drafted.";
+      const ds = Object.values(s.decisions || {});
+      if (!ds.length) return "Nothing needed a decision.";
+      const yes = ds.filter(Boolean).length;
+      return `${yes} approved, ${ds.length - yes} rejected.`;
+    }
+    case "draft":
+      if (status !== "done") return "Writes the reasoning behind each claim.";
+      return s.brief ? `Reasoning written for ${plural(s.brief.claims.length, "claim")}.` : "Reasoning written.";
+    case "brief": {
+      if (status !== "done") return "Assembles the brief, the graph and the exports.";
+      const b = s.brief;
+      if (!b) return "Brief assembled.";
+      return html`${plural(b.claims.length, "claim")}, ${plural(b.flags.length, "flagged signal")}.
+        <a href="#" onClick=${(e) => { e.preventDefault(); showStage("brief"); }}>Open the brief</a>`;
+    }
+    default:
+      return null;
+  }
 }
 
 function Run() {
   const { snap: s, busy } = get();
-  const chips = RUN_STAGES.map((name) => html`<${StageChip} key=${name} name=${name} st=${s.stages[name]} />`);
+  // while the pipeline is running, the first stage not yet done is the one in progress
+  const runningKey = busy ? FLOW.find((f) => s.stages[f.key]?.status !== "done")?.key : null;
+  const stateOf = (key) => {
+    const st = s.stages[key]?.status;
+    if (key === runningKey) return "running";
+    if (st === "paused") return "action";
+    return st === "done" || st === "failed" ? st : "pending";
+  };
   return html`<div class="canvas-narrow">
     <h1>Run</h1>
-    <p class="lede">${busy ? "Extracting signals and proposing cross-domain edges…" : "Per-stage tokens and latency, recorded at each stage boundary."}</p>
-    <${Panel} row class="stage-chips">${busy ? html`<span class="spinner"></span>` : null}${chips}<//>
+    <p class="lede">${busy ? "Extracting signals and proposing cross-domain links…" : "What each stage of the pipeline did, top to bottom."}</p>
+    <${Panel}>
+      <ol class="flow">
+        ${FLOW.map(({ key, label }) => {
+          const state = stateOf(key);
+          return html`<li key=${key} class=${`flow-step ${state}`} aria-current=${state === "running" || state === "action" ? "step" : undefined}>
+            <span class="flow-mark" aria-hidden="true">${state === "running" ? html`<span class="spinner sm"></span>` : MARK[state]}</span>
+            <div class="flow-body">
+              <div class="flow-name">${label}<span class="sr-only"> — ${state}</span></div>
+              <div class="flow-msg">${state === "running" ? "Working…" : stageMessage(key, s.stages[key], s)}</div>
+            </div>
+          </li>`;
+        })}
+      </ol>
+    <//>
     <${ErrorLine} />
   </div>`;
 }
@@ -532,7 +640,7 @@ function SignOff() {
     <//>`)}
     <${ErrorLine} />
     <div class="row">
-      <${Button} variant="primary" onClick=${confirm} disabled=${!all} busy=${busy} busyLabel="Resuming the run…">Confirm sign-off →<//>
+      <${Button} variant="primary" onClick=${confirm} disabled=${!all} busy=${busy} busyLabel="Resuming the run…">Confirm sign-off<//>
       ${all ? null : html`<span class="hint">Decide every proposed edge to resume the run.</span>`}
     </div>
   </div>`;
@@ -541,16 +649,19 @@ function SignOff() {
 function Brief() {
   const { snap, runId } = get();
   const b = snap?.brief;
-  if (!b) return html`<${Placeholder} title="Brief" note="The brief appears once the run resolves sign-off and drafting finishes." />`;
-  return html`<${ReviewTabs} active="brief" />
-  <div class="canvas-narrow">
+  if (!b) {
+    return html`<div class="canvas-narrow"><${ReviewTabs} active="brief" />
+      <h1>Brief</h1><${Panel}><${EmptyState} title="No brief yet">The brief appears once sign-off is resolved and drafting finishes.<//><//></div>`;
+  }
+  return html`<div class="canvas-narrow">
+    <${ReviewTabs} active="brief" />
     <div class="brief-head">
       <h1>Forecast brief — ${b.category}</h1>
       <span class="hint">as of ${b.as_of}</span>
     </div>
     <p class="lede">${plural(b.claims.length, "claim")}, ${b.flags.length} flagged.</p>
     <div class="exports"><span class="hint">Export</span>
-      ${["brief.md", "brief.json", "brief.pptx", "graph.ttl", "usage.json"].map(
+      ${["brief.md", "brief.json", "brief.pptx", "graph.ttl"].map(
         (name) => html`<${Button} key=${name} class="export-link" href=${`/api/runs/${runId}/exports/${name}`} download>${name}<//>`,
       )}
     </div>
@@ -563,7 +674,7 @@ function Brief() {
             <span class="claim-statement">${c.statement}</span>
             <${Chip} class="conf-chip" title="Confidence — how much we trust this, not a calibrated probability">${c.confidence}<//>
           </div>
-          <div class="claim-valid">valid ${c.temporal_validity.valid_from.slice(0, 10)} → ${c.temporal_validity.valid_until.slice(0, 10)}</div>
+          <div class="claim-valid">${validity(c.temporal_validity)}</div>
           <details><summary>reasoning</summary><p>${c.reasoning}</p></details>
           <details><summary>sources (${c.sources.length})</summary>
             <ul>${c.sources.map((src) => html`<li key=${src.uri}><a href=${src.uri} target="_blank" rel="noopener">${shortUri(src.uri)}</a>
@@ -598,7 +709,8 @@ function Brief() {
 function GraphView() {
   const { snap, runId, futures: f, futuresLayer, graphView } = get();
   if (!snap || snap.status !== "completed") {
-    return html`<${ReviewTabs} active="graph" /><${Placeholder} title="Graph" note="The graph explorer appears once the run completes." />`;
+    return html`<div class="canvas-narrow"><${ReviewTabs} active="graph" />
+      <h1>Graph</h1><${Panel}><${EmptyState} title="No graph yet">The graph explorer appears once the run completes.<//><//></div>`;
   }
   /* The futures layer adds this run's explorations to the graph; say what it adds,
      and say so plainly when there is nothing to add yet. */
@@ -622,99 +734,25 @@ function GraphView() {
       title="Graph explorer — search, layout, click-to-trace"></iframe>`;
 }
 
-function Metrics() {
-  const m = get().metrics;
-  if (!m) {
-    return html`<${ReviewTabs} active="metrics" />
-      <div class="canvas-narrow"><h1>Metrics</h1><${Panel} row><span class="spinner"></span> Loading metrics…<//></div>`;
-  }
-  const usage = m.usage || { total_tokens: 0, input_tokens: 0, output_tokens: 0, calls: [] };
-  const calls = usage.calls || [];
-  const stages = Object.entries(m.stages || {}).filter(([name]) => RUN_STAGES.includes(name));
-  const ev = m.eval;
-  const below = new Set(ev?.below_threshold || []);
-  const acc = m.accuracy;
-  return html`<${ReviewTabs} active="metrics" />
-  <div class="canvas-narrow">
-    <h1>Metrics</h1>
-    <p class="lede">Cost and latency are live-run measurements; eval scores gate regressions;
-    prediction accuracy is soft, lagging telemetry.</p>
-
-    <h2>Cost & latency</h2>
-    <${Panel}>
-      <div class="metric-big">${usage.total_tokens} <small>tokens</small></div>
-      <div class="hint">${usage.input_tokens} in / ${usage.output_tokens} out across ${plural(calls.length, "model call")}</div>
-      ${calls.length
-        ? html`<table><thead><tr><th>Model</th><th>In</th><th>Out</th><th>Total</th></tr></thead>
-            <tbody>${calls.map((c, i) => html`<tr key=${i} class="static"><td>${c.model}</td><td class="num">${c.input_tokens}</td><td class="num">${c.output_tokens}</td><td class="num">${c.total_tokens}</td></tr>`)}</tbody></table>`
-        : null}
-      ${stages.length
-        ? html`<table><thead><tr><th>Stage</th><th>Tokens</th><th>Latency</th></tr></thead>
-            <tbody>${stages.map(([name, st]) => html`<tr key=${name} class="static"><td>${name}</td><td class="num">${st.tokens} tok</td><td class="num">${fmtDuration(st.latency_ms)}</td></tr>`)}</tbody></table>`
-        : null}
-    <//>
-
-    <h2>Eval scores</h2>
-    <${Panel}>
-      ${!ev
-        ? html`<${EmptyState} compact title="Eval scores appear once the run is finalized." />`
-        : ev.scores == null
-          ? html`<div class="hint">${ev.reason}</div>`
-          : html`<div class="chips">${Object.entries(ev.scores).map(([metric, score]) => html`<${Chip} key=${metric}
-                tone=${below.has(metric) ? "danger" : "ok"} class="score-chip">${metric} ${score}${below.has(metric) ? " ⚠" : ""}<//>`)}</div>
-              <p class="hint">Scored against the golden case “${ev.case}” ${ev.scored_at || "at finalize"}
-              — the pipeline's correctness before your sign-off decisions. Below-threshold metrics are the regression gate.</p>`}
-    <//>
-
-    <h2>Prediction accuracy</h2>
-    <${Panel}>
-      ${!acc
-        ? html`<${EmptyState} compact title="Appears once the run is finalized." />`
-        : acc.accuracy == null
-          ? html`<div class="hint">${acc.trends_total} trends recorded, ${acc.checked} checked — accuracy is lagging
-              telemetry: it fills in as each trend is marked materialized later. Reported, never gating.</div>`
-          : html`<div class="metric-big">${Math.round(acc.accuracy * 100)}%</div>
-              <div class="hint">${acc.materialized} of ${acc.checked} checked trends materialized (${acc.trends_total} recorded).</div>`}
-    <//>
-  </div>`;
-}
-
-const VIEWS = { home: Home, ask: Ask, sources: Sources, run: Run, "sign-off": SignOff, brief: Brief, graph: GraphView, metrics: Metrics };
+const VIEWS = { home: Home, ask: Ask, sources: Sources, run: Run, "sign-off": SignOff, brief: Brief, graph: GraphView };
 
 /* --- shell ----------------------------------------------------------------- */
 
-function TopBar() {
-  const { snap, view } = get();
-  // Futures mode opens once extraction has run (the run paused at the gate or finished)
-  const futuresOpen = snap && ["paused", "completed"].includes(snap.status);
-  return html`<header id="topbar">
-    <span class="brand">Cultural Signal Graph</span>
-    ${snap?.mode === "fixture"
-      ? html`<${Chip} tone="warn" title="Fixture stages run on recorded outputs — no model, no network">fixture mode<//>`
-      : null}
-    ${futuresOpen
-      ? html`<${Button} class="futures-link" href=${`/futures?run=${encodeURIComponent(snap.id)}`}
-          title="Explore speculative futures from this run's evidence">Futures →<//>`
-      : null}
-    <span class="spacer"></span>
-    <${Button} class="theme-toggle" data-theme-toggle aria-label="Switch light / dark theme" />
-    ${view !== "home" ? html`<${Button} variant="ghost" onClick=${goHome}>← Runs<//>` : null}
-  </header>`;
-}
-
 function App() {
-  const View = VIEWS[get().view] || Home;
-  return html`<${TopBar} />
-    <div id="layout">
+  const { view, runId, snap } = get();
+  const View = VIEWS[view] || Home;
+  return html`<${AppBar} mode="forecast" run=${snap} skipTo="canvas" />
+    <div id="layout" class=${view === "home" ? "no-rail" : ""}>
       <${Rail} />
-      <main id="canvas"><${View} key=${`${get().view}:${get().runId}`} /></main>
+      <main id="canvas" tabindex="-1">
+        ${view !== "home" ? html`<div class="canvas-crumbs"><${Crumbs} items=${[{ label: "Runs", href: "/", onClick: goHome }]} /></div>` : null}
+        <${View} key=${`${view}:${runId}`} />
+      </main>
     </div>
     <${Toasts} />`;
 }
 
 render(html`<${App} />`, document.getElementById("app"));
-goHome().then(() => {
-  // deep link from Futures mode back to its run
-  const linked = new URLSearchParams(location.search).get("run");
-  if (linked) openRun(linked);
-});
+// The address says where to start: the runs list, a new ask, or a run's step
+// (Futures links back here with ?run=).
+route();

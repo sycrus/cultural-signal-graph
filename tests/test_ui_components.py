@@ -14,6 +14,7 @@ COMPONENTS = ["Button", "Chip", "Panel", "Tabs", "Roller", "NodeCard", "Drawer",
 def _views() -> dict[str, str]:
     views = {p.name: p.read_text(encoding="utf-8") for p in FUTURES.glob("*.js")}
     views["app.js"] = (STATIC / "app.js").read_text(encoding="utf-8")  # the stepper
+    views["shell.js"] = (STATIC / "shell.js").read_text(encoding="utf-8")  # the shared top bar
     return views
 
 
@@ -52,3 +53,13 @@ def test_both_pages_load_the_components():
     css = (STATIC / "ui.css").read_text(encoding="utf-8")
     for cls in ["ui-chip", "ui-panel", "ui-tabs", "ui-roller", "ui-drawer", "ui-toast", "ui-toggle", "ui-empty"]:
         assert f".{cls}" in css, cls
+
+
+def test_both_pages_share_one_top_bar():
+    """One AppBar for both pages: the Forecast | Futures switch can't drift apart again."""
+    shell = (STATIC / "shell.js").read_text(encoding="utf-8")
+    assert "export function AppBar(" in shell and "export function Crumbs(" in shell
+    for name, mode in [("app.js", "forecast"), ("futures/futures.js", "futures")]:
+        src = (STATIC / name).read_text(encoding="utf-8")
+        assert f'<${{AppBar}} mode="{mode}"' in src, name
+        assert 'id="topbar"' not in src and "mode-switch" not in src, name  # no page-local bar
