@@ -285,6 +285,10 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
 
 .futures-toggle { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px 4px; font-weight: 400; color: var(--futures); }
 .futures-toggle input { width: auto; margin: 0; }
+.futures-toggle-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.futures-toggle-row .futures-toggle { margin-bottom: 0; }
+.futures-toggle-row .hint { margin: 0; }
+.futures-toggle.disabled { color: var(--muted); cursor: not-allowed; }
 
 .origin-note { border-left: 3px solid var(--futures); color: var(--futures-ink); }
 
