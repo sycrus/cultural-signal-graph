@@ -3,8 +3,11 @@
    are styled by class, so they read these too) and the Cytoscape Graph tab (viz.py
    inlines this file and reads the --graph-* tokens at runtime).
 
-   Light is the default (daylight); theme.js sets data-theme="dark" on <html> from
-   the viewer's choice or the system setting, which turns on the phosphor console.
+   Both themes are the same instrument with the power on or off. Light is a
+   reflective LCD: cool grey-blue glass, near-black segments, the same rationed
+   hues (amber chrome, cyan evidence, magenta futures) darkened to read on it, and
+   a slight ink bleed. theme.js sets data-theme="dark" on <html> from the viewer's
+   choice or the system setting, which lights it up as the phosphor console.
    Change a value here and it changes everywhere. */
 
 /* Barlow (SIL OFL 1.1, vendor/fonts/Barlow-OFL.txt): the reading face in both
@@ -39,7 +42,7 @@
 }
 
 /* Kode Mono (SIL OFL 1.1, vendor/fonts/KodeMono-OFL.txt): an angular monospace,
-   the phosphor screen's display and data font. Variable weight, Latin subset.
+   the display and data font in both themes. Variable weight, Latin subset.
    viz.py swaps every vendored font url for a data: URI so the exported
    graph.html stays offline. */
 @font-face {
@@ -59,18 +62,19 @@
   --text-base: 14px;
   --text-md: 15px;
   --text-lg: 18px;
-  --font-display: var(--font-sans); /* brand, headings, uppercase labels */
-  --font-data: var(--font-sans);    /* years, orders, counts */
-  --tracking-label: .05em;         /* uppercase labels */
+  --font-display: "Kode Mono", var(--font-mono); /* brand, headings, uppercase labels */
+  --font-data: "Kode Mono", var(--font-mono);    /* years, orders, counts */
+  --tracking-label: .12em;         /* uppercase labels */
 
-  /* --- glow: none in daylight; the dark theme lights it -------------------------- */
-  --glow-text: none;
-  --glow-text-soft: none;
-  --glow-text-strong: none;
-  --glow-futures: 0 0 0 2px var(--futures);
-  --glow-evidence: none;
-  --glow-line: none;
-  --glow-on: 0;                    /* 0 or 1: scales glows built with calc() */
+  /* --- bleed: on the LCD, dark segments soak a little into the glass, with a faint
+     offset shadow; the dark theme turns the same tokens into phosphor glow --------- */
+  --glow-text: 0 0 3px color-mix(in srgb, currentColor 40%, transparent);
+  --glow-text-soft: 0 0 6px color-mix(in srgb, currentColor 18%, transparent);
+  --glow-text-strong: 1px 1px 0 color-mix(in srgb, currentColor 15%, transparent), 0 0 2px color-mix(in srgb, currentColor 55%, transparent), 0 0 8px color-mix(in srgb, currentColor 25%, transparent);
+  --glow-futures: 0 0 0 1px var(--futures), 0 0 10px color-mix(in srgb, var(--futures) 30%, transparent);
+  --glow-evidence: 0 0 8px color-mix(in srgb, var(--evidence) 20%, transparent);
+  --glow-line: drop-shadow(0 0 2px color-mix(in srgb, var(--futures) 60%, transparent));
+  --glow-on: 1;                    /* 0 or 1: scales glows built with calc() */
 
   /* --- shape ------------------------------------------------------------------ */
   --radius-sm: 6px;
@@ -85,94 +89,94 @@
   --dur-slide: .35s;
 
   /* --- surfaces & text -------------------------------------------------------- */
-  --bg: #f5f6f8;
-  --card: #ffffff;
-  --sunken: #f9fafb;
-  --hover: #f0f4ff;
-  --border: #d1d5db;
-  --border-soft: #e5e7eb;
-  --grid: #f0f1f4;
-  --ink: #111827;
-  --ink-soft: #374151;
-  --muted: #6b7280;
-  --faint: #9ca3af;
-  --neutral-soft: #f3f4f6;
-  --neutral-chip: #e5e7eb;
+  --bg: #bfc8cc;
+  --card: #ccd4d7;
+  --sunken: #b5bec3;
+  --hover: #d6dde0;
+  --border: #98a4aa;
+  --border-soft: #aab4b9;
+  --grid: #b8c1c5;
+  --ink: #111a20;
+  --ink-soft: #27323a;
+  --muted: #434e56;
+  --faint: #6f7a81;
+  --neutral-soft: #c3cbcf;
+  --neutral-chip: #b3bdc2;
 
   /* --- interaction ------------------------------------------------------------ */
-  --accent: #3b82f6;
-  --on-accent: #ffffff;
-  --accent-soft: #eff6ff;
-  --accent-tint: #dbeafe;
-  --accent-ring: #bfdbfe;
-  --accent-ink: #1e40af;
+  --accent: #7a4200;
+  --on-accent: #f3e7d0;
+  --accent-soft: #cfc6b0;
+  --accent-tint: #d4c7a6;
+  --accent-ring: #a88a50;
+  --accent-ink: #5c3100;
 
   /* --- status ----------------------------------------------------------------- */
-  --ok: #16a34a;
-  --ok-soft: #dcfce7;
-  --ok-wash: #f0fdf4;
-  --ok-line: #86efac;
-  --ok-ink: #166534;
-  --warn: #d97706;
-  --warn-soft: #fef3c7;
-  --warn-wash: #fffbeb;
-  --warn-line: #fcd34d;
-  --warn-ink: #92400e;
-  --danger: #dc2626;
-  --on-danger: #ffffff;
-  --danger-soft: #fee2e2;
-  --danger-wash: #fef2f2;
-  --danger-line: #fca5a5;
-  --danger-ink: #991b1b;
+  --ok: #155c31;
+  --ok-soft: #b9cfbf;
+  --ok-wash: #c6d3cb;
+  --ok-line: #6e9a7c;
+  --ok-ink: #12502a;
+  --warn: #8a3600;
+  --warn-soft: #d6c0ab;
+  --warn-wash: #d2cabe;
+  --warn-line: #b8805a;
+  --warn-ink: #6e2a00;
+  --danger: #a3112f;
+  --on-danger: #f6e8ea;
+  --danger-soft: #d7b9be;
+  --danger-wash: #d3c6c9;
+  --danger-line: #bc7380;
+  --danger-ink: #750a20;
 
   /* --- evidence palette: anchors, the audited side --------------------------- */
-  --evidence: #0f766e;
-  --evidence-soft: #ccfbf1;
-  --evidence-line: #99f6e4;
-  --evidence-ink: #134e4a;
-  --xedge: #4f46e5;          /* a cross-domain edge used as an anchor */
-  --xedge-soft: #e0e7ff;
-  --xedge-ink: #3730a3;
+  --evidence: #005a62;
+  --evidence-soft: #b0cdcf;
+  --evidence-line: #5f9da2;
+  --evidence-ink: #003f45;
+  --xedge: #1f3f9a;          /* a cross-domain edge used as an anchor */
+  --xedge-soft: #b8c3dc;
+  --xedge-ink: #142c70;
 
   /* --- futures palette: projections, the speculative side -------------------- */
-  --futures: #7c3aed;
-  --on-futures: #ffffff;
-  --futures-soft: #ede9fe;
-  --futures-wash: #faf9ff;
-  --futures-faint: #ddd6fe;
-  --futures-line: #c4b5fd;
-  --futures-label: #a78bfa;
-  --futures-grid: #ece8fb;
-  --futures-ink: #4c1d95;
-  --baseline: #9ca3af;       /* the business-as-usual branch */
+  --futures: #9a0f7c;
+  --on-futures: #f9e6f4;
+  --futures-soft: #d6bcd0;
+  --futures-wash: #c9c4cc;
+  --futures-faint: #c9aac2;
+  --futures-line: #b26aa2;
+  --futures-label: #7e3470;
+  --futures-grid: #c0bcc6;
+  --futures-ink: #6a0855;
+  --baseline: #6f7a81;       /* the business-as-usual branch */
 
   /* --- lens-tag palette: Three Horizons -------------------------------------- */
-  --h1: #64748b;
-  --h1-soft: #e2e8f0;
-  --h1-ink: #475569;
-  --h2: #d97706;
-  --h2-soft: #fde68a;
-  --h2-ink: #b45309;
-  --h3: #7c3aed;
-  --h3-soft: #ddd6fe;
-  --h3-ink: #6d28d9;
+  --h1: #4b5a66;
+  --h1-soft: #b3bec6;
+  --h1-ink: #34414b;
+  --h2: #7a4200;
+  --h2-soft: #d4c7a6;
+  --h2-ink: #5c3100;
+  --h3: #9a0f7c;
+  --h3-soft: #d6bcd0;
+  --h3-ink: #6a0855;
 
   /* --- forecast Graph tab (Cytoscape) ---------------------------------------- */
-  --graph-entity: #3b82f6;
-  --graph-signal: #22c55e;
-  --graph-flagged: #ef4444;
-  --graph-source: #9ca3af;
-  --graph-edge: #cbd5e1;
-  --graph-about: #60a5fa;
-  --graph-equiv: #a855f7;
-  --graph-equiv-pending: #c084fc;
+  --graph-entity: #1f3f9a;
+  --graph-signal: #1d6b3a;
+  --graph-flagged: #a3112f;
+  --graph-source: #6f7a81;
+  --graph-edge: #98a4aa;
+  --graph-about: #3d5fb8;
+  --graph-equiv: #9a0f7c;
+  --graph-equiv-pending: #b26aa2;
 
   /* --- elevation -------------------------------------------------------------- */
-  --shadow-sm: 0 1px 2px rgba(17, 24, 39, .05);
-  --shadow-md: 0 6px 18px rgba(17, 24, 39, .1);
-  --shadow-drawer: -8px 8px 28px rgba(17, 24, 39, .12);
-  --shadow-futures: 0 3px 10px rgba(124, 58, 237, .18);
-  --shadow-futures-lift: 0 6px 18px rgba(124, 58, 237, .3);
+  --shadow-sm: 0 1px 0 rgba(17, 26, 32, .12);
+  --shadow-md: 0 6px 16px rgba(17, 26, 32, .18);
+  --shadow-drawer: -8px 8px 24px rgba(17, 26, 32, .2);
+  --shadow-futures: 0 0 10px color-mix(in srgb, var(--futures) 25%, transparent);
+  --shadow-futures-lift: 0 0 16px color-mix(in srgb, var(--futures) 38%, transparent);
 
   color-scheme: light;
 }
@@ -184,9 +188,6 @@
    brightness, line style and glow, not by more colors. */
 
 :root[data-theme="dark"] {
-  --font-display: "Kode Mono", var(--font-mono);
-  --font-data: "Kode Mono", var(--font-mono);
-  --tracking-label: .12em;
   --glow-text: 0 0 6px color-mix(in srgb, currentColor 55%, transparent);
   --glow-text-soft: 0 0 10px color-mix(in srgb, currentColor 22%, transparent);
   --glow-text-strong: 0 0 4px color-mix(in srgb, currentColor 70%, transparent), 0 0 14px color-mix(in srgb, currentColor 35%, transparent);
@@ -290,3 +291,7 @@
 [data-theme-pref="system"] .theme-toggle::after { content: "◐ Auto"; }
 [data-theme-pref="light"] .theme-toggle::after { content: "☀ Light"; }
 [data-theme-pref="dark"] .theme-toggle::after { content: "☾ Dark"; }
+
+/* Links take the chrome hue, not the browser's default blue. */
+a { color: var(--accent-ink); }
+a:visited { color: var(--accent-ink); }
