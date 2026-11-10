@@ -33,3 +33,6 @@ runs/
 
 # Editor (personal workspace styling)
 .vscode/
+
+# graphify knowledge-graph output (local cache, machine paths)
+graphify-out/

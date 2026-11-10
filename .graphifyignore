@@ -1,0 +1,3 @@
+# Third-party minified bundles: not project code, they swamp the graph with noise.
+src/cultural_signal_graph/static/vendor/
+src/cultural_signal_graph/static/cytoscape.min.js
