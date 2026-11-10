@@ -245,6 +245,6 @@ the regression gate.
   | [0008](docs/adr/0008-futures-operation-log-plain-workflow.md) | Futures: an operation log as source of truth, a plain workflow |
   | [0009](docs/adr/0009-search-first-source-discovery.md) | Search-first source discovery, the index as a relevance-gated supplement |
   | [0010](docs/adr/0010-futures-cross-into-evidence-only-by-promotion.md) | Futures enter forecast evidence only through promotion (a new run) |
-  | [0011](docs/adr/0011-futures-frontend-preact-d3-no-build.md) | Preact + htm + signals and D3, vendored, no build step |
+  | [0011](docs/adr/0011-futures-frontend-preact-d3-no-build.md) | Preact + htm + signals and D3, vendored, no build step (the stepper too, since #71) |
   | [0012](docs/adr/0012-workshop-is-a-second-surface-on-the-futures-engine.md) | Workshops are a second surface on the futures engine |
   | [0013](docs/adr/0013-operation-log-in-sqlite.md) | The operation log in SQLite; JSONL stays the export format |
