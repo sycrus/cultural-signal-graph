@@ -13,18 +13,13 @@ body {
   flex-direction: column;
 }
 
-#topbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-}
-#topbar .brand { font-weight: 650; font-size: 15px; }
-#topbar .spacer { flex: 1; }
+/* The top bar is the shared shell: see ui.css (.app-bar). */
 
 #app { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+/* the breadcrumb lines up with the page it sits on */
+.canvas-crumbs { max-width: 720px; margin: 0 auto; }
+.canvas-crumbs.wide { max-width: none; }
+#canvas:focus, #futures-canvas:focus { outline: none; }
 #layout { flex: 1; display: flex; min-height: 0; }
 
 #rail {
@@ -70,16 +65,12 @@ body {
 .rail-item.action { color: var(--ink); border-color: var(--warn); }
 .rail-item.action .dot { background: var(--warn); border-color: var(--warn); }
 .rail-item.action .dot::after { content: "\2691"; }
-.rail-item.active {
-  color: var(--ink);
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  cursor: pointer;
-}
+/* reachable steps read as normal text; only the step on screen is highlighted */
+.rail-item.active { color: var(--ink); cursor: pointer; }
 .rail-item.active .dot { border-color: var(--accent); }
 .rail-item.current .dot { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .rail-item.blocked .dot::after { content: ""; }
-.rail-item.here { color: var(--ink); font-weight: 600; }
+.rail-item.here { color: var(--ink); font-weight: 600; border-color: var(--accent); background: var(--accent-soft); }
 .rail-item.done.btn:not(:disabled):hover, .rail-item.active.btn:not(:disabled):hover { border-color: var(--accent-ring); background: var(--hover); }
 
 #canvas { flex: 1; overflow: auto; padding: 22px; }
@@ -124,7 +115,8 @@ input, select {
 
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 550; font-size: 12px; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+td { font-variant-numeric: tabular-nums; }
 tbody tr.row-link { cursor: pointer; }
 tbody tr.row-link:hover, tbody tr.row-link:focus-visible { background: var(--hover); outline: none; }
 td.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
@@ -228,11 +220,8 @@ a.btn.futures-link { margin-left: 8px; padding: 3px 10px; border-color: var(--fu
 
 /* --- Phosphor treatment (#46): light that comes from the screen. Every value is a
    token, and the glow tokens are `none` in daylight, so this only lights up dark. -- */
-#topbar .brand { text-transform: uppercase; letter-spacing: var(--tracking-label); font-family: var(--font-display); color: var(--accent); text-shadow: var(--glow-text-strong); }
 h1, h2 { font-family: var(--font-display); text-shadow: var(--glow-text-soft); }
-th { font-family: var(--font-display); letter-spacing: var(--tracking-label); }
-th { text-transform: uppercase; }
 .metric-big { font-family: var(--font-data); color: var(--accent); text-shadow: var(--glow-text-strong); }
-.rail-item.current, .rail-item.active { text-shadow: var(--glow-text); }
+.rail-item.here { text-shadow: var(--glow-text); }
 .rail-item.current .dot { box-shadow: 0 0 0 3px var(--accent-ring), var(--glow-text); }
 button.primary { box-shadow: 0 0 14px color-mix(in srgb, var(--accent) calc(var(--glow-on, 0) * 45%), transparent); }

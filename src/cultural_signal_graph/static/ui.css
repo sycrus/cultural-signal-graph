@@ -97,10 +97,52 @@ a.btn:hover { border-color: var(--accent-ring); }
 /* --- EmptyState -------------------------------------------------------------------- */
 .ui-empty { display: grid; justify-items: center; gap: 4px; padding: 28px 16px; text-align: center; color: var(--muted); }
 .ui-empty-mark { font-family: var(--font-display); font-size: 22px; color: var(--futures); text-shadow: var(--glow-text); line-height: 1; }
-.ui-empty-title { font-family: var(--font-display); letter-spacing: var(--tracking-label); text-transform: uppercase; font-size: var(--text-sm); color: var(--ink-soft); }
+.ui-empty-title { font-weight: 600; font-size: var(--text-md); color: var(--ink-soft); }
 .ui-empty-body { font-size: 12.5px; max-width: 46ch; }
 .ui-empty-action { margin-top: 8px; }
 .ui-empty.compact { padding: 10px 8px; justify-items: start; text-align: left; grid-template-columns: auto 1fr; column-gap: 8px; }
 .ui-empty.compact .ui-empty-mark { font-size: 14px; }
 .ui-empty.compact .ui-empty-title { text-transform: none; letter-spacing: 0; font-family: var(--font-sans); font-style: italic; font-size: 12.5px; color: var(--muted); }
 .ui-empty.compact .ui-empty-body, .ui-empty.compact .ui-empty-action { grid-column: 2; }
+
+/* --- App shell: the top bar and breadcrumb both pages share (shell.js) ----------
+   One fixed height, whatever it holds, so moving between pages never shifts them. */
+.app-bar { flex: none; height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+  background: var(--card); border-bottom: 1px solid var(--border); position: relative; z-index: 10; }
+.app-bar .spacer { flex: 1; }
+.app-bar .brand { font-family: var(--font-display); font-weight: 650; font-size: 15px; letter-spacing: var(--tracking-label);
+  text-transform: uppercase; color: var(--accent); text-shadow: var(--glow-text-strong); text-decoration: none; white-space: nowrap; }
+.app-bar .brand:hover { color: var(--accent-ink); }
+.app-bar .mode-switch { flex: none; padding: 2px; }
+.ui-tabs a, .ui-tabs .disabled { display: inline-block; padding: 4px 12px; border-radius: var(--radius-sm); color: var(--muted); text-decoration: none;
+  font-family: var(--font-display); letter-spacing: var(--tracking-label); text-transform: uppercase; font-size: 13px; line-height: 1.4;
+  transition: background var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast); }
+.ui-tabs a:not(.on):hover { color: var(--ink); background: var(--hover); }
+.ui-tabs a.on { background: var(--accent); color: var(--on-accent); font-weight: 600; box-shadow: 0 0 12px color-mix(in srgb, var(--accent) calc(var(--glow-on, 0) * 40%), transparent); }
+:root[data-mode="futures"] .ui-tabs a.on { background: var(--futures); color: var(--on-futures); box-shadow: var(--shadow-futures); }
+.ui-tabs .disabled { opacity: .45; cursor: not-allowed; }
+.ui-tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bar-context { min-width: 0; max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }
+.bar-button { font-size: 13px; padding: 4px 10px; }
+.app-bar .theme-switch { color: var(--muted); }
+.skip-link { position: absolute; left: 12px; top: -40px; padding: 6px 12px; background: var(--accent); color: var(--on-accent); border-radius: var(--radius-sm); z-index: 50; text-decoration: none; }
+.skip-link:focus { top: 8px; }
+
+/* who is acting (Workshop B, #52) */
+.identity { position: relative; font-size: 13px; }
+.identity summary { list-style: none; cursor: pointer; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--muted); white-space: nowrap; }
+.identity summary::-webkit-details-marker { display: none; }
+.identity summary:hover { color: var(--ink); border-color: var(--accent-ring); }
+.identity summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.identity summary.unset { border-style: dashed; color: var(--accent-ink); }
+.identity-form { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: 260px; display: grid; gap: 8px;
+  padding: 12px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
+.identity-form label { display: grid; gap: 3px; margin: 0; font-size: 12px; color: var(--muted); font-weight: 400; }
+.identity-form input { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.identity-form .btn { justify-self: end; }
+
+/* breadcrumb: the way back up a level, at the top of the page */
+.crumbs ol { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.crumbs li::after { content: "›"; margin-left: 6px; color: var(--faint); }
+.crumbs a { color: var(--muted); text-decoration: none; }
+.crumbs a:hover { color: var(--accent-ink); text-decoration: underline; }

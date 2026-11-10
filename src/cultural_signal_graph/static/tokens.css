@@ -287,12 +287,7 @@
   :root { --dur-fast: 0s; --dur-base: 0s; --dur-slide: 0s; }
 }
 
-/* The theme switch (theme.js wires every [data-theme-toggle]). */
-.theme-toggle { font: inherit; font-size: 13px; padding: 3px 9px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--card); color: var(--muted); cursor: pointer; }
-.theme-toggle:hover { color: var(--ink); }
-[data-theme-pref="system"] .theme-toggle::after { content: "◐ Auto"; }
-[data-theme-pref="light"] .theme-toggle::after { content: "☀ Light"; }
-[data-theme-pref="dark"] .theme-toggle::after { content: "☾ Dark"; }
+
 
 /* Links take the chrome hue, not the browser's default blue. */
 a { color: var(--accent-ink); }
