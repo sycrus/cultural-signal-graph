@@ -74,10 +74,13 @@ function SpreadPicker() {
 
 export function LensTabs() {
   const timeLens = ["scroll", "cone", "horizons", "pestle"].includes(S.lens.value);
+  // The spread picker is always laid out, so the bar keeps its height on every lens;
+  // it is hidden (and inert) where time isn't the x-axis.
   return html`<div class="lens-bar">
     <${Tabs} variant="line" label="Lens" value=${S.lens.value} onChange=${S.setLens}
       items=${LENSES.map((l) => ({ key: l.key, label: l.label, hint: l.hint }))} />
-    ${timeLens ? html`<span class="spacer"></span><${SpreadPicker} />` : null}
+    <span class="spacer"></span>
+    <div class=${`spread-slot ${timeLens ? "" : "off"}`} aria-hidden=${timeLens ? undefined : "true"} inert=${!timeLens}><${SpreadPicker} /></div>
   </div>`;
 }
 
