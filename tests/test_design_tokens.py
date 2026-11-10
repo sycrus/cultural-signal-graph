@@ -17,13 +17,13 @@ def _colors(text: str) -> list[str]:
 
 
 def test_stylesheets_use_tokens_only():
-    for name in ["app.css", "futures/futures.css"]:
+    for name in ["app.css", "futures/futures.css", "futures/ui.css"]:
         assert _colors((STATIC / name).read_text(encoding="utf-8")) == [], name
 
 
 def test_every_token_used_is_defined():
     defined = set(re.findall(r"(--[\w-]+)\s*:", (STATIC / "tokens.css").read_text(encoding="utf-8")))
-    for name in ["app.css", "futures/futures.css"]:
+    for name in ["app.css", "futures/futures.css", "futures/ui.css"]:
         used = set(re.findall(r"var\((--[\w-]+)", (STATIC / name).read_text(encoding="utf-8")))
         assert used <= defined, (name, used - defined)
 

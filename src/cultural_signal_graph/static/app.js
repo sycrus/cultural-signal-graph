@@ -22,6 +22,7 @@ const state = {
   error: null,
   signoffDraft: {}, // edge id -> true(approve) | false(reject), before confirming
   metrics: null, // the /metrics report for the open run
+  futures: null, // {explorations, projections} on the open run, for the Graph tab's futures layer
   futuresLayer: false, // Graph tab: show exploration projections (hidden by default)
 };
 
@@ -93,6 +94,15 @@ function showStage(key) {
   if (key === "metrics" && state.snap && !state.metrics) {
     fetchMetrics();
   }
+  if (key === "graph" && !state.futures) fetchFutures();
+}
+
+async function fetchFutures() {
+  const runId = state.runId;
+  const list = await api(`/api/runs/${runId}/explorations`).catch(() => null);
+  if (state.runId !== runId || !list) return;
+  state.futures = { explorations: list.length, projections: list.reduce((n, e) => n + (e.projections || 0), 0) };
+  if (state.view === "graph") render();
 }
 
 async function fetchMetrics() {
@@ -525,16 +535,37 @@ function reviewPlaceholder(tab, note) {
   return `${tabsHtml(tab)}${renderPlaceholder(tab === "graph" ? "Graph" : "Metrics", note)}`;
 }
 
+function graphViewHash() {
+  const v = state.graphView;
+  if (!v || !v.zoom) return "";
+  return `#zoom=${v.zoom.toFixed(3)}${v.focus ? `&focus=${encodeURIComponent(v.focus)}` : ""}`;
+}
+
+function futuresToggle() {
+  /* The futures layer adds this run's explorations to the graph; say what it adds,
+     and say so plainly when there is nothing to add yet. */
+  const f = state.futures;
+  const none = f && f.projections === 0;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const what = !f ? "" : none
+    ? `<span class="hint">No explorations on this run yet. <a href="/futures?run=${state.runId}">Start one in Futures →</a></span>`
+    : `<span class="hint">adds ${plural(f.projections, "projection")} from ${plural(f.explorations, "exploration")}</span>`;
+  return `<div class="futures-toggle-row">
+    <label class="futures-toggle ${none ? "disabled" : ""}" title="Projections from this run's explorations, beside the evidence they grow from. Never part of the brief.">
+      <input type="checkbox" id="toggle-futures" ${state.futuresLayer && !none ? "checked" : ""} ${none ? "disabled" : ""}> Show futures layer
+    </label>
+    ${what}
+  </div>`;
+}
+
 function renderGraph() {
   if (!state.snap || state.snap.status !== "completed") {
     return reviewPlaceholder("graph", "The graph explorer appears once the run completes.");
   }
   return `
   ${tabsHtml("graph")}
-  <label class="futures-toggle" title="Projections from this run's explorations, beside the evidence they grow from. Never part of the brief.">
-    <input type="checkbox" id="toggle-futures" ${state.futuresLayer ? "checked" : ""}> Show futures layer
-  </label>
-  <iframe class="graph-frame" src="/runs/${state.runId}/graph.html${state.futuresLayer ? "?futures_layer=true" : ""}"
+  ${futuresToggle()}
+  <iframe class="graph-frame" src="/runs/${state.runId}/graph.html${state.futuresLayer ? "?futures_layer=true" : ""}${graphViewHash()}"
     title="Graph explorer — search, layout, click-to-trace"></iframe>`;
 }
 
@@ -674,6 +705,10 @@ function bind() {
   });
   on("btn-confirm-signoff", "click", confirmSignoff);
   on("toggle-futures", "change", (e) => {
+    // Keep the viewer's zoom and centre across the reload the toggle causes.
+    try {
+      state.graphView = document.querySelector(".graph-frame")?.contentWindow?.graphView?.() || null;
+    } catch { state.graphView = null; }
     state.futuresLayer = e.target.checked;
     render();
   });
@@ -769,9 +804,12 @@ async function openRun(runId) {
   state.runId = runId;
   state.signoffDraft = {};
   state.metrics = null;
+  state.futures = null;
+  state.graphView = null;
   state.view = currentStage(state.snap);
   render();
   if (state.view === "metrics") fetchMetrics();
+  if (state.view === "graph") fetchFutures();
 }
 
 /* --- sign-off ------------------------------------------------------------ */

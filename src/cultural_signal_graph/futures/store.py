@@ -732,12 +732,12 @@ class ExplorationStore:
             for node in g.subjects(RDF.type, CSGF.Projection):
                 p = state["projections"][str(node).rsplit("#", 1)[-1]]
                 nodes.append({"data": {
-                    "id": str(node), "label": p["statement"][:40] + ("…" if len(p["statement"]) > 40 else ""),
+                    "id": str(node), "label": p["statement"][:72] + ("…" if len(p["statement"]) > 72 else ""),
                     "statement": p["statement"], "kind": "projection", "exploration": e["goal"],
                     "valid": f"{p['window'][0]} -> {p['window'][1]}", "origin": p["origin"],
                 }})
             for node in g.subjects(RDF.type, CSGF.Reference):
-                nodes.append({"data": {"id": str(node), "label": str(g.value(node, RDFS.label))[:40], "kind": "reference"}})
+                nodes.append({"data": {"id": str(node), "label": str(g.value(node, RDFS.label))[:72], "kind": "reference"}})
             for s, o in g.subject_objects(CSGF.growsFrom):
                 edges.append({"data": {"id": f"grows:{s}:{o}", "source": str(o), "target": str(s), "kind": "growsFrom"}})
         return {"nodes": nodes, "edges": edges}

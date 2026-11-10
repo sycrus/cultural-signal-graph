@@ -7,6 +7,7 @@ import { h } from "preact";
 import { useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
+import { Button, Drawer, Tabs, toast } from "./ui.js";
 
 const html = htm.bind(h);
 
@@ -37,7 +38,10 @@ export function AddPanel() {
       }
       await S.addProjection(body);
     }
-    if (!S.error.value) close();
+    if (!S.error.value) {
+      close();
+      toast(kind === "reference" ? "Reference added to the Present column." : kind === "wildcard" ? "Wild card added." : "Assumption added.");
+    }
   };
 
   const referenceFields = html`
@@ -47,14 +51,9 @@ export function AddPanel() {
     <textarea rows="3" value=${excerpt} onInput=${(e) => setExcerpt(e.target.value)} placeholder="What the source says"></textarea>
     <div class="hint">Summarized to one line for the generator. Stays futures-scoped: never forecast evidence.</div>`;
 
-  return html`<aside class="detail-panel add-panel">
-    <button class="ghost close" onClick=${close}>✕</button>
-    <div class="panel-kind">Add to the exploration</div>
-    <div class="seg">
-      ${[["assumption", "Grounded assumption"], ["wildcard", "Wild card"], ["reference", "Reference"]].map(
-        ([k, label]) => html`<button key=${k} class=${kind === k ? "on" : ""} onClick=${() => setKind(k)}>${label}</button>`,
-      )}
-    </div>
+  return html`<${Drawer} kind="Add to the exploration" class="add-panel" onClose=${close}>
+    <${Tabs} variant="soft" label="What to add" value=${kind} onChange=${setKind}
+      items=${[{ key: "assumption", label: "Grounded assumption" }, { key: "wildcard", label: "Wild card" }, { key: "reference", label: "Reference" }]} />
     ${kind === "reference"
       ? referenceFields
       : html`
@@ -76,10 +75,8 @@ export function AddPanel() {
         ${kind === "assumption"
           ? html`<label>Reference</label>
             ${refs.length
-              ? html`<div class="seg small">
-                  <button class=${refMode === "existing" ? "on" : ""} onClick=${() => setRefMode("existing")}>Existing</button>
-                  <button class=${refMode === "new" ? "on" : ""} onClick=${() => setRefMode("new")}>New</button>
-                </div>`
+              ? html`<${Tabs} variant="soft" size="sm" label="Reference" value=${refMode} onChange=${setRefMode}
+                  items=${[{ key: "existing", label: "Existing" }, { key: "new", label: "New" }]} />`
               : null}
             ${refMode === "existing" && refs.length
               ? html`<select value=${refId} onChange=${(e) => setRefId(e.target.value)}>
@@ -89,8 +86,8 @@ export function AddPanel() {
           : null}`}
     ${S.error.value ? html`<div class="error">${S.error.value}</div>` : null}
     <div class="row right" style="margin-top:12px">
-      <button class="ghost" onClick=${close}>Cancel</button>
-      <button class="primary" onClick=${submit} disabled=${S.busy.value}>${S.busy.value ? "Adding…" : "Add"}</button>
+      <${Button} variant="ghost" onClick=${close}>Cancel<//>
+      <${Button} variant="primary" onClick=${submit} busy=${S.busy.value} busyLabel="Adding…">Add<//>
     </div>
-  </aside>`;
+  <//>`;
 }

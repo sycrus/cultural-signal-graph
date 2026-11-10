@@ -60,8 +60,20 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   html, body { margin: 0; height: 100%; overflow: hidden; font-family: var(--font-sans); background: var(--card); color: var(--ink); }
   #cy { width: 100%; height: 100%; display: block; }
   .floating { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); }
-  #legend { position: absolute; top: 12px; left: 12px; padding: 8px 12px; font-size: var(--text-sm); }
-  #legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  #legend { position: absolute; top: 12px; left: 12px; padding: 10px 12px; font-size: var(--text-sm); display: grid; gap: 6px; max-width: 220px; }
+  .legend-title { font-family: var(--font-display); font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { padding: 3px 8px; border-radius: var(--radius-sm); border: 1.5px solid; font-size: var(--text-xs); line-height: 1.3; }
+  .chip.entity { background: var(--xedge-soft); border-color: var(--graph-entity); color: var(--xedge-ink); font-family: var(--font-display); letter-spacing: var(--tracking-label); text-transform: uppercase; font-weight: 600; }
+  .chip.signal { background: var(--evidence-soft); border-color: var(--evidence-line); color: var(--evidence-ink); }
+  .chip.flagged { background: var(--warn-soft); border-color: var(--warn); color: var(--warn-ink); }
+  .chip.source { background: var(--card); border-color: var(--border); border-style: dashed; color: var(--muted); }
+  .chip.projection { background: var(--futures-soft); border-color: var(--futures); color: var(--futures-ink); }
+  .lines { display: grid; gap: 3px; font-size: var(--text-xs); color: var(--muted); }
+  .line { display: inline-block; width: 22px; vertical-align: middle; margin-right: 6px; border-top: 2px solid var(--graph-about); }
+  .line.equiv { border-top-color: var(--graph-equiv); }
+  .line.pending { border-top: 2px dashed var(--graph-equiv-pending); }
+  .line.grows { border-top: 2px dotted var(--futures-line); }
   #detail { position: absolute; top: 12px; right: 12px; width: 300px; padding: 12px; box-shadow: var(--shadow-md); display: none; }
   #detail a { color: var(--accent); }
   .notes { margin-top: 10px; border-top: 1px solid var(--border-soft); padding-top: 8px; }
@@ -88,12 +100,20 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   <button id="btn-grid" title="Grid layout">Grid</button>
 </div>
 <div id="legend" class="floating">
-  <div><span class="dot" style="background:var(--graph-entity)"></span>entity</div>
-  <div><span class="dot" style="background:var(--graph-signal)"></span>signal (confident)</div>
-  <div><span class="dot" style="background:var(--graph-flagged)"></span>signal (conflict/flag)</div>
-  <div><span class="dot" style="background:var(--graph-source)"></span>source</div>
-  <div style="margin-top:4px">dashed purple = gated cross-domain edge</div>
-  <div class="legend-futures" style="margin-top:4px; color:var(--futures); display:none">&#9671; projection (futures layer, speculative)</div>
+  <div class="legend-title">Key</div>
+  <div class="chips">
+    <span class="chip entity">Entity</span>
+    <span class="chip signal">Signal</span>
+    <span class="chip flagged">Flagged signal</span>
+    <span class="chip source">source</span>
+    <span class="chip projection legend-futures" style="display:none">Projection</span>
+  </div>
+  <div class="lines">
+    <div><span class="line"></span>signal is about an entity</div>
+    <div><span class="line equiv"></span>cross-domain link, signed off</div>
+    <div><span class="line pending"></span>cross-domain link, awaiting sign-off</div>
+    <div class="legend-futures" style="display:none"><span class="line grows"></span>projection grows from</div>
+  </div>
 </div>
 <details id="usage" class="floating">
   <summary>Usage</summary>
@@ -152,37 +172,129 @@ function bindNoteForm(targetId, targetKind) {
 }
 
 if (data.nodes.some((n) => n.data.kind === 'projection')) {
-  document.querySelector('.legend-futures').style.display = 'block';
+  document.querySelectorAll('.legend-futures').forEach((el) => { el.style.display = ''; });
 }
 
 // Every color comes from tokens.css; restyled when the theme switches.
+// Nodes are panels with their words inside, like the cards in futures mode:
+// the fill and border say what kind of thing it is, the text says which one.
 const tok = (name) => window.csgTheme.token(name);
+const glowOn = () => Number(tok('--glow-on')) || 0;
+const PANEL_W = { entity: 190, signal: 220, source: 150, projection: 220, reference: 210 };
+const FONT = { entity: 12.5, source: 10.5 };
+const BODY = 12;
+const SHOUT = 28; // entity names up to this long are set as uppercase labels
+const panelW = (n) => {
+  const max = PANEL_W[n.data('kind')] || 160;
+  const size = FONT[n.data('kind')] || BODY;
+  const len = (n.data('label') || '').length;
+  const caps = n.data('kind') === 'entity' && len <= SHOUT ? 1.25 : 1;
+  return Math.max(64, Math.min(max, len * size * 0.56 * caps + 22));
+};
+const panelH = (n) => {
+  const size = FONT[n.data('kind')] || BODY;
+  const perLine = Math.max(1, Math.floor((panelW(n) - 18) / (size * 0.56)));
+  const lines = Math.min(4, Math.ceil(((n.data('label') || '').length || 1) / perLine));
+  return lines * size * 1.3 + 16;
+};
 function graphStyle() {
+  const glow = glowOn();
   return [
     { selector: 'node', style: {
-      'label': 'data(label)', 'font-size': 9, 'text-valign': 'bottom', 'text-halign': 'center',
-      'text-wrap': 'ellipsis', 'text-max-width': '90px', 'color': tok('--ink'), 'font-family': tok('--font-sans')
+      'label': 'data(label)', 'shape': 'round-rectangle', 'corner-radius': 6,
+      'width': panelW, 'height': panelH, 'text-valign': 'center', 'text-halign': 'center',
+      'text-wrap': 'wrap', 'text-max-width': (n) => panelW(n) - 16, 'text-justification': 'left',
+      'font-size': (n) => FONT[n.data('kind')] || BODY, 'line-height': 1.3,
+      'font-family': tok('--font-sans'), 'color': tok('--ink'),
+      'background-color': tok('--card'), 'border-width': 1.5, 'border-color': tok('--border'),
+      'underlay-padding': 5, 'underlay-opacity': 0, 'underlay-shape': 'round-rectangle',
+      'transition-property': 'opacity, underlay-opacity', 'transition-duration': 150,
     }},
-    { selector: 'node[kind = "entity"]', style: { 'background-color': tok('--graph-entity'), 'shape': 'ellipse', 'width': 56, 'height': 56 } },
-    { selector: 'node[kind = "signal"]', style: { 'background-color': tok('--graph-signal'), 'shape': 'round-rectangle' } },
-    { selector: 'node[kind = "signal"][flagged = "true"]', style: { 'background-color': tok('--graph-flagged') } },
-    { selector: 'node[kind = "source"]', style: { 'background-color': tok('--graph-source'), 'shape': 'hexagon' } },
-    { selector: 'edge', style: { 'curve-style': 'bezier', 'width': 1.5, 'line-color': tok('--graph-edge'), 'target-arrow-shape': 'triangle', 'target-arrow-color': tok('--graph-edge') } },
+    { selector: 'node[kind = "entity"]', style: {
+      'background-color': tok('--xedge-soft'), 'border-color': tok('--graph-entity'), 'border-width': 2,
+      'color': tok('--xedge-ink'), 'font-weight': 600, 'text-justification': 'center',
+      'font-family': (n) => ((n.data('label') || '').length <= SHOUT ? tok('--font-display') : tok('--font-sans')),
+      'text-transform': (n) => ((n.data('label') || '').length <= SHOUT ? 'uppercase' : 'none'),
+      'underlay-color': tok('--graph-entity'), 'underlay-opacity': glow * 0.18,
+    }},
+    { selector: 'node[kind = "signal"]', style: {
+      'background-color': tok('--evidence-soft'), 'border-color': tok('--evidence-line'), 'color': tok('--evidence-ink'),
+    }},
+    { selector: 'node[kind = "signal"][flagged = "true"]', style: {
+      'background-color': tok('--warn-soft'), 'border-color': tok('--warn'), 'color': tok('--warn-ink'),
+    }},
+    { selector: 'node[kind = "source"]', style: {
+      'border-style': 'dashed', 'color': tok('--muted'), 'text-justification': 'center',
+    }},
+    { selector: 'node[kind = "projection"]', style: {
+      'background-color': tok('--futures-soft'), 'border-color': tok('--futures'), 'color': tok('--futures-ink'),
+    }},
+    { selector: 'node[kind = "reference"]', style: {
+      'border-style': 'dashed', 'border-color': tok('--evidence'), 'color': tok('--evidence-ink'),
+    }},
+    { selector: 'node:selected', style: {
+      'border-width': 2.5, 'underlay-color': tok('--accent'), 'underlay-opacity': 0.25 + glow * 0.15,
+    }},
+    { selector: 'edge', style: { 'curve-style': 'bezier', 'width': 1.5, 'line-color': tok('--graph-edge'), 'target-arrow-shape': 'triangle', 'target-arrow-color': tok('--graph-edge'), 'arrow-scale': 0.8 } },
     { selector: 'edge[kind = "about"]', style: { 'line-color': tok('--graph-about'), 'target-arrow-color': tok('--graph-about'), 'width': 2 } },
     { selector: 'edge[kind = "equivalence"]', style: { 'line-color': tok('--graph-equiv'), 'target-arrow-color': tok('--graph-equiv'), 'width': 2.5 } },
     { selector: 'edge[kind = "equivalence"][status != "real"]', style: { 'line-style': 'dashed', 'line-color': tok('--graph-equiv-pending'), 'target-arrow-color': tok('--graph-equiv-pending') } },
-    { selector: 'node[kind = "projection"]', style: { 'background-color': tok('--futures-soft'), 'border-width': 2, 'border-color': tok('--futures'), 'shape': 'diamond', 'color': tok('--futures-ink') } },
-    { selector: 'node[kind = "reference"]', style: { 'background-color': tok('--card'), 'border-width': 2, 'border-style': 'dashed', 'border-color': tok('--evidence'), 'shape': 'round-rectangle' } },
     { selector: 'edge[kind = "growsFrom"]', style: { 'line-color': tok('--futures-line'), 'target-arrow-color': tok('--futures-line'), 'line-style': 'dotted', 'width': 1.5 } },
     { selector: '.dimmed', style: { 'opacity': 0.12 } },
   ];
+}
+
+// Panels need room: strong repulsion and a large overlap penalty keep them apart.
+const COSE = { name: 'cose', fit: true, padding: 40, nodeRepulsion: 40000, idealEdgeLength: 170, nodeOverlap: 60,
+  componentSpacing: 120, gravity: 0.6, numIter: 2500 };
+// Never fit so far out that the words in the panels can't be read: past that,
+// sit at a readable zoom on the busiest entity and let the viewer pan.
+const READABLE = 0.8;
+// The force layout discourages overlap but doesn't forbid it; panels that still
+// touch are pushed apart along the shorter axis until none do (or 60 passes).
+const GAP = 14;
+function separate() {
+  const ns = cy.nodes(':visible').toArray();
+  for (let pass = 0; pass < 60; pass++) {
+    let moved = false;
+    for (let i = 0; i < ns.length; i++) {
+      for (let j = i + 1; j < ns.length; j++) {
+        const a = ns[i].position(), b = ns[j].position();
+        const ox = (ns[i].width() + ns[j].width()) / 2 + GAP - Math.abs(a.x - b.x);
+        const oy = (ns[i].height() + ns[j].height()) / 2 + GAP - Math.abs(a.y - b.y);
+        if (ox <= 0 || oy <= 0) continue;
+        moved = true;
+        if (ox < oy) {
+          const d = (ox / 2) * (a.x <= b.x ? -1 : 1);
+          ns[i].position({ x: a.x + d, y: a.y }); ns[j].position({ x: b.x - d, y: b.y });
+        } else {
+          const d = (oy / 2) * (a.y <= b.y ? -1 : 1);
+          ns[i].position({ x: a.x, y: a.y + d }); ns[j].position({ x: b.x, y: b.y - d });
+        }
+      }
+    }
+    if (!moved) break;
+  }
+}
+function readableFit() {
+  separate();
+  cy.fit(undefined, 40);
+  if (cy.zoom() >= READABLE) return;
+  const hub = cy.nodes('[kind = "entity"]').max((n) => n.degree()).ele || cy.nodes()[0];
+  cy.zoom(READABLE);
+  if (hub) cy.center(hub);
 }
 
 const cy = cytoscape({
   container: document.getElementById('cy'),
   elements: data,
   style: graphStyle(),
-  layout: { name: 'cose', animate: false, fit: true, padding: 30, nodeRepulsion: 6000, idealEdgeLength: 90 },
+  layout: { ...COSE, animate: false },
+  // Gentle wheel zoom: ~9% per mouse-wheel notch (the default is ~10x that); a trackpad
+  // sends many small steps, so it stays smooth. Bounded so panels never vanish or balloon.
+  wheelSensitivity: 0.1,
+  minZoom: 0.2,
+  maxZoom: 2.5,
 });
 
 function detailHtml(id, kind) {
@@ -229,8 +341,29 @@ document.getElementById('search').addEventListener('input', (e) => {
 
 window.addEventListener('csg-theme', () => cy.style(graphStyle()));
 
+// The page that embeds the graph can ask for a view in the hash
+// (#zoom=0.9&focus=<node id>): the Graph tab does, so turning the futures layer on
+// or off keeps your zoom and the node you were looking at in the middle.
+function initialView() {
+  const want = new URLSearchParams(location.hash.slice(1));
+  const zoom = Number(want.get('zoom'));
+  if (!zoom) return readableFit();
+  separate();
+  cy.zoom(Math.min(cy.maxZoom(), Math.max(cy.minZoom(), zoom)));
+  const focus = want.get('focus') && cy.getElementById(want.get('focus'));
+  if (focus && focus.length) cy.center(focus);
+  else cy.center(cy.nodes('[kind = "entity"]').max((n) => n.degree()).ele || cy.nodes());
+}
+// What the embedding page reads before it reloads the graph.
+window.graphView = () => {
+  const e = cy.extent();
+  const mid = { x: (e.x1 + e.x2) / 2, y: (e.y1 + e.y2) / 2 };
+  const near = cy.nodes().min((n) => (n.position('x') - mid.x) ** 2 + (n.position('y') - mid.y) ** 2).ele;
+  return { zoom: cy.zoom(), focus: near ? near.id() : null };
+};
+cy.ready(initialView);
 document.getElementById('btn-fit').onclick = () => cy.fit(undefined, 30);
-document.getElementById('btn-cose').onclick = () => cy.layout({ name: 'cose', animate: true, fit: true, padding: 30 }).run();
+document.getElementById('btn-cose').onclick = () => cy.layout({ ...COSE, animate: false, stop: readableFit }).run();
 document.getElementById('btn-grid').onclick = () => cy.layout({ name: 'grid', animate: true, fit: true, padding: 30 }).run();
 </script>
 </body>
@@ -270,7 +403,7 @@ def build_cyto_elements(forecast: ForecastRun) -> dict:
             {
                 "data": {
                     "id": sid,
-                    "label": _shorten(statement),
+                    "label": _shorten(statement, 72),
                     "statement": statement,
                     "kind": "signal",
                     "confidence": _value(graph, signal, CSG.confidence),

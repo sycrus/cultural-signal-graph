@@ -8,6 +8,7 @@ import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
+import { Button, Chip, toast } from "./ui.js";
 
 const html = htm.bind(h);
 
@@ -15,9 +16,9 @@ export const STANCE_MARK = { support: "✓", contradict: "✗" };
 
 export function GroundButton({ p }) {
   const busy = S.groundingPid.value != null;
-  return html`<button onClick=${() => S.groundProjection(p.id)} disabled=${S.busy.value || busy}
-    title="Search for evidence that supports or contradicts this projection">
-    ${S.groundingPid.value === p.id ? "Grounding…" : "⌖ Ground this"}</button>`;
+  return html`<${Button} onClick=${() => S.groundProjection(p.id)} disabled=${S.busy.value || busy}
+    busy=${S.groundingPid.value === p.id} busyLabel="Grounding…"
+    title="Search for evidence that supports or contradicts this projection">⌖ Ground this<//>`;
 }
 
 function Trail({ seq }) {
@@ -61,16 +62,18 @@ export function GroundSection({ p }) {
         ${open.map(
           (pr) => html`<div key=${pr.url} class="ground-proposal">
             <div class="ground-proposal-head">
-              <span class=${`stance ${pr.stance}`}>${STANCE_MARK[pr.stance]} ${pr.stance}</span>
+              <${Chip} tone=${pr.stance === "support" ? "ok" : "danger"}>${STANCE_MARK[pr.stance]} ${pr.stance}<//>
               <a href=${pr.url} target="_blank" rel="noopener">${pr.title}</a>
               ${pr.backend && pr.backend !== "wikipedia" ? html`<span class="hint">${pr.backend}</span>` : null}
             </div>
             <blockquote>“${pr.excerpt}”</blockquote>
             ${pr.why ? html`<div class="hint">${pr.why}</div>` : null}
             <div class="row right">
-              <button onClick=${() => S.addReference(pr.url, pr.excerpt, { stance: pr.stance, grounds: p.id })}
-                disabled=${S.busy.value} title="Add to the Present column as a futures-scoped reference">
-                Accept as reference</button>
+              <${Button} disabled=${S.busy.value} title="Add to the Present column as a futures-scoped reference"
+                onClick=${async () => {
+                  await S.addReference(pr.url, pr.excerpt, { stance: pr.stance, grounds: p.id });
+                  if (!S.error.value) toast(`Accepted: it now ${pr.stance === "support" ? "supports" : "contradicts"} this projection from the Present column.`);
+                }}>Accept as reference<//>
             </div>
           </div>`,
         )}
@@ -82,8 +85,8 @@ export function GroundSection({ p }) {
                 : "Nothing usable came back — run it again; the queries differ each time."}</div>`
             : null}
         <div class="actions">
-          <button onClick=${() => S.groundProjection(p.id)} disabled=${S.busy.value || S.groundingPid.value != null}
-            title="Search again for evidence for and against this projection">↻ Search again</button>
+          <${Button} onClick=${() => S.groundProjection(p.id)} disabled=${S.busy.value || S.groundingPid.value != null}
+            title="Search again for evidence for and against this projection">↻ Search again<//>
         </div>`
       : null}
   </div>`;

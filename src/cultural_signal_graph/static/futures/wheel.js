@@ -8,6 +8,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import { lineage } from "./layout.js";
 import { nodeTitle } from "./hints.js";
+import { Toggle } from "./ui.js";
 
 const html = htm.bind(h);
 const TAU = Math.PI * 2;
@@ -111,7 +112,8 @@ export function Wheel({ snap, selectedId, onSelect, dimmed = () => false }) {
 
   return html`<div class="wheel" ref=${ref}>
     <div class="wheel-tools">
-      <button class="chip ${labelAll ? "on" : ""}" onClick=${() => setLabelAll(!labelAll)}>${labelAll ? "Labels: all" : "Labels: order 1 + selection"}</button>
+      <${Toggle} label="Label every node" checked=${labelAll} onChange=${setLabelAll}
+        title="Off: only order 1 and the selected lineage are labelled" />
     </div>
     <svg width=${size} height=${size} viewBox=${`0 0 ${size} ${size}`}>
       ${Array.from({ length: rings }, (_, i) => html`<g key=${i}>

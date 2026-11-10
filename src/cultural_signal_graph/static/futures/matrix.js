@@ -9,6 +9,7 @@ import { useState } from "preact/hooks";
 import htm from "htm";
 import * as S from "./store.js";
 import { marksText } from "./hints.js";
+import { Button, Chip, EmptyState, Panel, Toggle } from "./ui.js";
 
 const html = htm.bind(h);
 
@@ -25,12 +26,11 @@ function AxisPicker({ snap, onDone }) {
     setPicked(has ? picked.filter((p) => p.name !== c.name) : picked.length < 2 ? [...picked, { ...c }] : picked);
   };
   const edit = (i, key, value) => setPicked(picked.map((p, j) => (j === i ? { ...p, [key]: value } : p)));
-  return html`<div class="card axis-picker">
-    <h3>Critical uncertainties</h3>
+  return html`<${Panel} class="axis-picker" title="Critical uncertainties">
     <p class="hint">Scenario planning starts from two uncertainties that matter and are unresolved. The model
       proposes candidates from your flagged and conflicting evidence; pick two and edit them freely.
       ${snap.axes ? " Changing the axes starts a new matrix: placements and narratives reset (undoable)." : ""}</p>
-    <button onClick=${S.proposeAxes} disabled=${S.busy.value}>${cands.length ? "↻ Propose again" : "Propose axes"}</button>
+    <${Button} onClick=${S.proposeAxes} busy=${S.busy.value} busyLabel="Proposing…">${cands.length ? "↻ Propose again" : "Propose axes"}<//>
     ${cands.map((c) => {
       const on = picked.some((p) => p.name === c.name);
       return html`<label key=${c.name} class=${`axis-cand ${on ? "on" : ""}`}>
@@ -49,11 +49,11 @@ function AxisPicker({ snap, onDone }) {
       <input value=${a.high} onInput=${(e) => edit(i, "high", e.target.value)} placeholder="high pole" />
     </div>`)}
     <div class="row right">
-      ${snap.axes ? html`<button class="ghost" onClick=${onDone}>Cancel</button>` : null}
-      <button class="primary" disabled=${picked.length !== 2 || S.busy.value}
-        onClick=${async () => { await S.setAxes(picked); onDone(); }}>Use these two axes</button>
+      ${snap.axes ? html`<${Button} variant="ghost" onClick=${onDone}>Cancel<//>` : null}
+      <${Button} variant="primary" disabled=${picked.length !== 2 || S.busy.value}
+        onClick=${async () => { await S.setAxes(picked); onDone(); }}>Use these two axes<//>
     </div>
-  </div>`;
+  <//>`;
 }
 
 export function Matrix({ snap, selectedId, onSelect, onRetag }) {
@@ -92,15 +92,15 @@ export function Matrix({ snap, selectedId, onSelect, onRetag }) {
       <div class="m-world">${A.name}: <b>${A[pa]}</b> · ${B.name}: <b>${B[pb]}</b></div>
       ${note
         ? html`<p class=${`m-narrative ${note.stale ? "stale" : ""}`}>${note.text}
-            ${note.stale ? html`<span class="stale-mark" title="Its projections changed after it was written">stale</span>` : null}</p>`
+            ${note.stale ? html` <${Chip} tone="danger" size="sm" title="Its projections changed after it was written">stale<//>` : null}</p>`
         : null}
       <div class="m-chips">${visible.map(chip)}</div>
-      ${!members.length ? html`<div class="m-empty">No branch explores this world.</div>` : null}
+      ${!members.length ? html`<${EmptyState} compact title="No branch explores this world." />` : null}
       <div class="m-actions">
-        <button class=${members.length ? "ghost" : "primary"} disabled=${busy} onClick=${() => S.seedQuadrant(q)}
-          title="Generate a branch from the present, conditioned on this world">⑂ Seed a branch here</button>
-        <button class="ghost" disabled=${busy || !members.length} onClick=${() => S.writeNarrative(q)}>
-          ${note ? (note.stale ? "↻ Rewrite narrative" : "↻ Narrative") : "✎ Write narrative"}</button>
+        <${Button} variant=${members.length ? "ghost" : "primary"} disabled=${busy} onClick=${() => S.seedQuadrant(q)}
+          title="Generate a branch from the present, conditioned on this world">⑂ Seed a branch here<//>
+        <${Button} variant="ghost" disabled=${busy || !members.length} onClick=${() => S.writeNarrative(q)}>
+          ${note ? (note.stale ? "↻ Rewrite narrative" : "↻ Narrative") : "✎ Write narrative"}<//>
         <span class="hint">${members.length} placed${members.length !== visible.length ? ` · ${visible.length} end states` : ""}</span>
       </div>
     </div>`;
@@ -112,8 +112,9 @@ export function Matrix({ snap, selectedId, onSelect, onRetag }) {
       <span><span class="axis-letter">A</span> ${A.name}: ${A.low} → ${A.high}</span>
       <span><span class="axis-letter">B</span> ${B.name}: ${B.low} → ${B.high}</span>
       <span class="spacer"></span>
-      <button class=${`chip ${showAll ? "on" : ""}`} onClick=${() => setShowAll(!showAll)}>${showAll ? "All projections" : "End states"}</button>
-      <button class="ghost" onClick=${() => setPicking(true)}>Change axes</button>
+      <${Toggle} label="Show every projection" checked=${showAll} onChange=${setShowAll}
+        title="Off: only each branch's end state is placed. On: every projection along the branch." />
+      <${Button} variant="ghost" onClick=${() => setPicking(true)}>Change axes<//>
     </div>
     <div class="m-frame">
       <div class="m-axis-b"><span>${B.high}</span><span>${B.name}</span><span>${B.low}</span></div>
