@@ -54,13 +54,14 @@ between them. Section headings have 24px above.
 
 ## Page layouts
 
-Three, each starting from the page's own left edge:
+Three, all centred on the page, with the scrollbar's space always reserved so a page that
+scrolls keeps the same centre:
 
 | Layout | Pages | Content |
 |---|---|---|
-| **List** | Forecast runs (`/`), Futures explorations | A centred 880px column: page head, then a `List` of `ListRow`s |
-| **Step / form** | Each forecast step (Ask, Sources, Run, Sign-off, Brief), New exploration | A 720px reading column; in the stepper it sits on the left edge beside the step rail, so moving between steps never shifts the page |
-| **Workspace** | Graph tab, an exploration | Full width: page head, then the canvas |
+| **List** | Forecast runs (`/`), Futures explorations | An 880px column: page head, then a `List` of `ListRow`s |
+| **Step / form** | Each forecast step (Ask, Sources, Run, Sign-off, Brief), New exploration | A 720px reading column |
+| **Workspace** | The Graph tab; an exploration | The Graph tab keeps its header (breadcrumb, tabs, title) in the same 720px column as every step, so switching Brief ↔ Graph never moves it; the graph sits below, centred, at most 1080px wide. An exploration is full width: its lenses need the room. |
 
 ## List rows
 

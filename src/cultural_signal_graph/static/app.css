@@ -16,11 +16,12 @@ body {
 /* The top bar is the shared shell: see ui.css (.app-bar). */
 
 #app { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-/* the breadcrumb lines up with the page it sits on */
-/* Every step of a run shares one left edge beside the rail (breadcrumb, tabs, content),
-   so moving between steps or between Brief and Graph never shifts the page. The runs
-   list, with no rail, stays centred. */
-#layout:not(.no-rail) #canvas .canvas-narrow { margin-left: 0; }
+/* Every step's header (breadcrumb, tabs, title, lede) sits in the same centred 720px
+   column, so moving between steps or between Brief and Graph never moves it. Only the
+   Graph's canvas is wider: centred below the header, capped so it doesn't fill the
+   whole screen. */
+.canvas-crumbs { max-width: 720px; margin: 0 auto; }
+.graph-wrap { max-width: 1080px; margin: 0 auto; }
 #canvas:focus, #futures-canvas:focus { outline: none; }
 #layout { flex: 1; display: flex; min-height: 0; }
 
@@ -75,7 +76,7 @@ body {
 .rail-item.here { color: var(--ink); font-weight: 600; border-color: var(--accent); background: var(--accent-soft); }
 .rail-item.done.btn:not(:disabled):hover, .rail-item.active.btn:not(:disabled):hover { border-color: var(--accent-ring); background: var(--hover); }
 
-#canvas { flex: 1; overflow: auto; padding: 24px; }
+#canvas { flex: 1; overflow: auto; padding: 24px; scrollbar-gutter: stable; } /* a page that scrolls keeps the same centre */
 .canvas-narrow { max-width: 720px; margin: 0 auto; }
 
 h1 { font-size: var(--text-lg); margin: 0 0 4px; }
@@ -221,8 +222,9 @@ button.danger-active { background: var(--danger); border-color: var(--danger); c
 
 /* Graph tab: the embedded explorer fills the canvas */
 .graph-frame {
+  display: block;
   width: 100%;
-  height: calc(100vh - 150px);
+  height: max(420px, calc(100vh - 300px)); /* the rest of the screen below the header */
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--card);

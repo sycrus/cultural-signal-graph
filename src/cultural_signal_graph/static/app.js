@@ -726,7 +726,8 @@ function GraphView() {
     set({ futuresLayer: on, graphView: view });
   };
   const hash = graphView?.zoom ? `#zoom=${graphView.zoom.toFixed(3)}${graphView.focus ? `&focus=${encodeURIComponent(graphView.focus)}` : ""}` : "";
-  return html`<${ReviewTabs} active="graph" />
+  return html`<div class="canvas-narrow">
+    <${ReviewTabs} active="graph" />
     <${PageHead} title="Graph" lede="The run's evidence: sources, the signals drawn from them, and the entities they're about." />
     <div class="futures-toggle-row">
       <${Toggle} class="futures-toggle" label="Show futures layer" checked=${futuresLayer && !none} disabled=${!!none} onChange=${toggle}
@@ -735,8 +736,11 @@ function GraphView() {
         ? html`<span class="hint">No explorations on this run yet. <a href=${`/futures?run=${runId}`}>Start one in Futures →</a></span>`
         : html`<span class="hint">adds ${plural(f.projections, "projection")} from ${plural(f.explorations, "exploration")}</span>`}
     </div>
-    <iframe class="graph-frame" src=${`/runs/${runId}/graph.html${futuresLayer && !none ? "?futures_layer=true" : ""}${hash}`}
-      title="Graph explorer — search, layout, click-to-trace"></iframe>`;
+    </div>
+    <div class="graph-wrap">
+      <iframe class="graph-frame" src=${`/runs/${runId}/graph.html${futuresLayer && !none ? "?futures_layer=true" : ""}${hash}`}
+        title="Graph explorer — search, layout, click-to-trace"></iframe>
+    </div>`;
 }
 
 const VIEWS = { home: Home, ask: Ask, sources: Sources, run: Run, "sign-off": SignOff, brief: Brief, graph: GraphView };
