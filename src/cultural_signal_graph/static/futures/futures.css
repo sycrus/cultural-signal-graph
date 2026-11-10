@@ -144,7 +144,9 @@ blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--evi
 .anchor-card.rejected { text-decoration: line-through; opacity: .6; }
 
 /* --- lenses --------------------------------------------------------------------- */
-.lens-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.lens-bar { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border-soft); }
+.lens-bar .ui-tabs.line { border-bottom: 0; }
+.lens-bar .ui-tabs.soft { margin: 0 0 6px; }
 .lens-bar .spacer { flex: 1; }
 .wheel { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); display: flex; justify-content: center; padding: 8px; }
 .wheel-tools { position: absolute; top: 10px; left: 12px; }

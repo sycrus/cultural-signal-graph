@@ -52,6 +52,15 @@ a.btn:hover, label.btn:hover { border-color: var(--accent-ring); }
 .ui-tabs.soft button.on { background: var(--futures-soft); color: var(--futures-ink); font-weight: 600; text-shadow: var(--glow-text); }
 .ui-tabs.sm button { padding: 3px 9px; font-size: var(--text-sm); }
 .ui-tabs.solid.sm button { font-family: var(--font-data); text-transform: none; letter-spacing: 0; }
+/* "line": tabs within a page (Brief | Graph, the lenses). Lighter than the app bar's
+   Forecast | Futures switch (the only filled pill): no box, smaller type, the active
+   tab marked by ink and an underline in the mode's hue. */
+.ui-tabs.line { padding: 0; gap: 18px; background: none; border: 0; border-radius: 0; border-bottom: 1px solid var(--border-soft); display: flex; }
+.ui-tabs.line button { padding: 6px 0 7px; border-radius: 0; margin-bottom: -1px; border-bottom: 2px solid transparent;
+  font-family: var(--font-display); font-size: var(--text-sm); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--muted); }
+.ui-tabs.line button:not(.on):hover { background: none; color: var(--ink); border-bottom-color: var(--border); }
+.ui-tabs.line button.on { color: var(--ink); font-weight: 600; border-bottom-color: var(--accent); text-shadow: var(--glow-text); }
+:root[data-mode="futures"] .ui-tabs.line button.on { border-bottom-color: var(--futures); }
 
 /* --- Roller ------------------------------------------------------------------------ */
 .ui-roller { position: relative; height: 100%; }

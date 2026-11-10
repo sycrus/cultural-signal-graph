@@ -22,6 +22,17 @@ Every page has a level-1 head, including the Graph tab and an exploration (whose
 its goal). Hints say what something is or does; they are never the only place an action
 lives.
 
+## Tabs: three weights, one per level
+
+| Weight | Where | Look |
+|---|---|---|
+| **Solid** (filled pill) | Only the app bar's Forecast \| Futures switch: which app you are in | `AppBar` |
+| **Line** (underline) | Tabs within a page: Brief \| Graph, the futures lenses (Scroll, Wheel, Cone…) | `Tabs variant="line"`: no box, `--text-sm`, active in ink with an underline in the mode's hue |
+| **Soft** (tinted segment) | A choice inside a form or a toolbar: what to add, Fit / 1.5× / 2× / 3× | `Tabs variant="soft"` |
+
+A page's tabs never look like the mode switch: switching a lens is a smaller act than
+switching apps.
+
 ## Type scale
 
 `--text-mark` 9.5 · `--text-xs` 11 · `--text-sm` 12 · `--text-base` 14 · `--text-md` 15 ·

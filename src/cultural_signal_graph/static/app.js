@@ -196,7 +196,7 @@ function Placeholder({ title, note }) {
 }
 
 const REVIEW_TABS = [{ key: "brief", label: "Brief" }, { key: "graph", label: "Graph" }];
-const ReviewTabs = ({ active }) => html`<${Tabs} class="review-tabs" label="Review" value=${active} onChange=${showStage} items=${REVIEW_TABS} />`;
+const ReviewTabs = ({ active }) => html`<${Tabs} variant="line" class="review-tabs" label="Review" value=${active} onChange=${showStage} items=${REVIEW_TABS} />`;
 
 /* --- rail ---------------------------------------------------------------- */
 

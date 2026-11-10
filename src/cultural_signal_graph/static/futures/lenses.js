@@ -66,7 +66,7 @@ const outOfCone = (p) => p.tags?.cone?.value === "preposterous";
 /* Lenses with time on x can stretch the axis past the container and pan. */
 const SPREADS = [1, 1.5, 2, 3];
 function SpreadPicker() {
-  return html`<${Tabs} size="sm" label="Stretch the time axis" value=${S.spread.value}
+  return html`<${Tabs} variant="soft" size="sm" label="Stretch the time axis" value=${S.spread.value}
     onChange=${(sv) => (S.spread.value = sv)}
     items=${SPREADS.map((sv) => ({ key: sv, label: sv === 1 ? "Fit" : `${sv}×`,
       hint: sv === 1 ? "Fit the whole horizon" : `Stretch the time axis ${sv}× — pan left and right` }))} />`;
@@ -75,7 +75,7 @@ function SpreadPicker() {
 export function LensTabs() {
   const timeLens = ["scroll", "cone", "horizons", "pestle"].includes(S.lens.value);
   return html`<div class="lens-bar">
-    <${Tabs} label="Lens" value=${S.lens.value} onChange=${S.setLens}
+    <${Tabs} variant="line" label="Lens" value=${S.lens.value} onChange=${S.setLens}
       items=${LENSES.map((l) => ({ key: l.key, label: l.label, hint: l.hint }))} />
     ${timeLens ? html`<span class="spacer"></span><${SpreadPicker} />` : null}
   </div>`;
