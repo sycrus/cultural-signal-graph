@@ -18,10 +18,10 @@ hold the rules below.
 | 5 | Meta / hint | Barlow, `--text-sm`, muted: scope, dates, counts, explanations | `.hint`, `.list-row-scope` |
 | 6 | Uppercase label | Kode Mono, uppercase, tracked: tabs and the drawer kind only | |
 
-**Logotype.** A small mark in the graph's own grammar and colours (two cyan signals → a
-blue entity → a magenta projection) and "Cultural Signal Graph" in Barlow 600, sentence
-case. The mode switch sits apart from it, at the right, in plain sentence case, so it can't
-read as part of the name. Chosen from three in a prototype (branch `prototype/app-bar`).
+**Logotype.** A signal trace (a pulse on a flat line, in the accent hue, glowing in the
+dark theme) and "cultural signal graph" in lowercase Kode Mono. The mode switch sits
+apart from it, at the right, in plain sentence case, so it can't read as part of the
+name. Chosen from three in a prototype (branch `prototype/app-bar`, logotype C).
 
 Every page has a level-1 head, including the Graph tab and an exploration (whose title is
 its goal). Hints say what something is or does; they are never the only place an action

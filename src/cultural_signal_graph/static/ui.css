@@ -142,14 +142,12 @@ a.btn:hover, label.btn:hover { border-color: var(--accent-ring); }
 .mode-switch .disabled { opacity: .45; cursor: not-allowed; }
 .mode-switch a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* the logotype: mark + name (shell.js) */
+/* the logotype: signal trace + name (shell.js) */
 .logo { display: inline-flex; align-items: center; gap: 8px; }
-.logo-mark { width: 26px; height: 16px; }
-.logo-mark line { stroke: var(--border); stroke-width: 1.2; }
-.logo-mark .m-signal { fill: var(--evidence); }
-.logo-mark .m-entity { fill: var(--graph-entity); }
-.logo-mark .m-future { fill: var(--futures); }
-.logo-word { font-weight: 600; font-size: var(--text-md); color: var(--ink); letter-spacing: -.005em; }
+.logo-trace { width: 28px; height: 14px; }
+.logo-trace polyline { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round;
+  filter: drop-shadow(0 0 calc(var(--glow-on, 0) * 3px) var(--accent)); }
+.logo-word { font-family: var(--font-display); font-size: var(--text-base); color: var(--ink); letter-spacing: .02em; }
 .bar-button { font-size: var(--text-sm); padding: 4px 10px; }
 .app-bar .theme-switch { color: var(--muted); }
 .skip-link { position: absolute; left: 12px; top: -40px; padding: 6px 12px; background: var(--accent); color: var(--on-accent); border-radius: var(--radius-sm); z-index: 50; text-decoration: none; }

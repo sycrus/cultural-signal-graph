@@ -61,17 +61,13 @@ function Identity() {
 /* --- the bar ------------------------------------------------------------------- */
 
 /* --- logotype ----------------------------------------------------------------------
-   A small mark in the graph's own layered grammar and colours (two signals → an entity
-   → a projection: evidence growing into futures), then the name in Barlow. Chosen from
-   three in a prototype (branch prototype/app-bar). */
+   A signal trace (a pulse on a flat line: a signal picked out of the noise) and the
+   name in lowercase Kode Mono. Chosen from three in a prototype (branch
+   prototype/app-bar, logotype C). */
 function Logo() {
   return html`<span class="logo" aria-hidden="true">
-    <svg viewBox="0 0 26 16" class="logo-mark">
-      <line x1="4" y1="4" x2="13" y2="8" /><line x1="4" y1="12" x2="13" y2="8" /><line x1="13" y1="8" x2="22" y2="8" />
-      <rect x="1" y="2" width="6" height="4" rx="1" class="m-signal" /><rect x="1" y="10" width="6" height="4" rx="1" class="m-signal" />
-      <rect x="10" y="6" width="6" height="4" rx="1" class="m-entity" /><rect x="19" y="6" width="6" height="4" rx="1" class="m-future" />
-    </svg>
-    <span class="logo-word">Cultural Signal Graph</span>
+    <svg viewBox="0 0 28 14" class="logo-trace"><polyline points="0,7 6,7 9,2 13,12 17,4 20,7 28,7" /></svg>
+    <span class="logo-word">cultural signal graph</span>
   </span>`;
 }
 
