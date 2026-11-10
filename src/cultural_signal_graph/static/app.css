@@ -19,6 +19,8 @@ body {
 /* the breadcrumb lines up with the page it sits on */
 .canvas-crumbs { max-width: 720px; margin: 0 auto; }
 .canvas-crumbs.wide { max-width: none; }
+/* Brief and Graph share one left edge, so switching tabs never moves the tabs */
+.canvas-narrow.review { margin-left: 0; }
 #canvas:focus, #futures-canvas:focus { outline: none; }
 #layout { flex: 1; display: flex; min-height: 0; }
 
