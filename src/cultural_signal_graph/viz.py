@@ -96,7 +96,8 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="toolbar">
   <input id="search" type="text" placeholder="Search nodes…" />
   <button id="btn-fit" title="Fit graph to view">Fit</button>
-  <button id="btn-cose" title="Force-directed layout">Cose</button>
+  <button id="btn-layered" title="Columns, left to right: source → signal → entity → projections">Layered</button>
+  <button id="btn-cose" title="Force-directed layout">Force</button>
   <button id="btn-grid" title="Grid layout">Grid</button>
 </div>
 <div id="legend" class="floating">
@@ -237,13 +238,34 @@ function graphStyle() {
     { selector: 'edge[kind = "equivalence"]', style: { 'line-color': tok('--graph-equiv'), 'target-arrow-color': tok('--graph-equiv'), 'width': 2.5 } },
     { selector: 'edge[kind = "equivalence"][status != "real"]', style: { 'line-style': 'dashed', 'line-color': tok('--graph-equiv-pending'), 'target-arrow-color': tok('--graph-equiv-pending') } },
     { selector: 'edge[kind = "growsFrom"]', style: { 'line-color': tok('--futures-line'), 'target-arrow-color': tok('--futures-line'), 'line-style': 'dotted', 'width': 1.5 } },
+    // after the base edge rule, so the bend wins over its straight 'bezier'
+    { selector: 'edge[arc]', style: { 'curve-style': 'unbundled-bezier', 'control-point-distances': (e) => e.data('arc'), 'control-point-weights': 0.5 } },
     { selector: '.dimmed', style: { 'opacity': 0.12 } },
   ];
 }
 
-// Panels need room: strong repulsion and a large overlap penalty keep them apart.
-const COSE = { name: 'cose', fit: true, padding: 40, nodeRepulsion: 40000, idealEdgeLength: 170, nodeOverlap: 60,
-  componentSpacing: 120, gravity: 0.6, numIter: 2500 };
+// The alternative force layout (Force button): default spring settings, which keep
+// edges short; the separation pass below removes any overlap it leaves.
+const COSE = { name: 'cose', fit: true, padding: 40, numIter: 2500 };
+
+/* The default layout: columns read left to right in provenance order —
+   source → signal → entity, then the projections that grow from the evidence, order
+   by order. A layered (breadth-first) layout keeps edges short and the whole graph
+   about one screen tall; sources get their own column left of the signals they back,
+   so the links between entities never run through them. */
+function layered() {
+  cy.layout({
+    name: 'breadthfirst', directed: true, spacingFactor: 0.75, avoidOverlap: true, animate: false, fit: false,
+    transform: (n, p) => ({ x: p.y * 1.7, y: p.x * 0.42 }), // breadth-first is top-down: turn it to left-to-right
+  }).run();
+  cy.nodes('[kind = "source"]').forEach((src) => {
+    const backed = src.incomers('node');
+    if (!backed.length) return;
+    const left = Math.min(...backed.map((n) => n.position('x') - n.width() / 2));
+    const y = backed.reduce((sum, n) => sum + n.position('y'), 0) / backed.length;
+    src.position({ x: left - src.width() / 2 - 48, y });
+  });
+}
 // Never fit so far out that the words in the panels can't be read: past that,
 // sit at a readable zoom on the busiest entity and let the viewer pan.
 const READABLE = 0.8;
@@ -273,8 +295,53 @@ function separate() {
     if (!moved) break;
   }
 }
+/* An edge whose straight line would cross a panel bends around it: try a bow to
+   either side, growing until the curve clears every panel (or give up and stay
+   straight). Run after the positions settle. */
+function crossings(e, d) {
+  const s = e.source().position(), t = e.target().position();
+  const dx = t.x - s.x, dy = t.y - s.y, len = Math.hypot(dx, dy) || 1;
+  // Cytoscape's control-point-distances: positive bows to the left of source → target
+  const cx = (s.x + t.x) / 2 + (dy / len) * d, cy2 = (s.y + t.y) / 2 - (dx / len) * d;
+  let hits = 0;
+  cy.nodes(':visible').forEach((n) => {
+    if (n.same(e.source()) || n.same(e.target())) return;
+    const b = n.boundingBox({ includeLabels: false });
+    for (let k = 1; k < 24; k++) {
+      const u = k / 24, x = (1 - u) ** 2 * s.x + 2 * (1 - u) * u * cx + u * u * t.x, y = (1 - u) ** 2 * s.y + 2 * (1 - u) * u * cy2 + u * u * t.y;
+      if (x > b.x1 - 4 && x < b.x2 + 4 && y > b.y1 - 4 && y < b.y2 + 4) { hits++; return; }
+    }
+  });
+  return hits;
+}
+function arcAround() {
+  const want = [];
+  cy.edges().forEach((e) => {
+    e.removeData('arc');
+    if (!crossings(e, 0)) return;
+    for (const d of [80, 140, 200, 280, 380]) {
+      for (const side of [1, -1]) {
+        if (!crossings(e, d * side)) { e.data('arc', d * side); want.push(e); return; }
+      }
+    }
+  });
+  // Cytoscape measures some edges' bend from the other end, which flips the side.
+  // Once drawn, compare the real control point with the intended one and flip
+  // any that bent the wrong way.
+  if (want.length) cy.one('render', () => want.forEach((e) => {
+    const cp = (e.controlPoints() || [])[0];
+    if (!cp) return;
+    const s = e.source().position(), t = e.target().position();
+    const dx = t.x - s.x, dy = t.y - s.y, len = Math.hypot(dx, dy) || 1, d = e.data('arc');
+    const ix = (s.x + t.x) / 2 + (dy / len) * d, iy = (s.y + t.y) / 2 - (dx / len) * d;
+    const mx = (s.x + t.x) / 2 - (dy / len) * d, my = (s.y + t.y) / 2 + (dx / len) * d;
+    if (Math.hypot(cp.x - mx, cp.y - my) < Math.hypot(cp.x - ix, cp.y - iy)) e.data('arc', -d);
+  }));
+}
+
 function readableFit() {
   separate();
+  arcAround();
   cy.fit(undefined, 40);
   if (cy.zoom() >= READABLE) return;
   const hub = cy.nodes('[kind = "entity"]').max((n) => n.degree()).ele || cy.nodes()[0];
@@ -286,7 +353,7 @@ const cy = cytoscape({
   container: document.getElementById('cy'),
   elements: data,
   style: graphStyle(),
-  layout: { ...COSE, animate: false },
+  layout: { name: 'null' }, // laid out by layered() once the panels are sized
   // Gentle wheel zoom: ~9% per mouse-wheel notch (the default is ~10x that); a trackpad
   // sends many small steps, so it stays smooth. Bounded so panels never vanish or balloon.
   wheelSensitivity: 0.1,
@@ -346,6 +413,7 @@ function initialView() {
   const zoom = Number(want.get('zoom'));
   if (!zoom) return readableFit();
   separate();
+  arcAround();
   cy.zoom(Math.min(cy.maxZoom(), Math.max(cy.minZoom(), zoom)));
   const focus = want.get('focus') && cy.getElementById(want.get('focus'));
   if (focus && focus.length) cy.center(focus);
@@ -358,8 +426,12 @@ window.graphView = () => {
   const near = cy.nodes().min((n) => (n.position('x') - mid.x) ** 2 + (n.position('y') - mid.y) ** 2).ele;
   return { zoom: cy.zoom(), focus: near ? near.id() : null };
 };
-cy.ready(initialView);
+cy.ready(() => {
+  layered();
+  initialView();
+});
 document.getElementById('btn-fit').onclick = () => cy.fit(undefined, 30);
+document.getElementById('btn-layered').onclick = () => { layered(); readableFit(); };
 document.getElementById('btn-cose').onclick = () => cy.layout({ ...COSE, animate: false, stop: readableFit }).run();
 document.getElementById('btn-grid').onclick = () => cy.layout({ name: 'grid', animate: true, fit: true, padding: 30 }).run();
 </script>
