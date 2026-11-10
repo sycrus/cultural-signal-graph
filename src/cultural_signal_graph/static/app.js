@@ -18,7 +18,6 @@ const RAIL_STAGES = [
   { key: "sign-off", label: "Sign-off" },
   { key: "brief", label: "Brief" },
   { key: "graph", label: "Graph" },
-  { key: "metrics", label: "Metrics" },
 ];
 
 
@@ -32,7 +31,6 @@ const state = signal({
   busy: false,
   error: null,
   signoffDraft: {}, // edge id -> true(approve) | false(reject), before confirming
-  metrics: null, // the /metrics report for the open run
   futures: null, // {explorations, projections} on the open run, for the Graph tab's futures layer
   futuresLayer: false, // Graph tab: show exploration projections (hidden by default)
   graphView: null, // {zoom, focus} carried across the futures-layer reload
@@ -112,7 +110,6 @@ function railStates(snap) {
           : "blocked",
     brief: snap.status === "completed" ? "done" : done("draft") ? "active" : "blocked",
     graph: snap.status === "completed" ? "active" : "blocked",
-    metrics: snap.status === "completed" ? "active" : "blocked",
   };
 }
 
@@ -131,7 +128,6 @@ function showStage(key) {
   const st = railStates(snap)[key];
   if (st !== "done" && st !== "active" && st !== "action") key = currentStage(snap); // not reachable yet
   set({ view: key, error: null });
-  if (key === "metrics" && !get().metrics) fetchMetrics();
   if (key === "graph" && !get().futures) fetchFutures();
 }
 
@@ -142,19 +138,13 @@ async function fetchFutures() {
   set({ futures: { explorations: list.length, projections: list.reduce((n, e) => n + (e.projections || 0), 0) } });
 }
 
-async function fetchMetrics() {
-  const runId = get().runId;
-  const metrics = await api(`/api/runs/${runId}/metrics`).catch(() => null);
-  if (get().runId === runId) set({ metrics });
-}
 
 async function openRun(runId, step = null) {
   try {
     const snap = await api(`/api/runs/${runId}`);
     const st = step && railStates(snap)[step];
     const view = st === "done" || st === "active" || st === "action" ? step : currentStage(snap);
-    set({ snap, runId, signoffDraft: {}, metrics: null, futures: null, graphView: null, error: null, view });
-    if (get().view === "metrics") fetchMetrics();
+    set({ snap, runId, signoffDraft: {}, futures: null, graphView: null, error: null, view });
     if (get().view === "graph") fetchFutures();
   } catch (err) {
     fail(err);
@@ -204,7 +194,7 @@ function Placeholder({ title, note }) {
   </div>`;
 }
 
-const REVIEW_TABS = [{ key: "brief", label: "Brief" }, { key: "graph", label: "Graph" }, { key: "metrics", label: "Metrics" }];
+const REVIEW_TABS = [{ key: "brief", label: "Brief" }, { key: "graph", label: "Graph" }];
 const ReviewTabs = ({ active }) => html`<${Tabs} class="review-tabs" label="Review" value=${active} onChange=${showStage} items=${REVIEW_TABS} />`;
 
 /* --- rail ---------------------------------------------------------------- */
@@ -234,7 +224,7 @@ function Home() {
   return html`<div class="canvas-narrow">
     <h1>Forecast runs</h1>
     <p class="lede">Start a forecast by entering an ask — or reopen a past run to
-    audit its brief, graph, and metrics.</p>
+    read its brief and graph.</p>
     <${Panel} row>
       <${Button} variant="primary" onClick=${() => set({ view: "ask", error: null })}>New run<//>
       <span class="hint">Category, question, window, market.</span>
@@ -290,7 +280,7 @@ function Ask() {
         category: form.category || "tech", question: form.question,
         window_start: form.start || "2026-01-01", window_end: form.end || "2026-06-30", market: form.market || null,
       } });
-      set({ snap, runId: snap.id, view: "sources", error: null, signoffDraft: {}, metrics: null, futures: null });
+      set({ snap, runId: snap.id, view: "sources", error: null, signoffDraft: {}, futures: null });
     } catch (err) {
       fail(err);
     }
@@ -740,46 +730,7 @@ function GraphView() {
       title="Graph explorer — search, layout, click-to-trace"></iframe>`;
 }
 
-function Metrics() {
-  const m = get().metrics;
-  if (!m) {
-    return html`<div class="canvas-narrow"><${ReviewTabs} active="metrics" /><h1>Metrics</h1><${Panel} row><span class="spinner"></span> Loading metrics…<//></div>`;
-  }
-  const ev = m.eval;
-  const below = new Set(ev?.below_threshold || []);
-  const acc = m.accuracy;
-  return html`<div class="canvas-narrow">
-    <${ReviewTabs} active="metrics" />
-    <h1>Metrics</h1>
-    <p class="lede">How far to trust this run: eval scores gate regressions; prediction accuracy
-    is soft, lagging telemetry.</p>
-
-    <h2>Eval scores</h2>
-    <${Panel}>
-      ${!ev
-        ? html`<${EmptyState} compact title="Eval scores appear once the run is finalized." />`
-        : ev.scores == null
-          ? html`<div class="hint">${ev.reason}</div>`
-          : html`<div class="chips">${Object.entries(ev.scores).map(([metric, score]) => html`<${Chip} key=${metric}
-                tone=${below.has(metric) ? "danger" : "ok"} class="score-chip">${metric} ${score}${below.has(metric) ? " ⚠" : ""}<//>`)}</div>
-              <p class="hint">Scored against the golden case “${ev.case}” ${ev.scored_at || "at finalize"}
-              — the pipeline's correctness before your sign-off decisions. Below-threshold metrics are the regression gate.</p>`}
-    <//>
-
-    <h2>Prediction accuracy</h2>
-    <${Panel}>
-      ${!acc
-        ? html`<${EmptyState} compact title="Appears once the run is finalized." />`
-        : acc.accuracy == null
-          ? html`<div class="hint">${acc.trends_total} trends recorded, ${acc.checked} checked — accuracy is lagging
-              telemetry: it fills in as each trend is marked materialized later. Reported, never gating.</div>`
-          : html`<div class="metric-big">${Math.round(acc.accuracy * 100)}%</div>
-              <div class="hint">${acc.materialized} of ${acc.checked} checked trends materialized (${acc.trends_total} recorded).</div>`}
-    <//>
-  </div>`;
-}
-
-const VIEWS = { home: Home, ask: Ask, sources: Sources, run: Run, "sign-off": SignOff, brief: Brief, graph: GraphView, metrics: Metrics };
+const VIEWS = { home: Home, ask: Ask, sources: Sources, run: Run, "sign-off": SignOff, brief: Brief, graph: GraphView };
 
 /* --- shell ----------------------------------------------------------------- */
 
