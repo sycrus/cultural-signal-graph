@@ -1,0 +1,299 @@
+/* Design tokens (#46) — the one source for every color, radius, type size and motion
+   in the app: the stepper (app.css), futures mode (futures.css), the D3 views (they
+   are styled by class, so they read these too) and the Cytoscape Graph tab (viz.py
+   inlines this file and reads the --graph-* tokens at runtime).
+
+   Both themes are the same instrument with the power on or off. Light is a
+   reflective LCD: warm yellow-grey glass, near-black segments, the same rationed
+   hues (amber chrome, cyan evidence, magenta futures) darkened to read on it, and
+   a slight ink bleed. theme.js sets data-theme="dark" on <html> from the viewer's
+   choice or the system setting, which lights it up as the phosphor console.
+   Change a value here and it changes everywhere. */
+
+/* Barlow (SIL OFL 1.1, vendor/fonts/Barlow-OFL.txt): the reading face in both
+   themes, a compact, slightly squared grotesk that sits under Kode Mono. Latin subset. */
+@font-face {
+  font-family: "Barlow";
+  src: url("/static/vendor/fonts/Barlow-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("/static/vendor/fonts/Barlow-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("/static/vendor/fonts/Barlow-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow";
+  src: url("/static/vendor/fonts/Barlow-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Kode Mono (SIL OFL 1.1, vendor/fonts/KodeMono-OFL.txt): an angular monospace,
+   the display and data font in both themes. Variable weight, Latin subset.
+   viz.py swaps every vendored font url for a data: URI so the exported
+   graph.html stays offline. */
+@font-face {
+  font-family: "Kode Mono";
+  src: url("/static/vendor/fonts/KodeMono.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* --- type ------------------------------------------------------------------- */
+  --font-sans: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --font-display: "Kode Mono", var(--font-mono); /* brand, headings, uppercase labels */
+  --font-data: "Kode Mono", var(--font-mono);    /* years, orders, counts */
+  --tracking-label: .12em;         /* uppercase labels */
+
+  /* --- bleed: on the LCD, dark segments soak a little into the glass, with a faint
+     offset shadow; the dark theme turns the same tokens into phosphor glow --------- */
+  --glow-text: 0 0 3px color-mix(in srgb, currentColor 40%, transparent);
+  --glow-text-soft: 0 0 6px color-mix(in srgb, currentColor 18%, transparent);
+  --glow-text-strong: 1px 1px 0 color-mix(in srgb, currentColor 15%, transparent), 0 0 2px color-mix(in srgb, currentColor 55%, transparent), 0 0 8px color-mix(in srgb, currentColor 25%, transparent);
+  --glow-futures: 0 0 0 1px var(--futures), 0 0 10px color-mix(in srgb, var(--futures) 30%, transparent);
+  --glow-evidence: 0 0 8px color-mix(in srgb, var(--evidence) 20%, transparent);
+  --glow-line: drop-shadow(0 0 2px color-mix(in srgb, var(--futures) 60%, transparent));
+  --glow-on: 1;                    /* 0 or 1: scales glows built with calc() */
+  --opacity-faded: .55;            /* off-lineage cards: legible on the light glass */
+
+  /* --- shape ------------------------------------------------------------------ */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+
+  /* --- motion: the handscroll governs transitions (sliding windows) ------------- */
+  --ease-slide: cubic-bezier(.22, .61, .36, 1);
+  --dur-fast: .15s;
+  --dur-base: .25s;
+  --dur-slide: .35s;
+
+  /* --- surfaces & text -------------------------------------------------------- */
+  --bg: #d8d3b2;
+  --card: #e4e0c6;
+  --sunken: #cdc8a6;
+  --hover: #ebe8d2;
+  --border: #8c8768;
+  --border-soft: #a8a384;
+  --grid: #c8c3a0;
+  --ink: #0e0c05;
+  --ink-soft: #221f15;
+  --muted: #36331f;
+  --faint: #57523c;
+  --neutral-soft: #dcd8ba;
+  --neutral-chip: #c4bf9c;
+
+  /* --- interaction ------------------------------------------------------------ */
+  --accent: #613200;
+  --on-accent: #f3e7d0;
+  --accent-soft: #d4c79c;
+  --accent-tint: #d9c890;
+  --accent-ring: #a88a50;
+  --accent-ink: #4a2500;
+
+  /* --- status ----------------------------------------------------------------- */
+  --ok: #0d4824;
+  --ok-soft: #bfc8a2;
+  --ok-wash: #ccccaa;
+  --ok-line: #7f9a6c;
+  --ok-ink: #083a1c;
+  --warn: #6e2c00;
+  --warn-soft: #dbc19d;
+  --warn-wash: #d4c7a5;
+  --warn-line: #b8805a;
+  --warn-ink: #552100;
+  --danger: #7a0b21;
+  --on-danger: #f6e8ea;
+  --danger-soft: #dbbcab;
+  --danger-wash: #d3c3a7;
+  --danger-line: #bf7d76;
+  --danger-ink: #5e0718;
+
+  /* --- evidence palette: anchors, the audited side --------------------------- */
+  --evidence: #00444a;
+  --evidence-soft: #b3c6b4;
+  --evidence-line: #6a9a8c;
+  --evidence-ink: #003238;
+  --xedge: #18307a;          /* a cross-domain edge used as an anchor */
+  --xedge-soft: #bfc0b8;
+  --xedge-ink: #10235c;
+
+  /* --- futures palette: projections, the speculative side -------------------- */
+  --futures: #72075b;
+  --on-futures: #f9e6f4;
+  --futures-soft: #d8bcbc;
+  --futures-wash: #cec3a8;
+  --futures-faint: #d0b2b0;
+  --futures-line: #9a5384;
+  --futures-label: #612456;
+  --futures-grid: #c6bca0;
+  --futures-ink: #550043;
+  --baseline: #57523c;       /* the business-as-usual branch */
+
+  /* --- lens-tag palette: Three Horizons -------------------------------------- */
+  --h1: #3d3a2a;
+  --h1-soft: #bcb698;
+  --h1-ink: #2c2a1e;
+  --h2: #613200;
+  --h2-soft: #d9c890;
+  --h2-ink: #4a2500;
+  --h3: #72075b;
+  --h3-soft: #d8bcbc;
+  --h3-ink: #550043;
+
+  /* --- forecast Graph tab (Cytoscape) ---------------------------------------- */
+  --graph-entity: #18307a;
+  --graph-signal: #0d4824;
+  --graph-flagged: #7a0b21;
+  --graph-source: #57523c;
+  --graph-edge: #8c8768;
+  --graph-about: #2e4c9e;
+  --graph-equiv: #72075b;
+  --graph-equiv-pending: #9a5384;
+
+  /* --- elevation -------------------------------------------------------------- */
+  --shadow-sm: 0 1px 0 rgba(28, 26, 16, .12);
+  --shadow-md: 0 6px 16px rgba(28, 26, 16, .18);
+  --shadow-drawer: -8px 8px 24px rgba(28, 26, 16, .2);
+  --shadow-futures: 0 0 10px color-mix(in srgb, var(--futures) 25%, transparent);
+  --shadow-futures-lift: 0 0 16px color-mix(in srgb, var(--futures) 38%, transparent);
+
+  color-scheme: light;
+}
+
+/* --- Dark: the phosphor console --------------------------------------------------
+   Near-black glass, light that seems to come from the screen itself. Hue is
+   rationed: one chrome hue for the interface (sodium amber), one for evidence
+   (cyan), one for futures (magenta), and alerts. Everything else is told apart by
+   brightness, line style and glow, not by more colors. */
+
+:root[data-theme="dark"] {
+  --glow-text: 0 0 6px color-mix(in srgb, currentColor 55%, transparent);
+  --glow-text-soft: 0 0 10px color-mix(in srgb, currentColor 22%, transparent);
+  --glow-text-strong: 0 0 4px color-mix(in srgb, currentColor 70%, transparent), 0 0 14px color-mix(in srgb, currentColor 35%, transparent);
+  --glow-futures: 0 0 0 1px var(--futures), 0 0 16px color-mix(in srgb, var(--futures) 45%, transparent);
+  --glow-evidence: 0 0 12px color-mix(in srgb, var(--evidence) 22%, transparent);
+  --glow-line: drop-shadow(0 0 3px color-mix(in srgb, var(--futures) 80%, transparent));
+  --glow-on: 1;
+  --opacity-faded: .35;
+
+  --bg: #05070a;
+  --card: #0a0f14;
+  --sunken: #0d1318;
+  --hover: #101a21;
+  --border: #1e2b34;
+  --border-soft: #152029;
+  --grid: #0e171d;
+  --ink: #f1e6d2;
+  --ink-soft: #cdbfa6;
+  --muted: #8b8273;
+  --faint: #5e584e;
+  --neutral-soft: #121920;
+  --neutral-chip: #1a232b;
+
+  --accent: #ffb000;
+  --on-accent: #140b00;
+  --accent-soft: #211805;
+  --accent-tint: #2b2008;
+  --accent-ring: #5a4010;
+  --accent-ink: #ffc94d;
+
+  --ok: #5dff9a;
+  --ok-soft: #0a2215;
+  --ok-wash: #07180e;
+  --ok-line: #1c6a3e;
+  --ok-ink: #8dffb8;
+  --warn: #ff7a1a;
+  --warn-soft: #291305;
+  --warn-wash: #1d0e04;
+  --warn-line: #7a3a0c;
+  --warn-ink: #ffa463;
+  --danger: #ff3b5c;
+  --on-danger: #1a0007;
+  --danger-soft: #2a0a12;
+  --danger-wash: #1e070d;
+  --danger-line: #7d1a2c;
+  --danger-ink: #ff8098;
+
+  --evidence: #2ee6d6;
+  --evidence-soft: #062422;
+  --evidence-line: #116b64;
+  --evidence-ink: #8ff7ee;
+  --xedge: #6aa8ff;
+  --xedge-soft: #0b1931;
+  --xedge-ink: #b3d1ff;
+
+  --futures: #ff4fd8;
+  --on-futures: #1a0016;
+  --futures-soft: #280a24;
+  --futures-wash: #12060f;
+  --futures-faint: #461640;
+  --futures-line: #7a2a6c;
+  --futures-label: #c45bb0;
+  --futures-grid: #1b0b18;
+  --futures-ink: #ffb3ef;
+  --baseline: #5d6670;
+
+  --h1: #7f93a3;
+  --h1-soft: #15202a;
+  --h1-ink: #b9c9d6;
+  --h2: #ffb000;
+  --h2-soft: #2b2008;
+  --h2-ink: #ffd27a;
+  --h3: #ff4fd8;
+  --h3-soft: #280a24;
+  --h3-ink: #ffb3ef;
+
+  --graph-entity: #6aa8ff;
+  --graph-signal: #5dff9a;
+  --graph-flagged: #ff3b5c;
+  --graph-source: #5d6670;
+  --graph-edge: #233039;
+  --graph-about: #3d7fd9;
+  --graph-equiv: #ff4fd8;
+  --graph-equiv-pending: #a8379a;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .6);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, .6);
+  --shadow-drawer: -10px 10px 32px rgba(0, 0, 0, .7);
+  --shadow-futures: 0 0 14px color-mix(in srgb, var(--futures) 30%, transparent);
+  --shadow-futures-lift: 0 0 22px color-mix(in srgb, var(--futures) 45%, transparent);
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0s; --dur-base: 0s; --dur-slide: 0s; }
+}
+
+/* The theme switch (theme.js wires every [data-theme-toggle]). */
+.theme-toggle { font: inherit; font-size: 13px; padding: 3px 9px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--card); color: var(--muted); cursor: pointer; }
+.theme-toggle:hover { color: var(--ink); }
+[data-theme-pref="system"] .theme-toggle::after { content: "◐ Auto"; }
+[data-theme-pref="light"] .theme-toggle::after { content: "☀ Light"; }
+[data-theme-pref="dark"] .theme-toggle::after { content: "☾ Dark"; }
+
+/* Links take the chrome hue, not the browser's default blue. */
+a { color: var(--accent-ink); }
+a:visited { color: var(--accent-ink); }
