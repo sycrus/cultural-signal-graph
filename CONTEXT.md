@@ -178,3 +178,53 @@ _Avoid_: history, event log, undo stack
 **Stale**:
 A projection whose anchor or ancestor was edited, deleted, or rejected after it was generated. Marked, never auto-regenerated.
 _Avoid_: invalid, outdated
+
+### Workshop
+
+**Surface**:
+One product face of the futures engine, with its own defaults and affordances: the strategist surface (`PRD-futures.md`) or the workshop surface (`PRD-workshop.md`). Both share the engine (ADR-0012).
+_Avoid_: mode, app, tab
+
+**Workshop**:
+An exploration run in stages by a facilitator with participants, on one shared screen plus participants' phones. May grow from a forecast run or start from a goal alone (a thin run). Can span several sessions.
+_Avoid_: session (one sitting of a workshop), meeting
+
+**Session**:
+One sitting of a workshop, marked in the operation log, with its own join token.
+_Avoid_: workshop (the whole series)
+
+**Facilitator**:
+The person running a workshop: advances stages, sets the focus, accepts or rejects proposals, and is the only one who can undo.
+_Avoid_: moderator, host (the machine running the server), admin
+
+**Co-facilitator**:
+An optional helper who sorts the tray and parking lot. Can place and edit ideas, but cannot accept proposals or undo.
+_Avoid_: assistant, tray steward
+
+**Participant**:
+A person contributing to a workshop, identified by name and role/discipline from a list prepared in advance. Owns the ideas they submit.
+_Avoid_: user, attendee, stakeholder (a participant may or may not be one)
+
+**Idea**:
+What a participant contributes. Once placed on the Scroll it is a projection authored by that participant; until then it sits in the tray.
+_Avoid_: post-it, note (a Note is a human overlay on the forecast graph), sticky
+
+**Tray**:
+The pool of unplaced ideas beside the Scroll, including the parking lot.
+_Avoid_: inbox, backlog, board
+
+**Parking lot**:
+The part of the tray for ideas a participant marked as "Elsewhere", outside the current focus.
+_Avoid_: other, misc
+
+**Focus**:
+The prompt the facilitator pushes to phones (e.g. one branch's consequences). Phones show only the ideas in focus, and submissions are tagged with it.
+_Avoid_: topic, filter
+
+**Proposal**:
+Model output in a workshop (a candidate idea, a connection, or a placement for a tray item) awaiting the facilitator's accept or reject. Carries a reason, never a score; must trace to an anchor, an accepted idea or a reference, and credits the participant whose idea it builds on.
+_Avoid_: suggestion, recommendation, prediction
+
+**Synthesis**:
+The workshop take-away the model drafts from accepted ideas. Every sentence cites the ideas and authors it draws on; it reimagines nothing. Credited by name, role or anonymously, as the facilitator chooses.
+_Avoid_: summary, report (the forecast's output is the brief)
