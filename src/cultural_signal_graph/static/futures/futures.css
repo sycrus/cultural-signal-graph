@@ -85,7 +85,7 @@ svg.edges { position: absolute; top: 0; left: 0; pointer-events: none; overflow:
 .proj-node.assumption { border-left-color: var(--evidence); }
 .proj-node.selected { box-shadow: 0 0 0 2px var(--futures); }
 .proj-node.stale { background: repeating-linear-gradient(135deg, var(--card), var(--card) 6px, var(--sunken) 6px, var(--sunken) 12px); }
-.proj-node.faded, .anchor-card.faded { opacity: .35; }
+.proj-node.faded, .anchor-card.faded { opacity: var(--opacity-faded); }
 .proj-node.dimmed { opacity: .4; filter: grayscale(.8); }
 .proj-node.rolled { opacity: 0; pointer-events: none; }
 .proj-meta { display: flex; gap: 6px; align-items: center; font-size: 10.5px; color: var(--muted); }

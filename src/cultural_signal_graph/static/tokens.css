@@ -75,6 +75,7 @@
   --glow-evidence: 0 0 8px color-mix(in srgb, var(--evidence) 20%, transparent);
   --glow-line: drop-shadow(0 0 2px color-mix(in srgb, var(--futures) 60%, transparent));
   --glow-on: 1;                    /* 0 or 1: scales glows built with calc() */
+  --opacity-faded: .55;            /* off-lineage cards: legible on the light glass */
 
   /* --- shape ------------------------------------------------------------------ */
   --radius-sm: 6px;
@@ -89,87 +90,87 @@
   --dur-slide: .35s;
 
   /* --- surfaces & text -------------------------------------------------------- */
-  --bg: #c9c4a3;
-  --card: #d6d2b4;
-  --sunken: #bfba98;
-  --hover: #dfdbc0;
-  --border: #a29d7e;
-  --border-soft: #b4af8f;
-  --grid: #c1bc9b;
-  --ink: #1c1a10;
-  --ink-soft: #34311f;
-  --muted: #48442f;
-  --faint: #77725a;
-  --neutral-soft: #cfcaab;
-  --neutral-chip: #bdb896;
+  --bg: #d8d3b2;
+  --card: #e4e0c6;
+  --sunken: #cdc8a6;
+  --hover: #ebe8d2;
+  --border: #8c8768;
+  --border-soft: #a8a384;
+  --grid: #c8c3a0;
+  --ink: #0e0c05;
+  --ink-soft: #221f15;
+  --muted: #36331f;
+  --faint: #57523c;
+  --neutral-soft: #dcd8ba;
+  --neutral-chip: #c4bf9c;
 
   /* --- interaction ------------------------------------------------------------ */
-  --accent: #7a4200;
+  --accent: #613200;
   --on-accent: #f3e7d0;
   --accent-soft: #d4c79c;
   --accent-tint: #d9c890;
   --accent-ring: #a88a50;
-  --accent-ink: #5c3100;
+  --accent-ink: #4a2500;
 
   /* --- status ----------------------------------------------------------------- */
-  --ok: #155c31;
+  --ok: #0d4824;
   --ok-soft: #bfc8a2;
   --ok-wash: #ccccaa;
   --ok-line: #7f9a6c;
-  --ok-ink: #12502a;
-  --warn: #8a3600;
+  --ok-ink: #083a1c;
+  --warn: #6e2c00;
   --warn-soft: #dbc19d;
   --warn-wash: #d4c7a5;
   --warn-line: #b8805a;
-  --warn-ink: #6e2a00;
-  --danger: #960e2a;
+  --warn-ink: #552100;
+  --danger: #7a0b21;
   --on-danger: #f6e8ea;
   --danger-soft: #dbbcab;
   --danger-wash: #d3c3a7;
   --danger-line: #bf7d76;
-  --danger-ink: #750a20;
+  --danger-ink: #5e0718;
 
   /* --- evidence palette: anchors, the audited side --------------------------- */
-  --evidence: #005a62;
+  --evidence: #00444a;
   --evidence-soft: #b3c6b4;
   --evidence-line: #6a9a8c;
-  --evidence-ink: #003f45;
-  --xedge: #1f3f9a;          /* a cross-domain edge used as an anchor */
+  --evidence-ink: #003238;
+  --xedge: #18307a;          /* a cross-domain edge used as an anchor */
   --xedge-soft: #bfc0b8;
-  --xedge-ink: #142c70;
+  --xedge-ink: #10235c;
 
   /* --- futures palette: projections, the speculative side -------------------- */
-  --futures: #8e0b72;
+  --futures: #72075b;
   --on-futures: #f9e6f4;
   --futures-soft: #d8bcbc;
   --futures-wash: #cec3a8;
   --futures-faint: #d0b2b0;
-  --futures-line: #b4719a;
-  --futures-label: #7e3470;
+  --futures-line: #9a5384;
+  --futures-label: #612456;
   --futures-grid: #c6bca0;
-  --futures-ink: #6a0855;
-  --baseline: #77725a;       /* the business-as-usual branch */
+  --futures-ink: #550043;
+  --baseline: #57523c;       /* the business-as-usual branch */
 
   /* --- lens-tag palette: Three Horizons -------------------------------------- */
-  --h1: #504c38;
+  --h1: #3d3a2a;
   --h1-soft: #bcb698;
-  --h1-ink: #3f3c2a;
-  --h2: #7a4200;
+  --h1-ink: #2c2a1e;
+  --h2: #613200;
   --h2-soft: #d9c890;
-  --h2-ink: #5c3100;
-  --h3: #8e0b72;
+  --h2-ink: #4a2500;
+  --h3: #72075b;
   --h3-soft: #d8bcbc;
-  --h3-ink: #6a0855;
+  --h3-ink: #550043;
 
   /* --- forecast Graph tab (Cytoscape) ---------------------------------------- */
-  --graph-entity: #1f3f9a;
-  --graph-signal: #1d6b3a;
-  --graph-flagged: #960e2a;
-  --graph-source: #77725a;
-  --graph-edge: #a29d7e;
-  --graph-about: #3d5fb8;
-  --graph-equiv: #8e0b72;
-  --graph-equiv-pending: #b4719a;
+  --graph-entity: #18307a;
+  --graph-signal: #0d4824;
+  --graph-flagged: #7a0b21;
+  --graph-source: #57523c;
+  --graph-edge: #8c8768;
+  --graph-about: #2e4c9e;
+  --graph-equiv: #72075b;
+  --graph-equiv-pending: #9a5384;
 
   /* --- elevation -------------------------------------------------------------- */
   --shadow-sm: 0 1px 0 rgba(28, 26, 16, .12);
@@ -195,6 +196,7 @@
   --glow-evidence: 0 0 12px color-mix(in srgb, var(--evidence) 22%, transparent);
   --glow-line: drop-shadow(0 0 3px color-mix(in srgb, var(--futures) 80%, transparent));
   --glow-on: 1;
+  --opacity-faded: .35;
 
   --bg: #05070a;
   --card: #0a0f14;
