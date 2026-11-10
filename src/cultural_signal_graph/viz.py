@@ -29,6 +29,15 @@ def _read_cytoscape() -> str:
     """The vendored Cytoscape.js, inlined so graph.html works offline."""
     return (_STATIC_DIR / "cytoscape.min.js").read_text(encoding="utf-8")
 
+
+def _read_theme() -> tuple[str, str]:
+    """The design tokens and the theme switcher (#46), inlined for the same reason:
+    the graph's colors come from tokens.css, light or dark, like the rest of the app."""
+    return (
+        (_STATIC_DIR / "tokens.css").read_text(encoding="utf-8"),
+        (_STATIC_DIR / "theme.js").read_text(encoding="utf-8"),
+    )
+
 _ONTOLOGY_NAMESPACES = (CSG_NS, TECH_NS, GAMING_NS)
 
 _HTML_TEMPLATE = """<!DOCTYPE html>
@@ -36,26 +45,30 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <title>Cultural Signal Graph</title>
+<script>__THEME_JS__</script>
 <script>__CYTOSCAPE__</script>
+<style>__TOKENS_CSS__</style>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: var(--font-sans); background: var(--card); color: var(--ink); }
   #cy { width: 100%; height: 100%; display: block; }
-  #legend { position: absolute; top: 12px; left: 12px; background: #fff;
-    border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 12px; font-size: 12px; }
+  .floating { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); }
+  #legend { position: absolute; top: 12px; left: 12px; padding: 8px 12px; font-size: var(--text-sm); }
   #legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-  #detail { position: absolute; top: 12px; right: 12px; width: 300px; background: #fff;
-    border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.12); display: none; }
-  .notes { margin-top: 10px; border-top: 1px solid #e5e7eb; padding-top: 8px; }
-  .notes-title { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
-  .note { font-size: 12px; margin: 4px 0; white-space: pre-wrap; }
-  .note-meta { display: block; font-size: 10px; color: #9ca3af; }
+  #detail { position: absolute; top: 12px; right: 12px; width: 300px; padding: 12px; box-shadow: var(--shadow-md); display: none; }
+  #detail a { color: var(--accent); }
+  .notes { margin-top: 10px; border-top: 1px solid var(--border-soft); padding-top: 8px; }
+  .notes-title { font-size: var(--text-xs); color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+  .note { font-size: var(--text-sm); margin: 4px 0; white-space: pre-wrap; }
+  .note-meta { display: block; font-size: 10px; color: var(--faint); }
   .note-form { display: flex; gap: 4px; margin-top: 6px; }
-  .note-form input { font-size: 11px; padding: 3px 6px; border: 1px solid #d1d5db; border-radius: 4px; min-width: 0; }
-  .note-form button { font-size: 11px; padding: 3px 8px; border: 1px solid #d1d5db; background: #fff; border-radius: 4px; cursor: pointer; }
+  input, button { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--border); }
+  .note-form input { font-size: var(--text-xs); padding: 3px 6px; border-radius: 4px; min-width: 0; }
+  .note-form button { font-size: var(--text-xs); padding: 3px 8px; border-radius: 4px; cursor: pointer; }
   #toolbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
     display: flex; gap: 6px; align-items: center; }
-  #toolbar input { padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; width: 160px; }
-  #toolbar button { padding: 4px 8px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  #toolbar input { padding: 4px 8px; border-radius: var(--radius-sm); font-size: var(--text-sm); width: 160px; }
+  #toolbar button { padding: 4px 8px; border-radius: var(--radius-sm); font-size: var(--text-sm); cursor: pointer; }
+  #usage { position: absolute; bottom: 12px; left: 12px; padding: 8px 12px; font-size: var(--text-sm); }
 </style>
 </head>
 <body>
@@ -66,19 +79,19 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   <button id="btn-cose" title="Force-directed layout">Cose</button>
   <button id="btn-grid" title="Grid layout">Grid</button>
 </div>
-<div id="legend">
-  <div><span class="dot" style="background:#3b82f6"></span>entity</div>
-  <div><span class="dot" style="background:#22c55e"></span>signal (confident)</div>
-  <div><span class="dot" style="background:#ef4444"></span>signal (conflict/flag)</div>
-  <div><span class="dot" style="background:#9ca3af"></span>source</div>
+<div id="legend" class="floating">
+  <div><span class="dot" style="background:var(--graph-entity)"></span>entity</div>
+  <div><span class="dot" style="background:var(--graph-signal)"></span>signal (confident)</div>
+  <div><span class="dot" style="background:var(--graph-flagged)"></span>signal (conflict/flag)</div>
+  <div><span class="dot" style="background:var(--graph-source)"></span>source</div>
   <div style="margin-top:4px">dashed purple = gated cross-domain edge</div>
-  <div class="legend-futures" style="margin-top:4px; color:#7c3aed; display:none">&#9671; projection (futures layer, speculative)</div>
+  <div class="legend-futures" style="margin-top:4px; color:var(--futures); display:none">&#9671; projection (futures layer, speculative)</div>
 </div>
-<details id="usage" style="position:absolute; bottom:12px; left:12px; background:#fff; border:1px solid #d1d5db; border-radius:8px; padding:8px 12px; font-size:12px;">
+<details id="usage" class="floating">
   <summary>Usage</summary>
   __USAGE__
 </details>
-<div id="detail"></div>
+<div id="detail" class="floating"></div>
 <script>
 const data = __DATA__;
 const NOTES_URL = "__NOTES_URL__" || null;
@@ -134,27 +147,33 @@ if (data.nodes.some((n) => n.data.kind === 'projection')) {
   document.querySelector('.legend-futures').style.display = 'block';
 }
 
+// Every color comes from tokens.css; restyled when the theme switches.
+const tok = (name) => window.csgTheme.token(name);
+function graphStyle() {
+  return [
+    { selector: 'node', style: {
+      'label': 'data(label)', 'font-size': 9, 'text-valign': 'bottom', 'text-halign': 'center',
+      'text-wrap': 'ellipsis', 'text-max-width': '90px', 'color': tok('--ink')
+    }},
+    { selector: 'node[kind = "entity"]', style: { 'background-color': tok('--graph-entity'), 'shape': 'ellipse', 'width': 56, 'height': 56 } },
+    { selector: 'node[kind = "signal"]', style: { 'background-color': tok('--graph-signal'), 'shape': 'round-rectangle' } },
+    { selector: 'node[kind = "signal"][flagged = "true"]', style: { 'background-color': tok('--graph-flagged') } },
+    { selector: 'node[kind = "source"]', style: { 'background-color': tok('--graph-source'), 'shape': 'hexagon' } },
+    { selector: 'edge', style: { 'curve-style': 'bezier', 'width': 1.5, 'line-color': tok('--graph-edge'), 'target-arrow-shape': 'triangle', 'target-arrow-color': tok('--graph-edge') } },
+    { selector: 'edge[kind = "about"]', style: { 'line-color': tok('--graph-about'), 'target-arrow-color': tok('--graph-about'), 'width': 2 } },
+    { selector: 'edge[kind = "equivalence"]', style: { 'line-color': tok('--graph-equiv'), 'target-arrow-color': tok('--graph-equiv'), 'width': 2.5 } },
+    { selector: 'edge[kind = "equivalence"][status != "real"]', style: { 'line-style': 'dashed', 'line-color': tok('--graph-equiv-pending'), 'target-arrow-color': tok('--graph-equiv-pending') } },
+    { selector: 'node[kind = "projection"]', style: { 'background-color': tok('--futures-soft'), 'border-width': 2, 'border-color': tok('--futures'), 'shape': 'diamond', 'color': tok('--futures-ink') } },
+    { selector: 'node[kind = "reference"]', style: { 'background-color': tok('--card'), 'border-width': 2, 'border-style': 'dashed', 'border-color': tok('--evidence'), 'shape': 'round-rectangle' } },
+    { selector: 'edge[kind = "growsFrom"]', style: { 'line-color': tok('--futures-line'), 'target-arrow-color': tok('--futures-line'), 'line-style': 'dotted', 'width': 1.5 } },
+    { selector: '.dimmed', style: { 'opacity': 0.12 } },
+  ];
+}
+
 const cy = cytoscape({
   container: document.getElementById('cy'),
   elements: data,
-  style: [
-    { selector: 'node', style: {
-      'label': 'data(label)', 'font-size': 9, 'text-valign': 'bottom', 'text-halign': 'center',
-      'text-wrap': 'ellipsis', 'text-max-width': '90px', 'color': '#111827'
-    }},
-    { selector: 'node[kind = "entity"]', style: { 'background-color': '#3b82f6', 'shape': 'ellipse', 'width': 56, 'height': 56 } },
-    { selector: 'node[kind = "signal"]', style: { 'background-color': '#22c55e', 'shape': 'round-rectangle' } },
-    { selector: 'node[kind = "signal"][flagged = "true"]', style: { 'background-color': '#ef4444' } },
-    { selector: 'node[kind = "source"]', style: { 'background-color': '#9ca3af', 'shape': 'hexagon' } },
-    { selector: 'edge', style: { 'curve-style': 'bezier', 'width': 1.5, 'line-color': '#cbd5e1', 'target-arrow-shape': 'triangle', 'target-arrow-color': '#cbd5e1' } },
-    { selector: 'edge[kind = "about"]', style: { 'line-color': '#60a5fa', 'target-arrow-color': '#60a5fa', 'width': 2 } },
-    { selector: 'edge[kind = "equivalence"]', style: { 'line-color': '#a855f7', 'target-arrow-color': '#a855f7', 'width': 2.5 } },
-    { selector: 'edge[kind = "equivalence"][status != "real"]', style: { 'line-style': 'dashed', 'line-color': '#c084fc', 'target-arrow-color': '#c084fc' } },
-    { selector: 'node[kind = "projection"]', style: { 'background-color': '#ede9fe', 'border-width': 2, 'border-color': '#7c3aed', 'shape': 'diamond', 'color': '#5b21b6' } },
-    { selector: 'node[kind = "reference"]', style: { 'background-color': '#ffffff', 'border-width': 2, 'border-style': 'dashed', 'border-color': '#0f766e', 'shape': 'round-rectangle' } },
-    { selector: 'edge[kind = "growsFrom"]', style: { 'line-color': '#c4b5fd', 'target-arrow-color': '#c4b5fd', 'line-style': 'dotted', 'width': 1.5 } },
-    { selector: '.dimmed', style: { 'opacity': 0.12 } },
-  ],
+  style: graphStyle(),
   layout: { name: 'cose', animate: false, fit: true, padding: 30, nodeRepulsion: 6000, idealEdgeLength: 90 },
 });
 
@@ -199,6 +218,8 @@ document.getElementById('search').addEventListener('input', (e) => {
   cy.nodes().addClass('dimmed');
   cy.nodes().filter(n => (n.data('label') || '').toLowerCase().includes(q)).removeClass('dimmed');
 });
+
+window.addEventListener('csg-theme', () => cy.style(graphStyle()));
 
 document.getElementById('btn-fit').onclick = () => cy.fit(undefined, 30);
 document.getElementById('btn-cose').onclick = () => cy.layout({ name: 'cose', animate: true, fit: true, padding: 30 }).run();
@@ -311,7 +332,9 @@ def render_html(elements: dict, usage: dict | None = None, notes_url: str | None
 
     `notes_url` opts the page into the annotations overlay (#25); the exported
     artifact passes None so it stays self-contained."""
-    html = _HTML_TEMPLATE.replace("__DATA__", json.dumps(elements))
+    tokens_css, theme_js = _read_theme()
+    html = _HTML_TEMPLATE.replace("__TOKENS_CSS__", tokens_css).replace("__THEME_JS__", theme_js)
+    html = html.replace("__DATA__", json.dumps(elements))
     html = html.replace("__USAGE__", _usage_html(usage) if usage else "")
     html = html.replace("__NOTES_URL__", notes_url or "")
     return html.replace("__CYTOSCAPE__", _read_cytoscape())

@@ -50,6 +50,7 @@ function TopBar() {
       ? html`<span class="badge" title="Recorded outputs — no model, no network">fixture mode</span>`
       : null}
     <span class="spacer"></span>
+    <button class="theme-toggle" data-theme-toggle aria-label="Switch light / dark theme"></button>
     <${Identity} />
     ${S.view.value !== "list" && S.runId.value
       ? html`<button class="ghost" onClick=${S.showList}>← Explorations</button>`

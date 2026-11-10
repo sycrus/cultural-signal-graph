@@ -1,0 +1,219 @@
+/* Design tokens (#46) — the one source for every color, radius, type size and motion
+   in the app: the stepper (app.css), futures mode (futures.css), the D3 views (they
+   are styled by class, so they read these too) and the Cytoscape Graph tab (viz.py
+   inlines this file and reads the --graph-* tokens at runtime).
+
+   Light is the default; theme.js sets data-theme="dark" on <html> from the viewer's
+   choice or the system setting. Change a value here and it changes everywhere. */
+
+:root {
+  /* --- type ------------------------------------------------------------------- */
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 18px;
+
+  /* --- shape ------------------------------------------------------------------ */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+
+  /* --- motion: the handscroll governs transitions (sliding windows) ------------- */
+  --ease-slide: cubic-bezier(.22, .61, .36, 1);
+  --dur-fast: .15s;
+  --dur-base: .25s;
+  --dur-slide: .35s;
+
+  /* --- surfaces & text -------------------------------------------------------- */
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --sunken: #f9fafb;
+  --hover: #f0f4ff;
+  --border: #d1d5db;
+  --border-soft: #e5e7eb;
+  --grid: #f0f1f4;
+  --ink: #111827;
+  --ink-soft: #374151;
+  --muted: #6b7280;
+  --faint: #9ca3af;
+  --neutral-soft: #f3f4f6;
+  --neutral-chip: #e5e7eb;
+
+  /* --- interaction ------------------------------------------------------------ */
+  --accent: #3b82f6;
+  --on-accent: #ffffff;
+  --accent-soft: #eff6ff;
+  --accent-tint: #dbeafe;
+  --accent-ring: #bfdbfe;
+  --accent-ink: #1e40af;
+
+  /* --- status ----------------------------------------------------------------- */
+  --ok: #16a34a;
+  --ok-soft: #dcfce7;
+  --ok-wash: #f0fdf4;
+  --ok-line: #86efac;
+  --ok-ink: #166534;
+  --warn: #d97706;
+  --warn-soft: #fef3c7;
+  --warn-wash: #fffbeb;
+  --warn-line: #fcd34d;
+  --warn-ink: #92400e;
+  --danger: #dc2626;
+  --on-danger: #ffffff;
+  --danger-soft: #fee2e2;
+  --danger-wash: #fef2f2;
+  --danger-line: #fca5a5;
+  --danger-ink: #991b1b;
+
+  /* --- evidence palette: anchors, the audited side --------------------------- */
+  --evidence: #0f766e;
+  --evidence-soft: #ccfbf1;
+  --evidence-line: #99f6e4;
+  --evidence-ink: #134e4a;
+  --xedge: #4f46e5;          /* a cross-domain edge used as an anchor */
+  --xedge-soft: #e0e7ff;
+  --xedge-ink: #3730a3;
+
+  /* --- futures palette: projections, the speculative side -------------------- */
+  --futures: #7c3aed;
+  --on-futures: #ffffff;
+  --futures-soft: #ede9fe;
+  --futures-wash: #faf9ff;
+  --futures-faint: #ddd6fe;
+  --futures-line: #c4b5fd;
+  --futures-label: #a78bfa;
+  --futures-grid: #ece8fb;
+  --futures-ink: #4c1d95;
+  --baseline: #9ca3af;       /* the business-as-usual branch */
+
+  /* --- lens-tag palette: Three Horizons -------------------------------------- */
+  --h1: #64748b;
+  --h1-soft: #e2e8f0;
+  --h1-ink: #475569;
+  --h2: #d97706;
+  --h2-soft: #fde68a;
+  --h2-ink: #b45309;
+  --h3: #7c3aed;
+  --h3-soft: #ddd6fe;
+  --h3-ink: #6d28d9;
+
+  /* --- forecast Graph tab (Cytoscape) ---------------------------------------- */
+  --graph-entity: #3b82f6;
+  --graph-signal: #22c55e;
+  --graph-flagged: #ef4444;
+  --graph-source: #9ca3af;
+  --graph-edge: #cbd5e1;
+  --graph-about: #60a5fa;
+  --graph-equiv: #a855f7;
+  --graph-equiv-pending: #c084fc;
+
+  /* --- elevation -------------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgba(17, 24, 39, .05);
+  --shadow-md: 0 6px 18px rgba(17, 24, 39, .1);
+  --shadow-drawer: -8px 8px 28px rgba(17, 24, 39, .12);
+  --shadow-futures: 0 3px 10px rgba(124, 58, 237, .18);
+  --shadow-futures-lift: 0 6px 18px rgba(124, 58, 237, .3);
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f1115;
+  --card: #171a21;
+  --sunken: #1c2028;
+  --hover: #1b2230;
+  --border: #2f3541;
+  --border-soft: #272c36;
+  --grid: #1f232b;
+  --ink: #e6e8ec;
+  --ink-soft: #c4c9d2;
+  --muted: #9198a4;
+  --faint: #6b7280;
+  --neutral-soft: #222730;
+  --neutral-chip: #2b313c;
+
+  --accent: #60a5fa;
+  --on-accent: #0b1220;
+  --accent-soft: #172338;
+  --accent-tint: #1c2c47;
+  --accent-ring: #1e3a66;
+  --accent-ink: #93c5fd;
+
+  --ok: #22c55e;
+  --ok-soft: #12291c;
+  --ok-wash: #10211a;
+  --ok-line: #1f6b3d;
+  --ok-ink: #86efac;
+  --warn: #f59e0b;
+  --warn-soft: #2e2410;
+  --warn-wash: #241d0e;
+  --warn-line: #78530f;
+  --warn-ink: #fcd34d;
+  --danger: #f87171;
+  --on-danger: #1a0b0b;
+  --danger-soft: #351a1a;
+  --danger-wash: #2a1515;
+  --danger-line: #7f1d1d;
+  --danger-ink: #fca5a5;
+
+  --evidence: #2dd4bf;
+  --evidence-soft: #0f2e2b;
+  --evidence-line: #155e57;
+  --evidence-ink: #99f6e4;
+  --xedge: #818cf8;
+  --xedge-soft: #1e2140;
+  --xedge-ink: #c7d2fe;
+
+  --futures: #a78bfa;
+  --on-futures: #160f2a;
+  --futures-soft: #2a2140;
+  --futures-wash: #1c1828;
+  --futures-faint: #3d3260;
+  --futures-line: #5b4b8a;
+  --futures-label: #8b7bc8;
+  --futures-grid: #262038;
+  --futures-ink: #ddd6fe;
+  --baseline: #6b7280;
+
+  --h1: #94a3b8;
+  --h1-soft: #283241;
+  --h1-ink: #cbd5e1;
+  --h2: #f59e0b;
+  --h2-soft: #3a2c0c;
+  --h2-ink: #fcd34d;
+  --h3: #a78bfa;
+  --h3-soft: #2e2550;
+  --h3-ink: #c4b5fd;
+
+  --graph-entity: #60a5fa;
+  --graph-signal: #4ade80;
+  --graph-flagged: #f87171;
+  --graph-source: #6b7280;
+  --graph-edge: #3a4250;
+  --graph-about: #3b82f6;
+  --graph-equiv: #c084fc;
+  --graph-equiv-pending: #a855f7;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, .45);
+  --shadow-drawer: -8px 8px 28px rgba(0, 0, 0, .5);
+  --shadow-futures: 0 3px 10px rgba(167, 139, 250, .2);
+  --shadow-futures-lift: 0 6px 18px rgba(167, 139, 250, .3);
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0s; --dur-base: 0s; --dur-slide: 0s; }
+}
+
+/* The theme switch (theme.js wires every [data-theme-toggle]). */
+.theme-toggle { font: inherit; font-size: 13px; padding: 3px 9px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--card); color: var(--muted); cursor: pointer; }
+.theme-toggle:hover { color: var(--ink); }
+[data-theme-pref="system"] .theme-toggle::after { content: "◐ Auto"; }
+[data-theme-pref="light"] .theme-toggle::after { content: "☀ Light"; }
+[data-theme-pref="dark"] .theme-toggle::after { content: "☾ Dark"; }
