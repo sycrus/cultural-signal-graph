@@ -462,7 +462,7 @@ def create_app(
         usage_path = store.artifact_path(run_id, "usage.json")
         usage = json.loads(usage_path.read_text(encoding="utf-8")) if usage_path.is_file() else None
         return HTMLResponse(
-            render_html(elements, usage, notes_url=f"/api/runs/{run_id}/notes")
+            render_html(elements, usage, notes_url=f"/api/runs/{run_id}/notes"), headers=_NO_CACHE
         )
 
     return app
