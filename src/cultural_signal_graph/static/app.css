@@ -17,10 +17,10 @@ body {
 
 #app { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 /* the breadcrumb lines up with the page it sits on */
-.canvas-crumbs { max-width: 720px; margin: 0 auto; }
-.canvas-crumbs.wide { max-width: none; }
-/* Brief and Graph share one left edge, so switching tabs never moves the tabs */
-.canvas-narrow.review { margin-left: 0; }
+/* Every step of a run shares one left edge beside the rail (breadcrumb, tabs, content),
+   so moving between steps or between Brief and Graph never shifts the page. The runs
+   list, with no rail, stays centred. */
+#layout:not(.no-rail) #canvas .canvas-narrow { margin-left: 0; }
 #canvas:focus, #futures-canvas:focus { outline: none; }
 #layout { flex: 1; display: flex; min-height: 0; }
 

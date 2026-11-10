@@ -650,10 +650,10 @@ function Brief() {
   const { snap, runId } = get();
   const b = snap?.brief;
   if (!b) {
-    return html`<div class="canvas-narrow review"><${ReviewTabs} active="brief" />
+    return html`<div class="canvas-narrow"><${ReviewTabs} active="brief" />
       <h1>Brief</h1><${Panel}><${EmptyState} title="No brief yet">The brief appears once sign-off is resolved and drafting finishes.<//><//></div>`;
   }
-  return html`<div class="canvas-narrow review">
+  return html`<div class="canvas-narrow">
     <${ReviewTabs} active="brief" />
     <div class="brief-head">
       <h1>Forecast brief — ${b.category}</h1>
@@ -709,7 +709,7 @@ function Brief() {
 function GraphView() {
   const { snap, runId, futures: f, futuresLayer, graphView } = get();
   if (!snap || snap.status !== "completed") {
-    return html`<div class="canvas-narrow review"><${ReviewTabs} active="graph" />
+    return html`<div class="canvas-narrow"><${ReviewTabs} active="graph" />
       <h1>Graph</h1><${Panel}><${EmptyState} title="No graph yet">The graph explorer appears once the run completes.<//><//></div>`;
   }
   /* The futures layer adds this run's explorations to the graph; say what it adds,
@@ -745,7 +745,7 @@ function App() {
     <div id="layout" class=${view === "home" ? "no-rail" : ""}>
       <${Rail} />
       <main id="canvas" tabindex="-1">
-        ${view !== "home" ? html`<div class=${`canvas-crumbs ${REVIEW_TABS.some((t) => t.key === view) ? "wide" : ""}`}><${Crumbs} items=${[{ label: "Runs", href: "/", onClick: goHome }]} /></div>` : null}
+        ${view !== "home" ? html`<div class="canvas-crumbs"><${Crumbs} items=${[{ label: "Runs", href: "/", onClick: goHome }]} /></div>` : null}
         <${View} key=${`${view}:${runId}`} />
       </main>
     </div>
